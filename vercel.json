@@ -3,19 +3,5 @@
   "buildCommand": "cd tracking-checker && npm run build",
   "outputDirectory": "tracking-checker/.next",
   "installCommand": "cd tracking-checker && npm install",
-  "framework": "nextjs",
-  "functions": {
-    "tracking-checker/src/app/api/analyze/route.ts": {
-      "memory": 1024,
-      "maxDuration": 60
-    },
-    "tracking-checker/src/app/api/ai/analyze/route.ts": {
-      "memory": 512,
-      "maxDuration": 30
-    },
-    "tracking-checker/src/app/api/ai/chat/route.ts": {
-      "memory": 512,
-      "maxDuration": 30
-    }
-  }
+  "framework": "nextjs"
 }

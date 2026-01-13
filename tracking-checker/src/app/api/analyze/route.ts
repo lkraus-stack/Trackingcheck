@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyzeWebsite } from '@/lib/analyzer';
 import { AnalysisRequest } from '@/types';
 
+// Vercel Serverless Konfiguration
+export const maxDuration = 60; // 60 Sekunden Timeout
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body: AnalysisRequest = await request.json();
