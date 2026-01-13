@@ -308,6 +308,140 @@ function generateIssues(
     });
   }
 
+  // GTM über GTM geladen Info
+  if (trackingTags.googleAnalytics.loadedViaGTM) {
+    issues.push({
+      severity: 'info',
+      category: 'tracking',
+      title: 'Google Analytics über GTM geladen',
+      description: 'Google Analytics wird über den Google Tag Manager geladen.',
+      recommendation: 'Dies ist eine Best Practice für zentralisiertes Tag-Management.',
+    });
+  }
+
+  // Meta Pixel Erkennungsdetails
+  if (trackingTags.metaPixel.detected) {
+    const methods = trackingTags.metaPixel.detectionMethod.join(', ');
+    if (trackingTags.metaPixel.loadedViaGTM) {
+      issues.push({
+        severity: 'info',
+        category: 'tracking',
+        title: 'Meta Pixel über GTM erkannt',
+        description: `Der Meta Pixel wurde über den Google Tag Manager geladen. Erkennungsmethoden: ${methods}.`,
+        recommendation: 'Stellen Sie sicher, dass der Pixel erst nach Consent-Erteilung ausgelöst wird.',
+      });
+    }
+
+    if (trackingTags.metaPixel.hasMultiplePixels) {
+      issues.push({
+        severity: 'warning',
+        category: 'tracking',
+        title: 'Mehrere Meta Pixel IDs erkannt',
+        description: `Es wurden ${trackingTags.metaPixel.pixelIds.length} Pixel IDs gefunden: ${trackingTags.metaPixel.pixelIds.join(', ')}.`,
+        recommendation: 'Prüfen Sie, ob alle Pixel IDs notwendig sind oder ob doppelte Events ausgelöst werden.',
+      });
+    }
+  }
+
+  // Server-Side Tracking Issues
+  if (trackingTags.serverSideTracking.detected) {
+    const summary = trackingTags.serverSideTracking.summary;
+    
+    // Server-Side GTM
+    if (summary.hasServerSideGTM) {
+      issues.push({
+        severity: 'info',
+        category: 'tracking',
+        title: 'Server-Side Google Tag Manager erkannt',
+        description: 'Es wurde ein Server-Side GTM Setup erkannt. Dies verbessert die Datenqualität und reduziert Client-Side Blocking.',
+        recommendation: 'Stellen Sie sicher, dass auch Server-Side Tags Consent-Signale respektieren.',
+      });
+    }
+
+    // Meta Conversions API
+    if (summary.hasMetaCAPI) {
+      issues.push({
+        severity: 'info',
+        category: 'tracking',
+        title: 'Meta Conversions API (CAPI) erkannt',
+        description: 'Server-Side Tracking für Meta/Facebook wurde erkannt. Dies verbessert die Attribution und Event-Qualität.',
+        recommendation: 'Implementieren Sie Event-Deduplizierung zwischen Browser-Pixel und Server-API.',
+      });
+    }
+
+    // First-Party Proxies
+    if (summary.hasFirstPartyProxy) {
+      const endpoints = trackingTags.serverSideTracking.firstPartyEndpoints;
+      issues.push({
+        severity: 'info',
+        category: 'tracking',
+        title: 'First-Party Tracking Proxy erkannt',
+        description: `Es wurden ${endpoints.length} First-Party Endpoint(s) für Tracking erkannt.`,
+        recommendation: 'First-Party Tracking kann Ad-Blocker umgehen, erfordert aber besondere DSGVO-Aufmerksamkeit.',
+      });
+    }
+
+    // TikTok Events API
+    if (summary.hasTikTokEventsAPI) {
+      issues.push({
+        severity: 'info',
+        category: 'tracking',
+        title: 'TikTok Events API erkannt',
+        description: 'Server-Side Tracking für TikTok wurde erkannt.',
+        recommendation: 'Stellen Sie sicher, dass Server-Side Events mit Consent-Status synchronisiert sind.',
+      });
+    }
+
+    // LinkedIn CAPI
+    if (summary.hasLinkedInCAPI) {
+      issues.push({
+        severity: 'info',
+        category: 'tracking',
+        title: 'LinkedIn Conversions API erkannt',
+        description: 'Server-Side Tracking für LinkedIn wurde erkannt.',
+        recommendation: 'Implementieren Sie Event-Deduplizierung zwischen Insight Tag und Conversions API.',
+      });
+    }
+
+    // Detaillierte Server-Side Indikatoren
+    for (const indicator of trackingTags.serverSideTracking.indicators) {
+      if (indicator.confidence === 'high' && indicator.evidence.length > 0) {
+        issues.push({
+          severity: 'info',
+          category: 'tracking',
+          title: `Server-Side Tracking: ${indicator.description}`,
+          description: `Evidenz: ${indicator.evidence.slice(0, 2).join('; ')}`,
+          recommendation: 'Server-Side Tracking erfordert besondere Datenschutz-Dokumentation.',
+        });
+      }
+    }
+  }
+
+  // GTM Container Issues
+  if (trackingTags.googleTagManager.hasMultipleContainers) {
+    issues.push({
+      severity: 'warning',
+      category: 'tracking',
+      title: 'Mehrere GTM Container erkannt',
+      description: `Es wurden ${trackingTags.googleTagManager.containerIds.length} GTM Container gefunden: ${trackingTags.googleTagManager.containerIds.join(', ')}.`,
+      recommendation: 'Konsolidieren Sie Container wenn möglich, um Konflikte und doppelte Tags zu vermeiden.',
+    });
+  }
+
+  // Server-Side GTM im GTM Ergebnis
+  if (trackingTags.googleTagManager.serverSideGTM?.detected) {
+    const sgtm = trackingTags.googleTagManager.serverSideGTM;
+    issues.push({
+      severity: 'info',
+      category: 'tracking',
+      title: 'Server-Side GTM Endpoint',
+      description: sgtm.isFirstParty 
+        ? `First-Party sGTM auf ${sgtm.domain || 'eigener Domain'} erkannt.`
+        : 'Server-Side GTM wurde erkannt.',
+      recommendation: 'Dokumentieren Sie den Server-Side Datenfluss in Ihrer Datenschutzerklärung.',
+    });
+  }
+
   // Marketing-Parameter Monitoring
   if (trackingTags.marketingParameters.any) {
     const activeParams = Object.entries(trackingTags.marketingParameters)

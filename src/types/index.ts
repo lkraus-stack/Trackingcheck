@@ -77,27 +77,39 @@ export interface TrackingTagsResult {
     measurementIds: string[];
     hasMultipleMeasurementIds: boolean;
     hasLegacyUA: boolean;
+    loadedViaGTM: boolean;
   };
   googleTagManager: {
     detected: boolean;
     containerId?: string;
+    containerIds: string[];
+    hasMultipleContainers: boolean;
+    serverSideGTM?: ServerSideGTMResult;
   };
   metaPixel: {
     detected: boolean;
     pixelId?: string;
+    pixelIds: string[];
+    hasMultiplePixels: boolean;
+    loadedViaGTM: boolean;
+    detectionMethod: ('script' | 'network' | 'window' | 'dataLayer')[];
+    serverSide?: MetaServerSideResult;
   };
   linkedInInsight: {
     detected: boolean;
     partnerId?: string;
+    loadedViaGTM: boolean;
   };
   tiktokPixel: {
     detected: boolean;
     pixelId?: string;
+    loadedViaGTM: boolean;
   };
   other: Array<{
     name: string;
     detected: boolean;
     identifier?: string;
+    loadedViaGTM?: boolean;
   }>;
   marketingParameters: {
     gclid: boolean;
@@ -109,6 +121,47 @@ export interface TrackingTagsResult {
     utm: boolean;
     any: boolean;
   };
+  serverSideTracking: ServerSideTrackingResult;
+}
+
+export interface ServerSideGTMResult {
+  detected: boolean;
+  endpoint?: string;
+  isFirstParty: boolean;
+  domain?: string;
+}
+
+export interface MetaServerSideResult {
+  detected: boolean;
+  hasConversionsAPI: boolean;
+  eventIds: string[];
+  indicators: string[];
+}
+
+export interface ServerSideTrackingResult {
+  detected: boolean;
+  indicators: ServerSideIndicator[];
+  firstPartyEndpoints: FirstPartyEndpoint[];
+  summary: {
+    hasServerSideGTM: boolean;
+    hasMetaCAPI: boolean;
+    hasFirstPartyProxy: boolean;
+    hasTikTokEventsAPI: boolean;
+    hasLinkedInCAPI: boolean;
+  };
+}
+
+export interface ServerSideIndicator {
+  type: 'sgtm' | 'meta_capi' | 'tiktok_events_api' | 'linkedin_capi' | 'first_party_proxy' | 'custom_endpoint';
+  confidence: 'high' | 'medium' | 'low';
+  description: string;
+  evidence: string[];
+}
+
+export interface FirstPartyEndpoint {
+  url: string;
+  type: 'gtm' | 'analytics' | 'pixel' | 'unknown';
+  originalService?: string;
 }
 
 export interface CookieResult {

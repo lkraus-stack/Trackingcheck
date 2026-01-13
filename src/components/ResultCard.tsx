@@ -13,9 +13,13 @@ import {
   Tag,
   BarChart3,
   ExternalLink,
+  Download,
+  Server,
+  Zap,
 } from 'lucide-react';
 import { AnalysisResult, Issue } from '@/types';
 import { AIAnalysis } from './AIAnalysis';
+import { exportAnalysisToPDF } from '@/lib/pdf/exportToPdf';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -26,6 +30,7 @@ export function ResultCard({ result }: ResultCardProps) {
     cookieBanner: true,
     googleConsentMode: true,
     tracking: false,
+    serverSide: false,
     cookies: false,
     issues: true,
   });
@@ -326,16 +331,25 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* KI-Analyse */}
       <AIAnalysis result={result} />
 
-      {/* Link zur Website */}
-      <a
-        href={result.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
-        Website öffnen
-      </a>
+      {/* Actions */}
+      <div className="flex gap-3 pt-2">
+        <button
+          onClick={() => exportAnalysisToPDF(result)}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-medium transition-all"
+        >
+          <Download className="w-4 h-4" />
+          PDF Export
+        </button>
+        <a
+          href={result.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Website öffnen
+        </a>
+      </div>
     </div>
   );
 }
