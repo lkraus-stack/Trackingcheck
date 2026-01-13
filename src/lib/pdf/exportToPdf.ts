@@ -31,7 +31,7 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
   yPos += 10;
 
   // Score
-  checkPageBreak(20);
+  checkPageBreak(30);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.text('Compliance Score', margin, yPos);
@@ -41,6 +41,12 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
   doc.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
   doc.text(`${result.score}/100`, margin, yPos);
   doc.setTextColor(0, 0, 0);
+  
+  // GDPR Score
+  if (result.gdprChecklist) {
+    doc.setFontSize(12);
+    doc.text(`DSGVO: ${result.gdprChecklist.score}%`, margin + 50, yPos);
+  }
   yPos += 15;
 
   // Cookie Banner Section
@@ -64,8 +70,42 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
   doc.text(`Einstellungen: ${result.cookieBanner.hasSettingsOption ? 'Ja' : 'Nein'}`, margin, yPos);
   yPos += 10;
 
+  // Cookie Consent Test
+  if (result.cookieConsentTest) {
+    checkPageBreak(40);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Cookie-Consent Test', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const test = result.cookieConsentTest;
+    
+    if (test.analysis.trackingBeforeConsent) {
+      doc.setTextColor(211, 47, 47);
+      doc.text('WARNUNG: Tracking-Cookies vor Einwilligung erkannt!', margin, yPos);
+      doc.setTextColor(0, 0, 0);
+      yPos += 5;
+    }
+    
+    doc.text(`Vor Consent: ${test.beforeConsent.cookieCount} Cookies`, margin, yPos);
+    yPos += 5;
+    doc.text(`Nach Akzeptieren: ${test.afterAccept.cookieCount} Cookies (+${test.afterAccept.newCookies.length} neue)`, margin, yPos);
+    yPos += 5;
+    doc.text(`Nach Ablehnen: ${test.afterReject.cookieCount} Cookies (+${test.afterReject.newCookies.length} neue)`, margin, yPos);
+    yPos += 5;
+    
+    if (test.analysis.consentWorksProperly && test.analysis.rejectWorksProperly) {
+      doc.setTextColor(46, 125, 50);
+      doc.text('Consent-Mechanismus funktioniert korrekt', margin, yPos);
+      doc.setTextColor(0, 0, 0);
+    }
+    yPos += 10;
+  }
+
   // Google Consent Mode
-  checkPageBreak(30);
+  checkPageBreak(40);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text('Google Consent Mode', margin, yPos);
@@ -78,29 +118,29 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     doc.text(`Version: ${result.googleConsentMode.version}`, margin, yPos);
     yPos += 5;
   }
+  if (result.googleConsentMode.updateConsent?.detected) {
+    doc.text(`Update-Funktion: Ja (${result.googleConsentMode.updateConsent.updateTrigger || 'Unbekannt'})`, margin, yPos);
+    yPos += 5;
+  }
   doc.text('Parameter:', margin, yPos);
   yPos += 5;
   Object.entries(result.googleConsentMode.parameters).forEach(([key, value]) => {
-    doc.text(`  • ${key}: ${value ? '✓' : '✗'}`, margin + 5, yPos);
-    yPos += 5;
+    doc.text(`  ${key}: ${value ? 'Ja' : 'Nein'}`, margin + 5, yPos);
+    yPos += 4;
   });
   yPos += 5;
 
   // TCF
   if (result.tcf.detected) {
-    checkPageBreak(20);
+    checkPageBreak(25);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('IAB TCF', margin, yPos);
     yPos += 8;
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Erkannt: Ja`, margin, yPos);
+    doc.text(`Version: ${result.tcf.version || 'Unbekannt'}`, margin, yPos);
     yPos += 5;
-    if (result.tcf.version) {
-      doc.text(`Version: ${result.tcf.version}`, margin, yPos);
-      yPos += 5;
-    }
     if (result.tcf.cmpName) {
       doc.text(`CMP: ${result.tcf.cmpName}`, margin, yPos);
       yPos += 5;
@@ -110,7 +150,7 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
   }
 
   // Tracking Tags
-  checkPageBreak(40);
+  checkPageBreak(60);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text('Tracking Tags', margin, yPos);
@@ -119,16 +159,22 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
   doc.setFont('helvetica', 'normal');
 
   const trackingTags = [
-    { name: 'Google Analytics', detected: result.trackingTags.googleAnalytics.detected, id: result.trackingTags.googleAnalytics.measurementId },
+    { name: 'Google Analytics', detected: result.trackingTags.googleAnalytics.detected, id: result.trackingTags.googleAnalytics.measurementId, version: result.trackingTags.googleAnalytics.version },
     { name: 'Google Tag Manager', detected: result.trackingTags.googleTagManager.detected, id: result.trackingTags.googleTagManager.containerId },
+    { name: 'Google Ads', detected: result.trackingTags.googleAdsConversion?.detected, id: result.trackingTags.googleAdsConversion?.conversionId },
     { name: 'Meta Pixel', detected: result.trackingTags.metaPixel.detected, id: result.trackingTags.metaPixel.pixelId },
     { name: 'LinkedIn Insight', detected: result.trackingTags.linkedInInsight.detected, id: result.trackingTags.linkedInInsight.partnerId },
     { name: 'TikTok Pixel', detected: result.trackingTags.tiktokPixel.detected, id: result.trackingTags.tiktokPixel.pixelId },
+    { name: 'Pinterest Tag', detected: result.trackingTags.pinterestTag?.detected, id: result.trackingTags.pinterestTag?.tagId },
+    { name: 'Snapchat Pixel', detected: result.trackingTags.snapchatPixel?.detected, id: result.trackingTags.snapchatPixel?.pixelId },
+    { name: 'Twitter/X Pixel', detected: result.trackingTags.twitterPixel?.detected, id: result.trackingTags.twitterPixel?.pixelId },
+    { name: 'Bing Ads', detected: result.trackingTags.bingAds?.detected, id: result.trackingTags.bingAds?.tagId },
   ];
 
   trackingTags.forEach(tag => {
     if (tag.detected) {
-      doc.text(`✓ ${tag.name}${tag.id ? ` (${tag.id})` : ''}`, margin, yPos);
+      checkPageBreak(5);
+      doc.text(`${tag.name}${tag.id ? ` (${tag.id})` : ''}${tag.version ? ` - ${tag.version}` : ''}`, margin, yPos);
       yPos += 5;
     }
   });
@@ -140,14 +186,61 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     yPos += 5;
     doc.setFont('helvetica', 'normal');
     result.trackingTags.other.forEach(tag => {
-      doc.text(`  • ${tag.name}`, margin + 5, yPos);
+      checkPageBreak(5);
+      doc.text(`  ${tag.name}`, margin + 5, yPos);
       yPos += 5;
     });
   }
-  yPos += 10;
+
+  // Server-Side Tracking
+  if (result.trackingTags.serverSideTracking.detected) {
+    yPos += 3;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Server-Side Tracking:', margin, yPos);
+    yPos += 5;
+    doc.setFont('helvetica', 'normal');
+    
+    const sst = result.trackingTags.serverSideTracking.summary;
+    if (sst.hasServerSideGTM) doc.text('  Server-Side GTM', margin + 5, yPos), yPos += 5;
+    if (sst.hasMetaCAPI) doc.text('  Meta Conversions API', margin + 5, yPos), yPos += 5;
+    if (sst.hasCookieBridging) doc.text('  Cookie Bridging', margin + 5, yPos), yPos += 5;
+  }
+  yPos += 5;
+
+  // E-Commerce
+  if (result.dataLayerAnalysis?.ecommerce?.detected) {
+    checkPageBreak(40);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('E-Commerce Tracking', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const ecom = result.dataLayerAnalysis.ecommerce;
+    doc.text(`Plattform: ${ecom.platform?.toUpperCase() || 'Unbekannt'}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Wertübergabe: ${ecom.valueTracking.hasTransactionValue ? 'Ja' : 'Nein'}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Währung: ${ecom.valueTracking.hasCurrency ? 'Ja' : 'Nein'}`, margin, yPos);
+    yPos += 5;
+    
+    if (ecom.events.length > 0) {
+      doc.text(`Events: ${ecom.events.map(e => e.name).join(', ')}`, margin, yPos);
+      yPos += 5;
+    }
+    
+    if (ecom.valueTracking.missingRecommended.length > 0) {
+      doc.setTextColor(237, 108, 2);
+      doc.text(`Fehlende Parameter: ${ecom.valueTracking.missingRecommended.join(', ')}`, margin, yPos);
+      doc.setTextColor(0, 0, 0);
+      yPos += 5;
+    }
+    yPos += 5;
+  }
 
   // Cookies Summary
-  checkPageBreak(30);
+  checkPageBreak(35);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text('Cookies', margin, yPos);
@@ -162,16 +255,83 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     functional: result.cookies.filter(c => c.category === 'functional').length,
     analytics: result.cookies.filter(c => c.category === 'analytics').length,
     marketing: result.cookies.filter(c => c.category === 'marketing').length,
+    unknown: result.cookies.filter(c => c.category === 'unknown').length,
   };
 
-  doc.text(`Notwendig: ${cookieCategories.necessary}`, margin, yPos);
-  yPos += 5;
-  doc.text(`Funktional: ${cookieCategories.functional}`, margin, yPos);
-  yPos += 5;
-  doc.text(`Analytics: ${cookieCategories.analytics}`, margin, yPos);
-  yPos += 5;
-  doc.text(`Marketing: ${cookieCategories.marketing}`, margin, yPos);
+  doc.text(`Notwendig: ${cookieCategories.necessary} | Funktional: ${cookieCategories.functional} | Analytics: ${cookieCategories.analytics} | Marketing: ${cookieCategories.marketing}`, margin, yPos);
   yPos += 10;
+
+  // Third-Party Domains
+  if (result.thirdPartyDomains) {
+    checkPageBreak(30);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Third-Party Domains', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    doc.text(`Gesamt: ${result.thirdPartyDomains.totalCount}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Advertising: ${result.thirdPartyDomains.categories.advertising} | Analytics: ${result.thirdPartyDomains.categories.analytics} | Social: ${result.thirdPartyDomains.categories.social}`, margin, yPos);
+    yPos += 5;
+    
+    if (result.thirdPartyDomains.riskAssessment.highRiskDomains.length > 0) {
+      doc.setTextColor(211, 47, 47);
+      doc.text(`Hochrisiko: ${result.thirdPartyDomains.riskAssessment.highRiskDomains.join(', ')}`, margin, yPos);
+      doc.setTextColor(0, 0, 0);
+      yPos += 5;
+    }
+    yPos += 5;
+  }
+
+  // GDPR Checklist
+  if (result.gdprChecklist) {
+    checkPageBreak(50);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`DSGVO-Checkliste (Score: ${result.gdprChecklist.score}%)`, margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    doc.text(`Bestanden: ${result.gdprChecklist.summary.passed} | Fehler: ${result.gdprChecklist.summary.failed} | Warnungen: ${result.gdprChecklist.summary.warnings}`, margin, yPos);
+    yPos += 8;
+    
+    // Failed checks
+    const failedChecks = result.gdprChecklist.checks.filter(c => c.status === 'failed');
+    if (failedChecks.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Kritische Probleme:', margin, yPos);
+      yPos += 5;
+      doc.setFont('helvetica', 'normal');
+      
+      failedChecks.slice(0, 5).forEach(check => {
+        checkPageBreak(10);
+        doc.setTextColor(211, 47, 47);
+        doc.text(`  ${check.title}`, margin + 5, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 5;
+      });
+    }
+    yPos += 5;
+  }
+
+  // DMA Check
+  if (result.dmaCheck?.applicable) {
+    checkPageBreak(30);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DMA-Compliance', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    doc.text(`Gatekeeper: ${result.dmaCheck.gatekeepersDetected.join(', ')}`, margin, yPos);
+    yPos += 5;
+    doc.text(`Konform: ${result.dmaCheck.summary.compliant} | Nicht konform: ${result.dmaCheck.summary.nonCompliant} | Prüfung erforderlich: ${result.dmaCheck.summary.requiresReview}`, margin, yPos);
+    yPos += 10;
+  }
 
   // Issues
   if (result.issues.length > 0) {
@@ -183,26 +343,32 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
 
-    result.issues.forEach((issue, index) => {
-      checkPageBreak(15);
+    result.issues.slice(0, 15).forEach((issue, index) => {
+      checkPageBreak(20);
       const severityColor = issue.severity === 'error' ? [211, 47, 47] : issue.severity === 'warning' ? [237, 108, 2] : [25, 118, 210];
       doc.setTextColor(severityColor[0], severityColor[1], severityColor[2]);
       doc.setFont('helvetica', 'bold');
-      doc.text(`${index + 1}. ${issue.title}`, margin, yPos);
+      doc.text(`${index + 1}. [${issue.category.toUpperCase()}] ${issue.title}`, margin, yPos);
       yPos += 5;
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
       const descriptionLines = doc.splitTextToSize(issue.description, pageWidth - 2 * margin);
       doc.text(descriptionLines, margin, yPos);
-      yPos += descriptionLines.length * 5;
+      yPos += descriptionLines.length * 4;
       if (issue.recommendation) {
+        const recLines = doc.splitTextToSize(`Empfehlung: ${issue.recommendation}`, pageWidth - 2 * margin - 5);
         doc.setFont('helvetica', 'italic');
-        doc.text(`💡 ${issue.recommendation}`, margin + 5, yPos);
-        yPos += 5;
+        doc.text(recLines, margin + 5, yPos);
+        yPos += recLines.length * 4;
         doc.setFont('helvetica', 'normal');
       }
-      yPos += 5;
+      yPos += 3;
     });
+    
+    if (result.issues.length > 15) {
+      doc.text(`... und ${result.issues.length - 15} weitere Hinweise`, margin, yPos);
+      yPos += 5;
+    }
   }
 
   // Footer
@@ -226,6 +392,6 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
   }
 
   // Save PDF
-  const fileName = `tracking-report-${result.url.replace(/https?:\/\//, '').replace(/\//g, '-')}-${Date.now()}.pdf`;
+  const fileName = `tracking-report-${result.url.replace(/https?:\/\//, '').replace(/[/:]/g, '-')}-${Date.now()}.pdf`;
   doc.save(fileName);
 }

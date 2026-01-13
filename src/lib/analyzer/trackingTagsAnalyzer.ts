@@ -45,8 +45,25 @@ const TRACKING_DEFINITIONS = {
       GTM: /GTM-[A-Z0-9]{6,}/g,
     },
   },
+  googleAdsConversion: {
+    scriptPatterns: [
+      'googleadservices.com/pagead/conversion',
+      'googleads.g.doubleclick.net',
+      'gtag_report_conversion',
+      'google_conversion',
+      'AW-',
+    ],
+    networkPatterns: [
+      'googleadservices.com/pagead',
+      'googleads.g.doubleclick.net/pagead',
+      'www.googleadservices.com',
+    ],
+    idPatterns: {
+      AW: /AW-\d{9,11}/g,
+      CONVERSION: /conversion[_-]?id['":\s=]+['"]?(\d{9,11})['"]?/gi,
+    },
+  },
   metaPixel: {
-    // Erweiterte Patterns für alle Lokalisierungen und Varianten
     scriptPatterns: [
       'connect.facebook.net',
       'facebook.net/signals',
@@ -74,14 +91,12 @@ const TRACKING_DEFINITIONS = {
       'pixel.facebook.com',
       'www.facebook.com/tr',
     ],
-    // Erweiterte ID-Patterns
     idPatterns: {
       PIXEL_INIT: /fbq\s*\(\s*['"]init['"]\s*,\s*['"](\d{15,16})['"]/g,
       PIXEL_TRACK: /fbq\s*\(\s*['"]track['"]/g,
       PIXEL_ID_ONLY: /['"](\d{15,16})['"]/g,
       PIXEL_CONFIG: /pixel[_-]?id['":\s]+['"]?(\d{15,16})['"]?/gi,
     },
-    // DataLayer Events die auf Meta Pixel hinweisen
     dataLayerIndicators: [
       'Facebook Pixel',
       'fb_pixel',
@@ -130,21 +145,109 @@ const TRACKING_DEFINITIONS = {
       PIXEL_ALT: /pixel[_-]?code['":\s]+['"]([A-Z0-9]+)['"]/gi,
     },
   },
+  pinterestTag: {
+    scriptPatterns: [
+      's.pinimg.com/ct',
+      'pintrk(',
+      'pinterest.com/ct',
+      'ct.pinterest.com',
+    ],
+    networkPatterns: [
+      's.pinimg.com/ct',
+      'ct.pinterest.com',
+      'pinterest.com/ct',
+    ],
+    idPatterns: {
+      TAG: /pintrk\s*\(\s*['"]load['"]\s*,\s*['"](\d+)['"]/g,
+      TAG_ALT: /pinterest[_-]?tag[_-]?id['":\s]+['"]?(\d+)['"]?/gi,
+    },
+  },
+  snapchatPixel: {
+    scriptPatterns: [
+      'sc-static.net/scevent',
+      'snaptr(',
+      'snap-pixel',
+    ],
+    networkPatterns: [
+      'sc-static.net/scevent',
+      'tr.snapchat.com',
+    ],
+    idPatterns: {
+      PIXEL: /snaptr\s*\(\s*['"]init['"]\s*,\s*['"]([a-f0-9-]+)['"]/gi,
+    },
+  },
+  twitterPixel: {
+    scriptPatterns: [
+      'static.ads-twitter.com',
+      'analytics.twitter.com',
+      'twq(',
+      'twitter-pixel',
+    ],
+    networkPatterns: [
+      'static.ads-twitter.com',
+      'analytics.twitter.com',
+      't.co/i/adsct',
+    ],
+    idPatterns: {
+      PIXEL: /twq\s*\(\s*['"]init['"]\s*,\s*['"]([a-z0-9]+)['"]/gi,
+    },
+  },
+  redditPixel: {
+    scriptPatterns: [
+      'alb.reddit.com',
+      'redditstatic.com/ads',
+      'rdt(',
+    ],
+    networkPatterns: [
+      'alb.reddit.com',
+      'events.reddit.com',
+    ],
+    idPatterns: {
+      PIXEL: /rdt\s*\(\s*['"]init['"]\s*,\s*['"]([a-z0-9_]+)['"]/gi,
+    },
+  },
+  bingAds: {
+    scriptPatterns: [
+      'bat.bing.com',
+      'bing.com/bat',
+      'UET',
+      'uetq',
+    ],
+    networkPatterns: [
+      'bat.bing.com',
+      'bing.com/bat',
+    ],
+    idPatterns: {
+      TAG: /uetq.*push.*['"]([0-9]+)['"]/gi,
+      TAG_ALT: /ti:\s*['"]?(\d+)['"]?/gi,
+    },
+  },
+  criteo: {
+    scriptPatterns: [
+      'static.criteo.net',
+      'criteo.com',
+      'criteo_q',
+    ],
+    networkPatterns: [
+      'static.criteo.net',
+      'dis.criteo.com',
+      'rtax.criteo.com',
+    ],
+    idPatterns: {
+      ACCOUNT: /account:\s*['"]?(\d+)['"]?/gi,
+    },
+  },
 };
 
-// Erweiterte bekannte Tracking-Dienste
+// Erweiterte bekannte Tracking-Dienste für "other"
 const OTHER_TRACKING_SERVICES = [
   { name: 'Hotjar', patterns: ['static.hotjar.com', 'hotjar.com', 'hj('] },
   { name: 'Microsoft Clarity', patterns: ['clarity.ms', 'clarity('] },
-  { name: 'Pinterest Tag', patterns: ['pintrk', 's.pinimg.com/ct', 'pinterest.com/ct'] },
-  { name: 'Twitter/X Pixel', patterns: ['static.ads-twitter.com', 'analytics.twitter.com', 'twq('] },
-  { name: 'Snapchat Pixel', patterns: ['sc-static.net/scevent', 'snaptr('] },
-  { name: 'Criteo', patterns: ['static.criteo.net', 'criteo.com', 'criteo.'] },
   { name: 'Adobe Analytics', patterns: ['omtrdc.net', 'adobedtm.com', '2o7.net'] },
   { name: 'Matomo/Piwik', patterns: ['matomo', 'piwik', '_paq.push'] },
   { name: 'Plausible', patterns: ['plausible.io'] },
   { name: 'Hubspot', patterns: ['js.hs-scripts.com', 'js.hsforms.net', 'hubspot.com'] },
-  { name: 'Segment', patterns: ['cdn.segment.com', 'api.segment.io', 'analytics.js'] },
+  { name: 'Segment', patterns: ['cdn.segment.com', 'api.segment.io'] },
   { name: 'Mixpanel', patterns: ['cdn.mxpnl.com', 'mixpanel.com', 'mixpanel.track'] },
   { name: 'Amplitude', patterns: ['cdn.amplitude.com', 'amplitude.com', 'amplitude.getInstance'] },
   { name: 'Heap', patterns: ['heap-analytics.com', 'heapanalytics.com', 'heap.load'] },
@@ -154,12 +257,9 @@ const OTHER_TRACKING_SERVICES = [
   { name: 'Crazy Egg', patterns: ['crazyegg.com', 'script.crazyegg'] },
   { name: 'VWO', patterns: ['dev.visualwebsiteoptimizer.com', 'vwo_'] },
   { name: 'Optimizely', patterns: ['cdn.optimizely.com', 'optimizely'] },
-  { name: 'Google Optimize', patterns: ['optimize.google.com', 'gtag.*optimize'] },
   { name: 'Taboola', patterns: ['cdn.taboola.com', 'trc.taboola'] },
   { name: 'Outbrain', patterns: ['outbrain.com', 'widgets.outbrain'] },
   { name: 'AdRoll', patterns: ['adroll.com', 's.adroll.com'] },
-  { name: 'Bing Ads/UET', patterns: ['bat.bing.com', 'bing.com/bat'] },
-  { name: 'Reddit Pixel', patterns: ['rdt(', 'alb.reddit.com', 'redditstatic.com/ads'] },
   { name: 'Quora Pixel', patterns: ['qevents.js', 'quora.com/qevents'] },
   { name: 'TradeDesk', patterns: ['js.adsrvr.org', 'match.adsrvr.org'] },
   { name: 'Pardot', patterns: ['pi.pardot.com', 'pardot.com'] },
@@ -169,12 +269,14 @@ const OTHER_TRACKING_SERVICES = [
   { name: 'Cookiebot', patterns: ['consent.cookiebot.com', 'cookiebot'] },
   { name: 'OneTrust', patterns: ['cdn.cookielaw.org', 'onetrust.com', 'optanon'] },
   { name: 'Usercentrics', patterns: ['usercentrics.eu', 'usercentrics.com'] },
+  { name: 'Klaviyo', patterns: ['static.klaviyo.com', 'klaviyo.com'] },
+  { name: 'Mailchimp', patterns: ['chimpstatic.com', 'list-manage.com'] },
+  { name: 'ActiveCampaign', patterns: ['trackcmp.net', 'activecampaign.com'] },
 ];
 
 // Server-Side Tracking Patterns
 const SERVER_SIDE_PATTERNS = {
   sgtm: {
-    // Server-Side GTM typische Patterns
     endpoints: [
       /\/gtm\//i,
       /\/gtag\//i,
@@ -192,12 +294,11 @@ const SERVER_SIDE_PATTERNS = {
     ],
   },
   metaCAPI: {
-    // Meta Conversions API Indikatoren
     patterns: [
       /event_id/i,
       /event_source_url/i,
       /action_source.*server/i,
-      /fbc.*fbp/i, // Beide Parameter zusammen deutet auf Server-Side
+      /fbc.*fbp/i,
     ],
     networkPatterns: [
       'graph.facebook.com',
@@ -216,6 +317,14 @@ const SERVER_SIDE_PATTERNS = {
     patterns: [
       'api.linkedin.com/rest/conversionEvents',
       'api.linkedin.com/v2/conversionEvents',
+    ],
+  },
+  cookieBridging: {
+    cookies: ['auid', 'fnbid', '_fbc', '_fbp', 'gclid', 'dclid'],
+    patterns: [
+      /first[_-]?party[_-]?cookie/i,
+      /cookie[_-]?bridging/i,
+      /server[_-]?set[_-]?cookie/i,
     ],
   },
 };
@@ -240,6 +349,9 @@ export function analyzeTrackingTags(crawlResult: CrawlResult): TrackingTagsResul
   // Google Tag Manager - erweitert
   const googleTagManager = analyzeGoogleTagManager(combinedContent, networkRequests, networkRequestsExtended, responseHeaders, pageDomain);
 
+  // NEU: Google Ads Conversion
+  const googleAdsConversion = analyzeGoogleAdsConversion(combinedContent, networkRequests, gtmDetected);
+
   // Meta Pixel - komplett überarbeitet
   const metaPixel = analyzeMetaPixel(combinedContent, networkRequests, windowObjects, gtmDetected, networkRequestsExtended, pageDomain);
 
@@ -249,27 +361,53 @@ export function analyzeTrackingTags(crawlResult: CrawlResult): TrackingTagsResul
   // TikTok Pixel
   const tiktokPixel = analyzeTikTokPixel(combinedContent, networkRequests, windowObjects, gtmDetected);
 
+  // NEU: Pinterest Tag
+  const pinterestTag = analyzePinterestTag(combinedContent, networkRequests, windowObjects, gtmDetected);
+
+  // NEU: Snapchat Pixel
+  const snapchatPixel = analyzeSnapchatPixel(combinedContent, networkRequests, windowObjects, gtmDetected);
+
+  // NEU: Twitter/X Pixel
+  const twitterPixel = analyzeTwitterPixel(combinedContent, networkRequests, windowObjects, gtmDetected);
+
+  // NEU: Reddit Pixel
+  const redditPixel = analyzeRedditPixel(combinedContent, networkRequests, windowObjects, gtmDetected);
+
+  // NEU: Bing Ads
+  const bingAds = analyzeBingAds(combinedContent, networkRequests, windowObjects, gtmDetected);
+
+  // NEU: Criteo
+  const criteo = analyzeCriteo(combinedContent, networkRequests, gtmDetected);
+
   // Andere Tracking-Dienste
   const other = analyzeOtherTracking(combinedContent, networkRequests, gtmDetected);
 
-  // Marketing-Parameter
-  const marketingParameters = detectMarketingParameters(networkRequests);
+  // Marketing-Parameter - erweitert
+  const marketingParameters = detectMarketingParameters(networkRequests, crawlResult.pageUrl);
 
-  // Server-Side Tracking Analyse
+  // Server-Side Tracking Analyse - erweitert
   const serverSideTracking = analyzeServerSideTracking(
     networkRequests, 
     networkRequestsExtended, 
     responseHeaders, 
     pageDomain,
-    combinedContent
+    combinedContent,
+    crawlResult.cookies
   );
 
   return {
     googleAnalytics,
     googleTagManager,
+    googleAdsConversion,
     metaPixel,
     linkedInInsight,
     tiktokPixel,
+    pinterestTag,
+    snapchatPixel,
+    twitterPixel,
+    redditPixel,
+    bingAds,
+    criteo,
     other,
     marketingParameters,
     serverSideTracking,
@@ -301,7 +439,6 @@ function analyzeGoogleAnalytics(
   const gtagDetected = windowObjects.hasGtag || windowObjects.hasDataLayer;
   const detected = scriptDetected || networkDetected || gtagDetected;
 
-  // Mehrfacherkennung von IDs
   const ga4Matches = content.match(def.idPatterns.GA4) || [];
   const uaMatches = content.match(def.idPatterns.UA) || [];
   const measurementIds = [...new Set([...ga4Matches, ...uaMatches])];
@@ -317,7 +454,6 @@ function analyzeGoogleAnalytics(
     measurementId = uaMatches[0];
   }
 
-  // Prüfe ob über GTM geladen
   const loadedViaGTM = gtmDetected && detected && !content.includes('gtag/js?id=');
 
   return { 
@@ -350,12 +486,10 @@ function analyzeGoogleTagManager(
 
   const detected = scriptDetected || networkDetected;
 
-  // Alle Container IDs finden
   const gtmMatches = content.match(def.idPatterns.GTM) || [];
   const containerIds = [...new Set(gtmMatches)];
   const containerId = containerIds[0];
 
-  // Server-Side GTM Erkennung
   const serverSideGTM = detectServerSideGTM(requests, extendedRequests, responseHeaders, pageDomain);
 
   return { 
@@ -364,6 +498,43 @@ function analyzeGoogleTagManager(
     containerIds,
     hasMultipleContainers: containerIds.length > 1,
     serverSideGTM,
+  };
+}
+
+function analyzeGoogleAdsConversion(
+  content: string,
+  requests: NetworkRequest[],
+  gtmDetected: boolean
+): TrackingTagsResult['googleAdsConversion'] {
+  const def = TRACKING_DEFINITIONS.googleAdsConversion;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const detected = scriptDetected || networkDetected;
+
+  // IDs extrahieren
+  const awMatches = content.match(def.idPatterns.AW) || [];
+  const conversionIds = [...new Set(awMatches)];
+  
+  // Remarketing erkennen
+  const hasRemarketing = content.includes('remarketing') || 
+                         content.includes('gtag_report_conversion') ||
+                         requests.some(r => r.url.includes('doubleclick.net'));
+
+  const loadedViaGTM = gtmDetected && detected;
+
+  return {
+    detected,
+    conversionId: conversionIds[0],
+    conversionIds,
+    hasRemarketing,
+    loadedViaGTM,
   };
 }
 
@@ -377,26 +548,25 @@ function detectServerSideGTM(
   let endpoint: string | undefined;
   let isFirstParty = false;
   let sgtmDomain: string | undefined;
+  let transportUrl: string | undefined;
+  const firstPartyCookies: string[] = [];
 
-  // Suche nach First-Party GTM Endpoints
   for (const req of requests) {
     const url = req.url.toLowerCase();
     
-    // Prüfe ob Request zu einer Subdomain der Seite geht und GTM-typische Pfade hat
     try {
       const reqUrl = new URL(req.url);
       const reqDomain = reqUrl.hostname;
       
-      // First-Party Check: Subdomain oder gleiche Domain
       const isSubdomain = reqDomain.endsWith(pageDomain) || pageDomain.endsWith(reqDomain.split('.').slice(-2).join('.'));
       
       if (isSubdomain) {
-        // Prüfe auf sGTM-typische Patterns
         for (const pattern of SERVER_SIDE_PATTERNS.sgtm.endpoints) {
           if (pattern.test(url) || pattern.test(reqUrl.pathname)) {
             isFirstParty = true;
             endpoint = req.url;
             sgtmDomain = reqDomain;
+            transportUrl = req.url;
             indicators.push(`First-Party Endpoint: ${reqDomain}${reqUrl.pathname}`);
             break;
           }
@@ -407,7 +577,6 @@ function detectServerSideGTM(
     }
   }
 
-  // Prüfe Response Headers auf sGTM Indikatoren
   for (const resp of responseHeaders) {
     for (const headerPattern of SERVER_SIDE_PATTERNS.sgtm.headers) {
       const hasHeader = Object.keys(resp.headers).some(h => 
@@ -425,6 +594,8 @@ function detectServerSideGTM(
     endpoint,
     isFirstParty,
     domain: sgtmDomain,
+    transportUrl,
+    firstPartyCookies,
   };
 }
 
@@ -439,26 +610,22 @@ function analyzeMetaPixel(
   const def = TRACKING_DEFINITIONS.metaPixel;
   const detectionMethods: ('script' | 'network' | 'window' | 'dataLayer')[] = [];
 
-  // 1. Script-Erkennung (erweitert für alle Lokalisierungen)
   const scriptDetected = def.scriptPatterns.some(pattern => 
     content.toLowerCase().includes(pattern.toLowerCase())
   );
   if (scriptDetected) detectionMethods.push('script');
 
-  // 2. Network Request Erkennung
   const networkDetected = requests.some(req => 
     def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
   );
   if (networkDetected) detectionMethods.push('network');
 
-  // 3. Window Object Erkennung (erweitert)
   const windowDetected = windowObjects.hasFbq || 
     windowObjects.hasFbEvents || 
     windowObjects.additionalTrackingObjects._fbq ||
     windowObjects.additionalTrackingObjects.fbq;
   if (windowDetected) detectionMethods.push('window');
 
-  // 4. DataLayer Analyse für GTM-geladene Pixel
   let dataLayerDetected = false;
   if (windowObjects.dataLayerContent) {
     const dataLayerStr = JSON.stringify(windowObjects.dataLayerContent).toLowerCase();
@@ -468,7 +635,6 @@ function analyzeMetaPixel(
     if (dataLayerDetected) detectionMethods.push('dataLayer');
   }
 
-  // 5. fbq Queue Analyse
   if (windowObjects.fbqQueue) {
     const queueStr = JSON.stringify(windowObjects.fbqQueue);
     if (queueStr.includes('init') || queueStr.includes('track')) {
@@ -478,10 +644,8 @@ function analyzeMetaPixel(
 
   const detected = scriptDetected || networkDetected || windowDetected || dataLayerDetected;
 
-  // Pixel IDs extrahieren (mehrere Methoden)
   const pixelIds: string[] = [];
   
-  // Methode 1: fbq('init', 'ID') Pattern
   const initMatches = content.matchAll(def.idPatterns.PIXEL_INIT);
   for (const match of initMatches) {
     if (match[1] && !pixelIds.includes(match[1])) {
@@ -489,7 +653,6 @@ function analyzeMetaPixel(
     }
   }
 
-  // Methode 2: Suche in Network Requests
   for (const req of requests) {
     if (req.url.includes('facebook.com/tr') || req.url.includes('facebook.net')) {
       const idMatch = req.url.match(/[?&]id=(\d{15,16})/);
@@ -499,7 +662,6 @@ function analyzeMetaPixel(
     }
   }
 
-  // Methode 3: Pixel ID Config Patterns
   const configMatches = content.matchAll(def.idPatterns.PIXEL_CONFIG);
   for (const match of configMatches) {
     if (match[1] && !pixelIds.includes(match[1])) {
@@ -507,13 +669,11 @@ function analyzeMetaPixel(
     }
   }
 
-  // Methode 4: Suche in fbq Queue
   if (windowObjects.fbqQueue) {
     const queueStr = JSON.stringify(windowObjects.fbqQueue);
     const queueIdMatches = queueStr.matchAll(/(\d{15,16})/g);
     for (const match of queueIdMatches) {
       if (match[1] && !pixelIds.includes(match[1])) {
-        // Validiere dass es eine echte Pixel ID ist (nicht irgendeine Zahl)
         if (queueStr.includes(`"${match[1]}"`) || queueStr.includes(`'${match[1]}'`)) {
           pixelIds.push(match[1]);
         }
@@ -523,12 +683,10 @@ function analyzeMetaPixel(
 
   const pixelId = pixelIds[0];
 
-  // Prüfe ob über GTM geladen
   const loadedViaGTM = gtmDetected && detected && 
     !content.includes('connect.facebook.net') && 
     (windowDetected || dataLayerDetected);
 
-  // Server-Side (CAPI) Erkennung
   const serverSide = detectMetaServerSide(requests, extendedRequests, content, pageDomain);
 
   return { 
@@ -551,27 +709,32 @@ function detectMetaServerSide(
   const indicators: string[] = [];
   const eventIds: string[] = [];
   let hasConversionsAPI = false;
+  let hasDedupe = false;
+  let dedupeMethod: 'event_id' | 'external_id' | 'both' | undefined;
 
-  // Suche nach Conversions API Indikatoren
   for (const req of requests) {
     const url = req.url.toLowerCase();
     
-    // Graph API Calls (typisch für CAPI)
     if (SERVER_SIDE_PATTERNS.metaCAPI.networkPatterns.some(p => url.includes(p.toLowerCase()))) {
       hasConversionsAPI = true;
       indicators.push('Facebook Graph API Aufruf erkannt');
     }
 
-    // Event ID Parameter (Deduplizierung zwischen Browser und Server)
     if (url.includes('event_id=')) {
       const eventIdMatch = req.url.match(/event_id=([^&]+)/);
       if (eventIdMatch) {
         eventIds.push(eventIdMatch[1]);
         indicators.push('Event ID für Deduplizierung gefunden');
+        hasDedupe = true;
+        dedupeMethod = 'event_id';
       }
     }
 
-    // First-Party Pixel Proxy
+    if (url.includes('external_id=')) {
+      hasDedupe = true;
+      dedupeMethod = dedupeMethod === 'event_id' ? 'both' : 'external_id';
+    }
+
     try {
       const reqUrl = new URL(req.url);
       if (reqUrl.hostname.includes(pageDomain) || pageDomain.includes(reqUrl.hostname.split('.').slice(-2).join('.'))) {
@@ -585,7 +748,6 @@ function detectMetaServerSide(
     }
   }
 
-  // Prüfe Content auf CAPI-typische Patterns
   for (const pattern of SERVER_SIDE_PATTERNS.metaCAPI.patterns) {
     if (pattern.test(content)) {
       indicators.push('CAPI-typisches Pattern im Code gefunden');
@@ -597,6 +759,8 @@ function detectMetaServerSide(
     hasConversionsAPI,
     eventIds: [...new Set(eventIds)],
     indicators,
+    hasDedupe,
+    dedupeMethod,
   };
 }
 
@@ -622,14 +786,12 @@ function analyzeLinkedInInsight(
 
   const detected = scriptDetected || networkDetected || windowDetected;
 
-  // Partner ID suchen
   let partnerId: string | undefined;
   const partnerMatch = content.match(/_linkedin_partner_id\s*=\s*['"]?(\d+)['"]?/);
   if (partnerMatch) {
     partnerId = partnerMatch[1];
   }
 
-  // Auch in Window Objects suchen
   if (!partnerId && windowObjects.additionalTrackingObjects._linkedin_data_partner_ids) {
     const ids = windowObjects.additionalTrackingObjects._linkedin_data_partner_ids;
     if (Array.isArray(ids) && ids.length > 0) {
@@ -664,7 +826,6 @@ function analyzeTikTokPixel(
 
   const detected: boolean = !!(scriptDetected || networkDetected || windowDetected);
 
-  // Pixel ID suchen
   let pixelId: string | undefined;
   const pixelMatch = content.match(/ttq\.load\s*\(\s*['"]([A-Z0-9]+)['"]/);
   if (pixelMatch) {
@@ -674,6 +835,185 @@ function analyzeTikTokPixel(
   const loadedViaGTM: boolean = !!(gtmDetected && detected && !content.includes('analytics.tiktok.com'));
 
   return { detected, pixelId, loadedViaGTM };
+}
+
+function analyzePinterestTag(
+  content: string,
+  requests: NetworkRequest[],
+  windowObjects: WindowObjectData,
+  gtmDetected: boolean
+): TrackingTagsResult['pinterestTag'] {
+  const def = TRACKING_DEFINITIONS.pinterestTag;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const windowDetected = windowObjects.additionalTrackingObjects.pintrk === true;
+
+  const detected = scriptDetected || networkDetected || windowDetected;
+
+  let tagId: string | undefined;
+  const tagMatch = content.match(/pintrk\s*\(\s*['"]load['"]\s*,\s*['"](\d+)['"]/);
+  if (tagMatch) {
+    tagId = tagMatch[1];
+  }
+
+  const loadedViaGTM = gtmDetected && detected && !content.includes('s.pinimg.com');
+
+  return { detected, tagId, loadedViaGTM };
+}
+
+function analyzeSnapchatPixel(
+  content: string,
+  requests: NetworkRequest[],
+  windowObjects: WindowObjectData,
+  gtmDetected: boolean
+): TrackingTagsResult['snapchatPixel'] {
+  const def = TRACKING_DEFINITIONS.snapchatPixel;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const windowDetected = windowObjects.additionalTrackingObjects.snaptr === true;
+
+  const detected = scriptDetected || networkDetected || windowDetected;
+
+  let pixelId: string | undefined;
+  const pixelMatch = content.match(/snaptr\s*\(\s*['"]init['"]\s*,\s*['"]([a-f0-9-]+)['"]/i);
+  if (pixelMatch) {
+    pixelId = pixelMatch[1];
+  }
+
+  const loadedViaGTM = gtmDetected && detected && !content.includes('sc-static.net');
+
+  return { detected, pixelId, loadedViaGTM };
+}
+
+function analyzeTwitterPixel(
+  content: string,
+  requests: NetworkRequest[],
+  windowObjects: WindowObjectData,
+  gtmDetected: boolean
+): TrackingTagsResult['twitterPixel'] {
+  const def = TRACKING_DEFINITIONS.twitterPixel;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const windowDetected = windowObjects.additionalTrackingObjects.twq === true;
+
+  const detected = scriptDetected || networkDetected || windowDetected;
+
+  let pixelId: string | undefined;
+  const pixelMatch = content.match(/twq\s*\(\s*['"]init['"]\s*,\s*['"]([a-z0-9]+)['"]/i);
+  if (pixelMatch) {
+    pixelId = pixelMatch[1];
+  }
+
+  const loadedViaGTM = gtmDetected && detected && !content.includes('static.ads-twitter.com');
+
+  return { detected, pixelId, loadedViaGTM };
+}
+
+function analyzeRedditPixel(
+  content: string,
+  requests: NetworkRequest[],
+  windowObjects: WindowObjectData,
+  gtmDetected: boolean
+): TrackingTagsResult['redditPixel'] {
+  const def = TRACKING_DEFINITIONS.redditPixel;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const detected = scriptDetected || networkDetected;
+
+  let pixelId: string | undefined;
+  const pixelMatch = content.match(/rdt\s*\(\s*['"]init['"]\s*,\s*['"]([a-z0-9_]+)['"]/i);
+  if (pixelMatch) {
+    pixelId = pixelMatch[1];
+  }
+
+  const loadedViaGTM = gtmDetected && detected && !content.includes('alb.reddit.com');
+
+  return { detected, pixelId, loadedViaGTM };
+}
+
+function analyzeBingAds(
+  content: string,
+  requests: NetworkRequest[],
+  windowObjects: WindowObjectData,
+  gtmDetected: boolean
+): TrackingTagsResult['bingAds'] {
+  const def = TRACKING_DEFINITIONS.bingAds;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const detected = scriptDetected || networkDetected;
+
+  let tagId: string | undefined;
+  const tagMatch = content.match(/ti:\s*['"]?(\d+)['"]?/i);
+  if (tagMatch) {
+    tagId = tagMatch[1];
+  }
+
+  const loadedViaGTM = gtmDetected && detected && !content.includes('bat.bing.com');
+
+  return { detected, tagId, loadedViaGTM };
+}
+
+function analyzeCriteo(
+  content: string,
+  requests: NetworkRequest[],
+  gtmDetected: boolean
+): TrackingTagsResult['criteo'] {
+  const def = TRACKING_DEFINITIONS.criteo;
+
+  const scriptDetected = def.scriptPatterns.some(pattern => 
+    content.toLowerCase().includes(pattern.toLowerCase())
+  );
+
+  const networkDetected = requests.some(req => 
+    def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
+  );
+
+  const detected = scriptDetected || networkDetected;
+
+  let accountId: string | undefined;
+  const accountMatch = content.match(/account:\s*['"]?(\d+)['"]?/i);
+  if (accountMatch) {
+    accountId = accountMatch[1];
+  }
+
+  const loadedViaGTM = gtmDetected && detected && !content.includes('static.criteo.net');
+
+  return { detected, accountId, loadedViaGTM };
 }
 
 function analyzeOtherTracking(
@@ -694,7 +1034,6 @@ function analyzeOtherTracking(
     );
 
     if (scriptDetected || networkDetected) {
-      // Prüfe ob wahrscheinlich über GTM geladen
       const likelyViaGTM = gtmDetected && !service.patterns.some(p => 
         content.includes(p) && !contentLower.includes('gtm')
       );
@@ -710,29 +1049,36 @@ function analyzeOtherTracking(
   return results;
 }
 
-function detectMarketingParameters(requests: NetworkRequest[]): TrackingTagsResult['marketingParameters'] {
+function detectMarketingParameters(requests: NetworkRequest[], pageUrl: string): TrackingTagsResult['marketingParameters'] {
   let gclid = false;
   let dclid = false;
   let wbraid = false;
   let pbraid = false;
   let fbclid = false;
   let msclkid = false;
+  let ttclid = false;
+  let li_fat_id = false;
   let utm = false;
 
-  for (const req of requests) {
-    const urlLower = req.url.toLowerCase();
+  // Prüfe Page URL und Network Requests
+  const allUrls = [pageUrl, ...requests.map(r => r.url)];
+
+  for (const url of allUrls) {
+    const urlLower = url.toLowerCase();
     if (urlLower.includes('gclid=')) gclid = true;
     if (urlLower.includes('dclid=')) dclid = true;
     if (urlLower.includes('wbraid=')) wbraid = true;
     if (urlLower.includes('pbraid=')) pbraid = true;
     if (urlLower.includes('fbclid=')) fbclid = true;
     if (urlLower.includes('msclkid=')) msclkid = true;
+    if (urlLower.includes('ttclid=')) ttclid = true;
+    if (urlLower.includes('li_fat_id=')) li_fat_id = true;
     if (!utm && urlLower.includes('utm_')) utm = true;
   }
 
-  const any = gclid || dclid || wbraid || pbraid || fbclid || msclkid || utm;
+  const any = gclid || dclid || wbraid || pbraid || fbclid || msclkid || ttclid || li_fat_id || utm;
 
-  return { gclid, dclid, wbraid, pbraid, fbclid, msclkid, utm, any };
+  return { gclid, dclid, wbraid, pbraid, fbclid, msclkid, ttclid, li_fat_id, utm, any };
 }
 
 function analyzeServerSideTracking(
@@ -740,7 +1086,8 @@ function analyzeServerSideTracking(
   extendedRequests: NetworkRequestExtended[],
   responseHeaders: ResponseHeaderData[],
   pageDomain: string,
-  content: string
+  content: string,
+  cookies: { name: string; value: string; domain: string }[]
 ): ServerSideTrackingResult {
   const indicators: ServerSideIndicator[] = [];
   const firstPartyEndpoints: FirstPartyEndpoint[] = [];
@@ -808,17 +1155,70 @@ function analyzeServerSideTracking(
     firstPartyEndpoints.push(...proxyResult.endpoints);
   }
 
+  // 6. NEU: Cookie Bridging Erkennung
+  const cookieBridgingResult = detectCookieBridging(cookies, content, requests);
+
+  if (cookieBridgingResult.detected) {
+    indicators.push({
+      type: 'cookie_bridging',
+      confidence: cookieBridgingResult.confidence,
+      description: 'Cookie Bridging erkannt',
+      evidence: cookieBridgingResult.evidence,
+    });
+  }
+
   return {
     detected: indicators.length > 0,
     indicators,
     firstPartyEndpoints,
+    cookieBridging: cookieBridgingResult,
     summary: {
       hasServerSideGTM: indicators.some(i => i.type === 'sgtm'),
       hasMetaCAPI: indicators.some(i => i.type === 'meta_capi'),
       hasFirstPartyProxy: indicators.some(i => i.type === 'first_party_proxy'),
       hasTikTokEventsAPI: indicators.some(i => i.type === 'tiktok_events_api'),
       hasLinkedInCAPI: indicators.some(i => i.type === 'linkedin_capi'),
+      hasCookieBridging: cookieBridgingResult.detected,
     },
+  };
+}
+
+function detectCookieBridging(
+  cookies: { name: string; value: string; domain: string }[],
+  content: string,
+  requests: NetworkRequest[]
+): { detected: boolean; confidence: 'high' | 'medium' | 'low'; cookies: string[]; indicators: string[] } {
+  const evidence: string[] = [];
+  const bridgingCookies: string[] = [];
+  let confidence: 'high' | 'medium' | 'low' = 'low';
+
+  // Prüfe auf bekannte Cookie Bridging Cookies
+  for (const cookie of cookies) {
+    if (SERVER_SIDE_PATTERNS.cookieBridging.cookies.includes(cookie.name.toLowerCase())) {
+      bridgingCookies.push(cookie.name);
+      evidence.push(`Cookie Bridging Cookie gefunden: ${cookie.name}`);
+    }
+    
+    // auid/fnbid sind typische Server-Side Cookie Bridging Indikatoren
+    if (cookie.name === 'auid' || cookie.name === 'fnbid') {
+      confidence = 'high';
+      evidence.push(`First-Party Cookie Bridging Cookie: ${cookie.name}`);
+    }
+  }
+
+  // Prüfe Content auf Cookie Bridging Patterns
+  for (const pattern of SERVER_SIDE_PATTERNS.cookieBridging.patterns) {
+    if (pattern.test(content)) {
+      evidence.push('Cookie Bridging Pattern im Code gefunden');
+      confidence = confidence === 'high' ? 'high' : 'medium';
+    }
+  }
+
+  return {
+    detected: evidence.length > 0,
+    confidence,
+    cookies: bridgingCookies,
+    indicators: evidence,
   };
 }
 
@@ -837,7 +1237,6 @@ function detectServerSideGTMIndicators(
       const reqUrl = new URL(req.url);
       const reqDomain = reqUrl.hostname;
       
-      // First-Party Domain Check
       const isFirstParty = reqDomain.endsWith(pageDomain) || 
         pageDomain.endsWith(reqDomain.split('.').slice(-2).join('.')) ||
         reqDomain.includes(pageDomain.split('.')[0]);
@@ -845,7 +1244,6 @@ function detectServerSideGTMIndicators(
       if (isFirstParty) {
         const pathLower = reqUrl.pathname.toLowerCase();
         
-        // GTM/Analytics-typische Pfade auf First-Party Domain
         if (pathLower.includes('/gtm') || pathLower.includes('/g/collect') || 
             pathLower.includes('/collect') || pathLower.includes('/gtag')) {
           evidence.push(`First-Party GTM Endpoint: ${reqDomain}${reqUrl.pathname}`);
@@ -853,7 +1251,6 @@ function detectServerSideGTMIndicators(
           confidence = 'high';
         }
         
-        // Subdomain-Patterns für sGTM
         if (reqDomain.match(/^(gtm|sgtm|tag|tagging|tracking|analytics|data)\./)) {
           evidence.push(`sGTM-typische Subdomain: ${reqDomain}`);
           confidence = confidence === 'high' ? 'high' : 'medium';
@@ -864,7 +1261,6 @@ function detectServerSideGTMIndicators(
     }
   }
 
-  // Response Header Check
   for (const resp of responseHeaders) {
     const headers = Object.keys(resp.headers).map(h => h.toLowerCase());
     if (headers.some(h => h.includes('x-gtm') || h.includes('x-sgtm'))) {
@@ -889,7 +1285,6 @@ function detectMetaCAPIIndicators(
   const evidence: string[] = [];
   let confidence: 'high' | 'medium' | 'low' = 'low';
 
-  // Graph API Aufrufe
   for (const req of requests) {
     if (req.url.includes('graph.facebook.com') && req.url.includes('/events')) {
       evidence.push('Facebook Graph API /events Aufruf erkannt');
@@ -897,7 +1292,6 @@ function detectMetaCAPIIndicators(
     }
   }
 
-  // Event ID Parameter (Deduplizierung)
   const hasEventId = requests.some(req => 
     req.url.includes('event_id=') && req.url.includes('facebook')
   );
@@ -906,13 +1300,11 @@ function detectMetaCAPIIndicators(
     confidence = confidence === 'high' ? 'high' : 'medium';
   }
 
-  // action_source=server Parameter
   if (content.includes('action_source') && content.includes('server')) {
     evidence.push('Server-Side action_source Parameter im Code');
     confidence = 'medium';
   }
 
-  // First-Party Pixel Proxy
   for (const req of requests) {
     try {
       const reqUrl = new URL(req.url);
@@ -1010,7 +1402,6 @@ function detectFirstPartyProxies(
       const reqUrl = new URL(req.url);
       const reqDomain = reqUrl.hostname;
       
-      // Prüfe ob First-Party
       const domainParts = pageDomain.split('.');
       const baseDomain = domainParts.slice(-2).join('.');
       const isFirstParty = reqDomain.endsWith(baseDomain);

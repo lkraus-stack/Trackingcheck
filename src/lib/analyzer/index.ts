@@ -1,36 +1,162 @@
-import { WebCrawler } from './crawler';
+import { WebCrawler, CookieConsentTestData } from './crawler';
 import { analyzeCookieBanner } from './cookieBannerAnalyzer';
 import { analyzeTCF } from './tcfAnalyzer';
 import { analyzeGoogleConsentMode, checkConsentModeCompleteness } from './googleConsentModeAnalyzer';
 import { analyzeTrackingTags } from './trackingTagsAnalyzer';
-import { AnalysisResult, Issue, CookieResult } from '@/types';
+import { analyzeDataLayer } from './dataLayerAnalyzer';
+import { analyzeThirdPartyDomains } from './thirdPartyAnalyzer';
+import { analyzeGDPRCompliance, analyzeDMACompliance } from './complianceAnalyzer';
+import { 
+  AnalysisResult, 
+  Issue, 
+  CookieResult, 
+  CookieConsentTestResult, 
+  CookieConsentIssue,
+  AnalysisStep,
+  DataLayerAnalysisResult,
+  ThirdPartyDomainsResult,
+  GDPRChecklistResult,
+  DMACheckResult,
+} from '@/types';
 
 export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
   const crawler = new WebCrawler();
+  const analysisSteps: AnalysisStep[] = [];
   
+  const addStep = (step: string, status: AnalysisStep['status'], message: string, details?: string) => {
+    analysisSteps.push({ step, status, message, details, timestamp: Date.now() });
+  };
+
   try {
+    addStep('init', 'running', 'Browser wird initialisiert...');
     await crawler.init();
+    addStep('init', 'completed', 'Browser bereit');
     
     // URL validieren und normalisieren
+    addStep('validate', 'running', 'URL wird validiert...');
     const normalizedUrl = normalizeUrl(url);
+    addStep('validate', 'completed', `URL: ${normalizedUrl}`);
     
     // Website crawlen
+    addStep('crawl', 'running', 'Website wird geladen und analysiert...', 'Netzwerk-Requests, Cookies und Scripts werden erfasst');
     const crawlResult = await crawler.crawl(normalizedUrl);
+    addStep('crawl', 'completed', `${crawlResult.networkRequests.length} Requests erfasst`);
     
     // Alle Analyzer ausführen
+    addStep('analyze_banner', 'running', 'Cookie-Banner wird analysiert...');
     const cookieBanner = analyzeCookieBanner(crawlResult);
+    addStep('analyze_banner', 'completed', cookieBanner.detected ? `Banner erkannt: ${cookieBanner.provider || 'Unbekannter Anbieter'}` : 'Kein Banner erkannt');
+
+    addStep('analyze_tcf', 'running', 'TCF Framework wird geprüft...');
     const tcf = analyzeTCF(crawlResult);
+    addStep('analyze_tcf', 'completed', tcf.detected ? `TCF ${tcf.version || '2.x'} erkannt` : 'Kein TCF erkannt');
+
+    addStep('analyze_consent_mode', 'running', 'Google Consent Mode wird analysiert...');
     const googleConsentMode = analyzeGoogleConsentMode(crawlResult);
+    addStep('analyze_consent_mode', 'completed', 
+      googleConsentMode.detected 
+        ? `Consent Mode ${googleConsentMode.version || ''} erkannt${googleConsentMode.updateConsent?.detected ? ' (mit Update)' : ''}`
+        : 'Kein Consent Mode erkannt'
+    );
+
+    addStep('analyze_tracking', 'running', 'Tracking-Tags werden identifiziert...');
     const trackingTags = analyzeTrackingTags(crawlResult);
+    const trackingCount = [
+      trackingTags.googleAnalytics.detected,
+      trackingTags.googleTagManager.detected,
+      trackingTags.metaPixel.detected,
+      trackingTags.linkedInInsight.detected,
+      trackingTags.tiktokPixel.detected,
+      trackingTags.pinterestTag?.detected,
+      trackingTags.snapchatPixel?.detected,
+      trackingTags.twitterPixel?.detected,
+      trackingTags.bingAds?.detected,
+      trackingTags.criteo?.detected,
+    ].filter(Boolean).length + trackingTags.other.length;
+    addStep('analyze_tracking', 'completed', `${trackingCount} Tracking-Dienst(e) erkannt`);
+
+    // NEU: DataLayer & E-Commerce analysieren
+    addStep('analyze_datalayer', 'running', 'DataLayer und E-Commerce Events werden analysiert...');
+    const dataLayerAnalysis = analyzeDataLayer(crawlResult);
+    addStep('analyze_datalayer', 'completed', 
+      dataLayerAnalysis.ecommerce.detected 
+        ? `E-Commerce erkannt: ${dataLayerAnalysis.ecommerce.events.length} Events`
+        : `${dataLayerAnalysis.events.length} DataLayer Events`
+    );
+    
+    // Cookie-Consent-Test durchführen (nur wenn Banner erkannt wurde)
+    let cookieConsentTest: CookieConsentTestResult | undefined;
+    if (cookieBanner.detected) {
+      try {
+        addStep('consent_test', 'running', 'Cookie-Consent wird getestet...', 'Cookies vor und nach Banner-Interaktion werden verglichen');
+        const consentTestData = await crawler.performCookieConsentTest(normalizedUrl);
+        cookieConsentTest = processCookieConsentTest(consentTestData);
+        addStep('consent_test', 'completed', 
+          cookieConsentTest.analysis.trackingBeforeConsent 
+            ? 'WARNUNG: Tracking vor Consent erkannt!'
+            : 'Consent-Test abgeschlossen'
+        );
+      } catch (error) {
+        console.error('Cookie consent test error:', error);
+        addStep('consent_test', 'error', 'Consent-Test fehlgeschlagen');
+      }
+    }
     
     // Cookies kategorisieren
-    const cookies = categorizeCookies(crawlResult.cookies);
+    addStep('analyze_cookies', 'running', 'Cookies werden kategorisiert...');
+    const cookiesToUse = cookieConsentTest?.afterAccept.cookies.length 
+      ? cookieConsentTest.afterAccept.cookies 
+      : categorizeCookies(crawlResult.cookies);
+    const cookies = Array.isArray(cookiesToUse) && cookiesToUse.length > 0 && 'category' in cookiesToUse[0]
+      ? cookiesToUse
+      : categorizeCookies(crawlResult.cookies);
+    addStep('analyze_cookies', 'completed', `${cookies.length} Cookies kategorisiert`);
+
+    // NEU: Third-Party Domains analysieren
+    addStep('analyze_third_party', 'running', 'Drittanbieter-Domains werden analysiert...');
+    const thirdPartyDomains = analyzeThirdPartyDomains(crawlResult, cookies);
+    addStep('analyze_third_party', 'completed', `${thirdPartyDomains.totalCount} Third-Party Domains`);
+
+    // NEU: DSGVO Checkliste
+    addStep('analyze_gdpr', 'running', 'DSGVO-Compliance wird geprüft...');
+    const gdprChecklist = analyzeGDPRCompliance(
+      cookieBanner,
+      tcf,
+      googleConsentMode,
+      trackingTags,
+      cookies,
+      cookieConsentTest,
+      thirdPartyDomains
+    );
+    addStep('analyze_gdpr', 'completed', `DSGVO Score: ${gdprChecklist.score}%`);
+
+    // NEU: DMA Check
+    addStep('analyze_dma', 'running', 'DMA-Compliance wird geprüft...');
+    const dmaCheck = analyzeDMACompliance(trackingTags, googleConsentMode, tcf, cookieBanner);
+    addStep('analyze_dma', 'completed', 
+      dmaCheck.applicable 
+        ? `${dmaCheck.gatekeepersDetected.length} Gatekeeper erkannt`
+        : 'Keine DMA-Gatekeeper erkannt'
+    );
     
     // Issues sammeln
-    const issues = generateIssues(cookieBanner, tcf, googleConsentMode, trackingTags, cookies);
+    addStep('generate_issues', 'running', 'Probleme und Empfehlungen werden generiert...');
+    const issues = generateIssues(
+      cookieBanner, 
+      tcf, 
+      googleConsentMode, 
+      trackingTags, 
+      cookies, 
+      cookieConsentTest,
+      dataLayerAnalysis,
+      thirdPartyDomains,
+      gdprChecklist,
+      dmaCheck
+    );
+    addStep('generate_issues', 'completed', `${issues.length} Hinweise generiert`);
     
     // Score berechnen
-    const score = calculateScore(cookieBanner, tcf, googleConsentMode, issues);
+    const score = calculateScore(cookieBanner, tcf, googleConsentMode, issues, cookieConsentTest, gdprChecklist);
     
     return {
       url: normalizedUrl,
@@ -41,8 +167,14 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       googleConsentMode,
       trackingTags,
       cookies,
+      cookieConsentTest,
+      dataLayerAnalysis,
+      thirdPartyDomains,
+      gdprChecklist,
+      dmaCheck,
       score,
       issues,
+      analysisSteps,
     };
   } catch (error) {
     console.error('Analysis error:', error);
@@ -52,15 +184,110 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
   }
 }
 
+// Cookie-Consent-Test Daten verarbeiten
+function processCookieConsentTest(testData: CookieConsentTestData): CookieConsentTestResult {
+  const beforeCookies = categorizeCookies(testData.beforeConsent.cookies);
+  const afterAcceptCookies = categorizeCookies(testData.afterAccept.cookies);
+  const afterRejectCookies = categorizeCookies(testData.afterReject.cookies);
+  
+  const beforeCookieNames = new Set(beforeCookies.map(c => c.name));
+  const newCookiesAfterAccept = afterAcceptCookies.filter(c => !beforeCookieNames.has(c.name));
+  const newCookiesAfterReject = afterRejectCookies.filter(c => !beforeCookieNames.has(c.name));
+  
+  const trackingCookiesBefore = beforeCookies.filter(
+    c => c.category === 'analytics' || c.category === 'marketing'
+  );
+  
+  const trackingCookiesAfterReject = afterRejectCookies.filter(
+    c => c.category === 'analytics' || c.category === 'marketing'
+  );
+  
+  const issues: CookieConsentIssue[] = [];
+  
+  if (trackingCookiesBefore.length > 0) {
+    issues.push({
+      severity: 'error',
+      title: 'Tracking-Cookies vor Consent',
+      description: `${trackingCookiesBefore.length} Tracking-Cookie(s) wurden gesetzt, BEVOR eine Einwilligung erteilt wurde: ${trackingCookiesBefore.map(c => c.name).join(', ')}`,
+    });
+  }
+  
+  if (trackingCookiesAfterReject.length > 0) {
+    issues.push({
+      severity: 'error',
+      title: 'Tracking-Cookies trotz Ablehnung',
+      description: `${trackingCookiesAfterReject.length} Tracking-Cookie(s) wurden trotz Ablehnung gesetzt: ${trackingCookiesAfterReject.map(c => c.name).join(', ')}`,
+    });
+  }
+  
+  if (testData.afterAccept.clickSuccessful && newCookiesAfterAccept.length === 0 && afterAcceptCookies.length === beforeCookies.length) {
+    issues.push({
+      severity: 'warning',
+      title: 'Keine neuen Cookies nach Akzeptieren',
+      description: 'Nach dem Klick auf "Akzeptieren" wurden keine zusätzlichen Cookies gesetzt. Der Banner könnte nicht korrekt funktionieren.',
+    });
+  }
+  
+  if (!testData.afterAccept.buttonFound) {
+    issues.push({
+      severity: 'warning',
+      title: 'Akzeptieren-Button nicht gefunden',
+      description: 'Der Akzeptieren-Button konnte nicht automatisch erkannt werden.',
+    });
+  }
+  
+  if (!testData.afterReject.buttonFound) {
+    issues.push({
+      severity: 'warning',
+      title: 'Ablehnen-Button nicht gefunden',
+      description: 'Der Ablehnen-Button konnte nicht automatisch erkannt werden. Möglicherweise ist keine einfache Ablehnung möglich.',
+    });
+  }
+  
+  const consentWorksProperly = 
+    testData.afterAccept.clickSuccessful && 
+    (newCookiesAfterAccept.length > 0 || afterAcceptCookies.length > beforeCookies.length);
+  
+  const rejectWorksProperly = 
+    testData.afterReject.clickSuccessful && 
+    trackingCookiesAfterReject.length === 0;
+  
+  return {
+    beforeConsent: {
+      cookies: beforeCookies,
+      cookieCount: beforeCookies.length,
+      trackingCookiesFound: trackingCookiesBefore.length > 0,
+    },
+    afterAccept: {
+      cookies: afterAcceptCookies,
+      cookieCount: afterAcceptCookies.length,
+      newCookies: newCookiesAfterAccept,
+      clickSuccessful: testData.afterAccept.clickSuccessful,
+      buttonFound: testData.afterAccept.buttonFound,
+    },
+    afterReject: {
+      cookies: afterRejectCookies,
+      cookieCount: afterRejectCookies.length,
+      newCookies: newCookiesAfterReject,
+      clickSuccessful: testData.afterReject.clickSuccessful,
+      buttonFound: testData.afterReject.buttonFound,
+    },
+    analysis: {
+      consentWorksProperly,
+      rejectWorksProperly,
+      trackingBeforeConsent: trackingCookiesBefore.length > 0,
+      issues,
+    },
+  };
+}
+
 function normalizeUrl(url: string): string {
   let normalizedUrl = url.trim();
   
-  // Protokoll hinzufügen wenn fehlend
   if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
     normalizedUrl = 'https://' + normalizedUrl;
   }
   
-  // URL validieren
   try {
     new URL(normalizedUrl);
   } catch {
@@ -82,17 +309,16 @@ function categorizeCookies(cookies: Array<{
 }>): CookieResult[] {
   const now = Date.now();
 
-  // Bekannte Cookie-Kategorien
   const cookieCategories: Record<string, CookieResult['category']> = {
-    // Notwendige Cookies
     'PHPSESSID': 'necessary',
     'JSESSIONID': 'necessary',
     'csrf': 'necessary',
     '_csrf': 'necessary',
     'session': 'necessary',
     'sessionid': 'necessary',
+    '__cf': 'necessary',
+    'cf_clearance': 'necessary',
     
-    // Analytics Cookies
     '_ga': 'analytics',
     '_gid': 'analytics',
     '_gat': 'analytics',
@@ -104,8 +330,9 @@ function categorizeCookies(cookies: Array<{
     '_hjSessionUser': 'analytics',
     'amplitude': 'analytics',
     'mixpanel': 'analytics',
+    '_clck': 'analytics',
+    '_clsk': 'analytics',
     
-    // Marketing Cookies
     '_fbp': 'marketing',
     '_fbc': 'marketing',
     'fr': 'marketing',
@@ -116,22 +343,39 @@ function categorizeCookies(cookies: Array<{
     'lidc': 'marketing',
     'bcookie': 'marketing',
     '_tt_': 'marketing',
+    '_ttp': 'marketing',
+    '_scid': 'marketing',
+    '_rdt_uuid': 'marketing',
+    'muc_ads': 'marketing',
+    'personalization_id': 'marketing',
     
-    // Funktionale Cookies
     'lang': 'functional',
     'locale': 'functional',
     'timezone': 'functional',
     'currency': 'functional',
   };
 
+  // Bekannte Cookie-Dienste
+  const cookieServices: Record<string, string> = {
+    '_ga': 'Google Analytics',
+    '_gid': 'Google Analytics',
+    '_fbp': 'Meta/Facebook',
+    '_fbc': 'Meta/Facebook',
+    '_gcl': 'Google Ads',
+    '_hjid': 'Hotjar',
+    '_clck': 'Microsoft Clarity',
+    '_tt_': 'TikTok',
+    '_pin': 'Pinterest',
+    'li_': 'LinkedIn',
+  };
+
   return cookies.map(cookie => {
     let category: CookieResult['category'] = 'unknown';
+    let service: string | undefined;
     
-    // Exakte Übereinstimmung
     if (cookieCategories[cookie.name]) {
       category = cookieCategories[cookie.name];
     } else {
-      // Partial Match
       for (const [pattern, cat] of Object.entries(cookieCategories)) {
         if (cookie.name.toLowerCase().includes(pattern.toLowerCase())) {
           category = cat;
@@ -140,19 +384,33 @@ function categorizeCookies(cookies: Array<{
       }
     }
     
-    // Domain-basierte Kategorisierung
     if (category === 'unknown') {
       if (cookie.domain.includes('google') || cookie.domain.includes('doubleclick')) {
         category = cookie.name.startsWith('_g') ? 'analytics' : 'marketing';
       } else if (cookie.domain.includes('facebook') || cookie.domain.includes('fb.com')) {
         category = 'marketing';
+      } else if (cookie.domain.includes('linkedin')) {
+        category = 'marketing';
+      } else if (cookie.domain.includes('tiktok')) {
+        category = 'marketing';
       }
     }
 
-    // Lifetime berechnen (Browser liefert Sekunden-Since-Epoch)
+    // Service ermitteln
+    for (const [pattern, serviceName] of Object.entries(cookieServices)) {
+      if (cookie.name.startsWith(pattern)) {
+        service = serviceName;
+        break;
+      }
+    }
+
     const expiresMs = cookie.expires > 0 ? cookie.expires * 1000 : undefined;
     const lifetimeDays = expiresMs ? Math.round((expiresMs - now) / (1000 * 60 * 60 * 24)) : undefined;
     const isLongLived = lifetimeDays !== undefined ? lifetimeDays > 400 : false;
+    
+    // Third-Party Erkennung (vereinfacht)
+    const isThirdParty = !cookie.domain.startsWith('.') || cookie.domain.includes('google') || 
+                         cookie.domain.includes('facebook') || cookie.domain.includes('doubleclick');
     
     return {
       name: cookie.name,
@@ -166,6 +424,8 @@ function categorizeCookies(cookies: Array<{
       category,
       lifetimeDays,
       isLongLived,
+      isThirdParty,
+      service,
     };
   });
 }
@@ -175,19 +435,51 @@ function generateIssues(
   tcf: AnalysisResult['tcf'],
   googleConsentMode: AnalysisResult['googleConsentMode'],
   trackingTags: AnalysisResult['trackingTags'],
-  cookies: CookieResult[]
+  cookies: CookieResult[],
+  cookieConsentTest: CookieConsentTestResult | undefined,
+  dataLayerAnalysis: DataLayerAnalysisResult,
+  thirdPartyDomains: ThirdPartyDomainsResult,
+  gdprChecklist: GDPRChecklistResult,
+  dmaCheck: DMACheckResult
 ): Issue[] {
   const issues: Issue[] = [];
 
+  // Cookie-Consent-Test Issues
+  if (cookieConsentTest) {
+    for (const issue of cookieConsentTest.analysis.issues) {
+      issues.push({
+        severity: issue.severity,
+        category: 'cookies',
+        title: issue.title,
+        description: issue.description,
+        recommendation: issue.severity === 'error' 
+          ? 'Prüfen Sie die Cookie-Implementierung und stellen Sie sicher, dass Cookies erst nach Einwilligung gesetzt werden.'
+          : undefined,
+      });
+    }
+    
+    if (cookieConsentTest.analysis.consentWorksProperly && cookieConsentTest.analysis.rejectWorksProperly) {
+      issues.push({
+        severity: 'info',
+        category: 'cookies',
+        title: 'Cookie-Consent funktioniert korrekt',
+        description: 'Der Cookie-Banner reagiert korrekt auf Akzeptieren und Ablehnen.',
+      });
+    }
+  }
+
   // Cookie Banner Issues
   if (!cookieBanner.detected) {
-    issues.push({
-      severity: 'error',
-      category: 'cookie-banner',
-      title: 'Kein Cookie-Banner erkannt',
-      description: 'Auf der Website wurde kein Cookie-Banner/Consent-Management gefunden.',
-      recommendation: 'Implementieren Sie einen DSGVO-konformen Cookie-Banner mit Consent-Management.',
-    });
+    const hasTracking = trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected;
+    if (hasTracking) {
+      issues.push({
+        severity: 'error',
+        category: 'cookie-banner',
+        title: 'Kein Cookie-Banner erkannt',
+        description: 'Tracking-Tags erkannt, aber kein Cookie-Banner/Consent-Management gefunden.',
+        recommendation: 'Implementieren Sie einen DSGVO-konformen Cookie-Banner mit Consent-Management.',
+      });
+    }
   } else {
     if (!cookieBanner.hasRejectButton) {
       issues.push({
@@ -252,6 +544,25 @@ function generateIssues(
       });
     }
 
+    // NEU: Consent Mode Update Check
+    if (googleConsentMode.detected && !googleConsentMode.updateConsent?.detected) {
+      issues.push({
+        severity: 'warning',
+        category: 'consent-mode',
+        title: 'Consent Mode Update nicht erkannt',
+        description: 'Es wurde kein gtag("consent", "update", {...}) Aufruf erkannt.',
+        recommendation: 'Stellen Sie sicher, dass nach Banner-Interaktion der Consent Mode aktualisiert wird.',
+      });
+    } else if (googleConsentMode.updateConsent?.detected && !googleConsentMode.updateConsent.triggeredAfterBanner) {
+      issues.push({
+        severity: 'warning',
+        category: 'consent-mode',
+        title: 'Consent Update möglicherweise nicht verknüpft',
+        description: 'Consent Update erkannt, aber Verknüpfung mit Banner-Interaktion nicht bestätigt.',
+        recommendation: 'Prüfen Sie, ob der Consent Update nach Nutzerinteraktion ausgelöst wird.',
+      });
+    }
+
     if (consentModeCheck.missingV2Parameters.length > 0) {
       issues.push({
         severity: 'warning',
@@ -263,38 +574,96 @@ function generateIssues(
     }
   }
 
-  // Tracking ohne Consent
-  const marketingCookies = cookies.filter(c => c.category === 'marketing');
-  const analyticsCookies = cookies.filter(c => c.category === 'analytics');
+  // E-Commerce Issues
+  if (dataLayerAnalysis.ecommerce.detected) {
+    for (const ecomIssue of dataLayerAnalysis.ecommerce.issues) {
+      issues.push({
+        severity: ecomIssue.severity,
+        category: 'ecommerce',
+        title: `E-Commerce: ${ecomIssue.issue}`,
+        description: `Event: ${ecomIssue.event}`,
+        recommendation: ecomIssue.recommendation,
+      });
+    }
 
-  if (marketingCookies.length > 0 && !cookieBanner.detected) {
-    issues.push({
-      severity: 'error',
-      category: 'cookies',
-      title: 'Marketing-Cookies ohne Consent',
-      description: `${marketingCookies.length} Marketing-Cookie(s) gefunden, aber kein Consent-Management.`,
-      recommendation: 'Marketing-Cookies dürfen nur nach ausdrücklicher Einwilligung gesetzt werden.',
-    });
+    // Wertübergabe-Prüfung
+    if (!dataLayerAnalysis.ecommerce.valueTracking.hasTransactionValue) {
+      const hasPurchase = dataLayerAnalysis.ecommerce.events.some(e => e.name === 'purchase');
+      if (hasPurchase) {
+        issues.push({
+          severity: 'error',
+          category: 'ecommerce',
+          title: 'Kein Transaktionswert erkannt',
+          description: 'Purchase-Event ohne Wertübergabe erkannt. Google Ads kann keine ROAS berechnen.',
+          recommendation: 'Fügen Sie den "value" Parameter mit dem Bestellwert zum Purchase-Event hinzu.',
+        });
+      }
+    }
+
+    if (!dataLayerAnalysis.ecommerce.valueTracking.hasCurrency && dataLayerAnalysis.ecommerce.valueTracking.hasTransactionValue) {
+      issues.push({
+        severity: 'warning',
+        category: 'ecommerce',
+        title: 'Keine Währung angegeben',
+        description: 'Transaktionswerte ohne Währung können zu Fehlberechnungen führen.',
+        recommendation: 'Fügen Sie den "currency" Parameter (z.B. "EUR") zu allen E-Commerce Events hinzu.',
+      });
+    }
   }
 
-  if (analyticsCookies.length > 0 && !cookieBanner.detected) {
+  // Third-Party Domain Issues
+  if (thirdPartyDomains.riskAssessment.highRiskDomains.length > 0) {
     issues.push({
       severity: 'warning',
-      category: 'cookies',
-      title: 'Analytics-Cookies ohne Consent',
-      description: `${analyticsCookies.length} Analytics-Cookie(s) gefunden, aber kein Consent-Management.`,
-      recommendation: 'Analytics-Cookies erfordern in der Regel Einwilligung gemäß DSGVO/ePrivacy.',
+      category: 'general',
+      title: 'Hochrisiko-Drittanbieter erkannt',
+      description: `Datenübertragung zu Hochrisiko-Ländern: ${thirdPartyDomains.riskAssessment.highRiskDomains.join(', ')}`,
+      recommendation: 'Prüfen Sie die Rechtsgrundlage für diese Datentransfers besonders sorgfältig.',
     });
   }
 
-  // GA4/UA Implementierung
+  if (thirdPartyDomains.riskAssessment.unknownDomains.length > 5) {
+    issues.push({
+      severity: 'info',
+      category: 'general',
+      title: 'Viele unbekannte Drittanbieter',
+      description: `${thirdPartyDomains.riskAssessment.unknownDomains.length} unbekannte Drittanbieter-Domains erkannt.`,
+      recommendation: 'Dokumentieren Sie alle Drittanbieter in Ihrer Datenschutzerklärung.',
+    });
+  }
+
+  // GDPR Failed Checks
+  const gdprFailedChecks = gdprChecklist.checks.filter(c => c.status === 'failed');
+  for (const check of gdprFailedChecks.slice(0, 3)) {
+    issues.push({
+      severity: 'error',
+      category: 'gdpr',
+      title: `DSGVO: ${check.title}`,
+      description: check.details || check.description,
+      recommendation: check.recommendation,
+    });
+  }
+
+  // DMA Non-Compliant Checks
+  const dmaNonCompliant = dmaCheck.checks.filter(c => c.status === 'non_compliant');
+  for (const check of dmaNonCompliant) {
+    issues.push({
+      severity: 'warning',
+      category: 'dma',
+      title: `DMA: ${check.requirement}`,
+      description: `${check.gatekeeper}: ${check.details}`,
+      recommendation: check.recommendation,
+    });
+  }
+
+  // Tracking Tags Issues
   if (trackingTags.googleAnalytics.hasMultipleMeasurementIds) {
     issues.push({
       severity: 'warning',
       category: 'tracking',
       title: 'Mehrere Google Analytics IDs erkannt',
       description: `Es wurden mehrere Measurement IDs gefunden (${trackingTags.googleAnalytics.measurementIds.join(', ')}).`,
-      recommendation: 'Prüfen Sie, ob doppelte Pageviews ausgelöst werden oder Container konsolidiert werden sollten.',
+      recommendation: 'Prüfen Sie, ob doppelte Pageviews ausgelöst werden.',
     });
   }
 
@@ -303,162 +672,36 @@ function generateIssues(
       severity: 'info',
       category: 'tracking',
       title: 'UA-Property erkannt',
-      description: 'Universal Analytics (UA) ist abgekündigt. Behalten Sie nur GA4-Implementierungen bei.',
-      recommendation: 'Entfernen Sie alte UA-Snippets und migrieren Sie alle Tags auf GA4.',
+      description: 'Universal Analytics (UA) ist abgekündigt.',
+      recommendation: 'Entfernen Sie UA-Snippets und migrieren Sie auf GA4.',
     });
   }
 
-  // GTM über GTM geladen Info
-  if (trackingTags.googleAnalytics.loadedViaGTM) {
-    issues.push({
-      severity: 'info',
-      category: 'tracking',
-      title: 'Google Analytics über GTM geladen',
-      description: 'Google Analytics wird über den Google Tag Manager geladen.',
-      recommendation: 'Dies ist eine Best Practice für zentralisiertes Tag-Management.',
-    });
-  }
-
-  // Meta Pixel Erkennungsdetails
-  if (trackingTags.metaPixel.detected) {
-    const methods = trackingTags.metaPixel.detectionMethod.join(', ');
-    if (trackingTags.metaPixel.loadedViaGTM) {
-      issues.push({
-        severity: 'info',
-        category: 'tracking',
-        title: 'Meta Pixel über GTM erkannt',
-        description: `Der Meta Pixel wurde über den Google Tag Manager geladen. Erkennungsmethoden: ${methods}.`,
-        recommendation: 'Stellen Sie sicher, dass der Pixel erst nach Consent-Erteilung ausgelöst wird.',
-      });
-    }
-
-    if (trackingTags.metaPixel.hasMultiplePixels) {
-      issues.push({
-        severity: 'warning',
-        category: 'tracking',
-        title: 'Mehrere Meta Pixel IDs erkannt',
-        description: `Es wurden ${trackingTags.metaPixel.pixelIds.length} Pixel IDs gefunden: ${trackingTags.metaPixel.pixelIds.join(', ')}.`,
-        recommendation: 'Prüfen Sie, ob alle Pixel IDs notwendig sind oder ob doppelte Events ausgelöst werden.',
-      });
-    }
-  }
-
-  // Server-Side Tracking Issues
+  // Server-Side Tracking Info
   if (trackingTags.serverSideTracking.detected) {
     const summary = trackingTags.serverSideTracking.summary;
     
-    // Server-Side GTM
     if (summary.hasServerSideGTM) {
       issues.push({
         severity: 'info',
         category: 'tracking',
-        title: 'Server-Side Google Tag Manager erkannt',
-        description: 'Es wurde ein Server-Side GTM Setup erkannt. Dies verbessert die Datenqualität und reduziert Client-Side Blocking.',
-        recommendation: 'Stellen Sie sicher, dass auch Server-Side Tags Consent-Signale respektieren.',
+        title: 'Server-Side GTM erkannt',
+        description: 'Server-Side GTM verbessert Datenqualität, erfordert aber Consent-Dokumentation.',
       });
     }
 
-    // Meta Conversions API
-    if (summary.hasMetaCAPI) {
+    if (summary.hasCookieBridging) {
       issues.push({
-        severity: 'info',
+        severity: 'warning',
         category: 'tracking',
-        title: 'Meta Conversions API (CAPI) erkannt',
-        description: 'Server-Side Tracking für Meta/Facebook wurde erkannt. Dies verbessert die Attribution und Event-Qualität.',
-        recommendation: 'Implementieren Sie Event-Deduplizierung zwischen Browser-Pixel und Server-API.',
+        title: 'Cookie Bridging erkannt',
+        description: 'First-Party Cookie Bridging erkannt. Dies erfordert besondere DSGVO-Aufmerksamkeit.',
+        recommendation: 'Dokumentieren Sie Cookie Bridging in Ihrer Datenschutzerklärung.',
       });
-    }
-
-    // First-Party Proxies
-    if (summary.hasFirstPartyProxy) {
-      const endpoints = trackingTags.serverSideTracking.firstPartyEndpoints;
-      issues.push({
-        severity: 'info',
-        category: 'tracking',
-        title: 'First-Party Tracking Proxy erkannt',
-        description: `Es wurden ${endpoints.length} First-Party Endpoint(s) für Tracking erkannt.`,
-        recommendation: 'First-Party Tracking kann Ad-Blocker umgehen, erfordert aber besondere DSGVO-Aufmerksamkeit.',
-      });
-    }
-
-    // TikTok Events API
-    if (summary.hasTikTokEventsAPI) {
-      issues.push({
-        severity: 'info',
-        category: 'tracking',
-        title: 'TikTok Events API erkannt',
-        description: 'Server-Side Tracking für TikTok wurde erkannt.',
-        recommendation: 'Stellen Sie sicher, dass Server-Side Events mit Consent-Status synchronisiert sind.',
-      });
-    }
-
-    // LinkedIn CAPI
-    if (summary.hasLinkedInCAPI) {
-      issues.push({
-        severity: 'info',
-        category: 'tracking',
-        title: 'LinkedIn Conversions API erkannt',
-        description: 'Server-Side Tracking für LinkedIn wurde erkannt.',
-        recommendation: 'Implementieren Sie Event-Deduplizierung zwischen Insight Tag und Conversions API.',
-      });
-    }
-
-    // Detaillierte Server-Side Indikatoren
-    for (const indicator of trackingTags.serverSideTracking.indicators) {
-      if (indicator.confidence === 'high' && indicator.evidence.length > 0) {
-        issues.push({
-          severity: 'info',
-          category: 'tracking',
-          title: `Server-Side Tracking: ${indicator.description}`,
-          description: `Evidenz: ${indicator.evidence.slice(0, 2).join('; ')}`,
-          recommendation: 'Server-Side Tracking erfordert besondere Datenschutz-Dokumentation.',
-        });
-      }
     }
   }
 
-  // GTM Container Issues
-  if (trackingTags.googleTagManager.hasMultipleContainers) {
-    issues.push({
-      severity: 'warning',
-      category: 'tracking',
-      title: 'Mehrere GTM Container erkannt',
-      description: `Es wurden ${trackingTags.googleTagManager.containerIds.length} GTM Container gefunden: ${trackingTags.googleTagManager.containerIds.join(', ')}.`,
-      recommendation: 'Konsolidieren Sie Container wenn möglich, um Konflikte und doppelte Tags zu vermeiden.',
-    });
-  }
-
-  // Server-Side GTM im GTM Ergebnis
-  if (trackingTags.googleTagManager.serverSideGTM?.detected) {
-    const sgtm = trackingTags.googleTagManager.serverSideGTM;
-    issues.push({
-      severity: 'info',
-      category: 'tracking',
-      title: 'Server-Side GTM Endpoint',
-      description: sgtm.isFirstParty 
-        ? `First-Party sGTM auf ${sgtm.domain || 'eigener Domain'} erkannt.`
-        : 'Server-Side GTM wurde erkannt.',
-      recommendation: 'Dokumentieren Sie den Server-Side Datenfluss in Ihrer Datenschutzerklärung.',
-    });
-  }
-
-  // Marketing-Parameter Monitoring
-  if (trackingTags.marketingParameters.any) {
-    const activeParams = Object.entries(trackingTags.marketingParameters)
-      .filter(([key, value]) => key !== 'any' && value)
-      .map(([key]) => key)
-      .join(', ');
-
-    issues.push({
-      severity: 'info',
-      category: 'tracking',
-      title: 'Marketing-Parameter erkannt',
-      description: `Folgende Kampagnen-Parameter wurden gefunden: ${activeParams}.`,
-      recommendation: 'Stellen Sie sicher, dass Parameter nur nach Consent verarbeitet und gespeichert werden.',
-    });
-  }
-
-  // Lange Laufzeiten von Cookies kennzeichnen (besonders Marketing/Analytics)
+  // Cookie Issues
   const longLivedCookies = cookies.filter(c => c.isLongLived && (c.category === 'marketing' || c.category === 'analytics'));
   if (longLivedCookies.length > 0) {
     issues.push({
@@ -466,7 +709,7 @@ function generateIssues(
       category: 'cookies',
       title: 'Sehr lange Cookie-Laufzeiten',
       description: `${longLivedCookies.length} Marketing/Analytics-Cookie(s) haben eine Laufzeit > 400 Tage.`,
-      recommendation: 'Reduzieren Sie die Gültigkeit auf maximal 13 Monate, um DSGVO-Konformität zu erleichtern.',
+      recommendation: 'Reduzieren Sie die Gültigkeit auf maximal 13 Monate.',
     });
   }
 
@@ -477,15 +720,16 @@ function calculateScore(
   cookieBanner: AnalysisResult['cookieBanner'],
   tcf: AnalysisResult['tcf'],
   googleConsentMode: AnalysisResult['googleConsentMode'],
-  issues: Issue[]
+  issues: Issue[],
+  cookieConsentTest: CookieConsentTestResult | undefined,
+  gdprChecklist: GDPRChecklistResult
 ): number {
   let score = 100;
 
-  // Abzüge für Errors
   const errors = issues.filter(i => i.severity === 'error').length;
   const warnings = issues.filter(i => i.severity === 'warning').length;
   
-  score -= errors * 20;
+  score -= errors * 15;
   score -= warnings * 5;
 
   // Bonus für gute Implementierung
@@ -499,9 +743,27 @@ function calculateScore(
 
   if (googleConsentMode.detected && googleConsentMode.version === 'v2') {
     score += 5;
+    // Extra Bonus für Update-Funktion
+    if (googleConsentMode.updateConsent?.detected) {
+      score += 3;
+    }
   }
 
-  // Score begrenzen
+  // Cookie-Consent-Test Bonus/Abzug
+  if (cookieConsentTest) {
+    if (cookieConsentTest.analysis.consentWorksProperly && cookieConsentTest.analysis.rejectWorksProperly) {
+      score += 10;
+    }
+    
+    if (cookieConsentTest.analysis.trackingBeforeConsent) {
+      score -= 15;
+    }
+  }
+
+  // GDPR Score einbeziehen
+  const gdprWeight = gdprChecklist.score * 0.2;
+  score = Math.round(score * 0.8 + gdprWeight);
+
   return Math.max(0, Math.min(100, score));
 }
 
@@ -510,3 +772,6 @@ export { analyzeCookieBanner } from './cookieBannerAnalyzer';
 export { analyzeTCF } from './tcfAnalyzer';
 export { analyzeGoogleConsentMode } from './googleConsentModeAnalyzer';
 export { analyzeTrackingTags } from './trackingTagsAnalyzer';
+export { analyzeDataLayer } from './dataLayerAnalyzer';
+export { analyzeThirdPartyDomains } from './thirdPartyAnalyzer';
+export { analyzeGDPRCompliance, analyzeDMACompliance } from './complianceAnalyzer';

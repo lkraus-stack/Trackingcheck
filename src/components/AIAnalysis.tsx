@@ -7,9 +7,10 @@ import ReactMarkdown from 'react-markdown';
 
 interface AIAnalysisProps {
   result: AnalysisResult;
+  onAnalysisGenerated?: (analysis: string | null) => void;
 }
 
-export function AIAnalysis({ result }: AIAnalysisProps) {
+export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export function AIAnalysis({ result }: AIAnalysisProps) {
       }
 
       setAiAnalysis(data.analysis);
+      onAnalysisGenerated?.(data.analysis);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
     } finally {

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Globe, Loader2 } from 'lucide-react';
-import { AnalysisResult } from '@/types';
+import { Send, Globe, Loader2, History, RefreshCw, Brain, CheckCircle2, XCircle, Clock, Sparkles } from 'lucide-react';
+import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
+import { getAnalysisHistory, addToHistory, removeFromHistory, clearHistory } from '@/lib/cache/analysisCache';
 
 interface Message {
   id: string;
@@ -12,6 +13,13 @@ interface Message {
   timestamp: Date;
   analysisResult?: AnalysisResult;
   isLoading?: boolean;
+  analysisSteps?: AnalysisStep[];
+  error?: {
+    type: string;
+    message: string;
+    details?: string;
+  };
+  fromCache?: boolean;
 }
 
 export function ChatInterface() {
@@ -19,13 +27,20 @@ export function ChatInterface() {
     {
       id: '1',
       role: 'system',
-      content: 'Willkommen beim Tracking Checker! 👋 Geben Sie eine Website-URL ein, und ich analysiere das Tracking-Setup, den Cookie-Banner und die Einwilligungssignale für Sie.',
+      content: 'Willkommen beim Tracking Checker! 👋 Geben Sie eine Website-URL ein, und ich analysiere das Tracking-Setup, den Cookie-Banner, die Einwilligungssignale und die DSGVO/DMA-Compliance für Sie.',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // History laden
+  useEffect(() => {
+    setHistory(getAnalysisHistory());
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,45 +63,77 @@ export function ChatInterface() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const simulateAnalysisSteps = (loadingId: string) => {
+    const steps: { step: string; message: string; delay: number }[] = [
+      { step: 'init', message: '🔧 Browser wird initialisiert...', delay: 500 },
+      { step: 'connect', message: '🌐 Verbindung zur Website wird hergestellt...', delay: 1500 },
+      { step: 'load', message: '📄 Seite wird geladen und gerendert...', delay: 3000 },
+      { step: 'cookies', message: '🍪 Cookies werden erfasst...', delay: 5000 },
+      { step: 'scripts', message: '📜 Scripts und Tracking-Tags werden analysiert...', delay: 7000 },
+      { step: 'consent', message: '🛡️ Consent-Implementierung wird geprüft...', delay: 9000 },
+      { step: 'banner', message: '🖼️ Cookie-Banner wird getestet...', delay: 12000 },
+      { step: 'compliance', message: '⚖️ DSGVO & DMA Compliance wird bewertet...', delay: 15000 },
+    ];
+
+    steps.forEach(({ step, message, delay }) => {
+      setTimeout(() => {
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === loadingId && msg.isLoading
+              ? { ...msg, content: message }
+              : msg
+          )
+        );
+      }, delay);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent, urlOverride?: string, skipCache?: boolean) => {
+    e?.preventDefault?.();
+    const urlToAnalyze = urlOverride || input;
+    
+    if (!urlToAnalyze.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input,
+      content: urlToAnalyze,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    if (!urlOverride) setInput('');
 
-    if (!isValidUrl(input)) {
+    if (!isValidUrl(urlToAnalyze)) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: 'Das sieht nicht wie eine gültige URL aus. Bitte geben Sie eine Website-Adresse ein (z.B. www.example.com)',
         timestamp: new Date(),
+        error: {
+          type: 'validation',
+          message: 'Ungültige URL',
+        },
       };
       setMessages((prev) => [...prev, errorMessage]);
       return;
     }
 
-    // Loading Message
+    // Loading Message mit animierten Schritten
     const loadingId = (Date.now() + 1).toString();
     setMessages((prev) => [
       ...prev,
       {
         id: loadingId,
         role: 'assistant',
-        content: 'Analysiere Website...',
+        content: '🔧 Analyse wird vorbereitet...',
         timestamp: new Date(),
         isLoading: true,
       },
     ]);
 
     setIsLoading(true);
+    simulateAnalysisSteps(loadingId);
 
     try {
       const response = await fetch('/api/analyze', {
@@ -94,13 +141,26 @@ export function ChatInterface() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: input.trim() }),
+        body: JSON.stringify({ 
+          url: urlToAnalyze.trim(),
+          options: { skipCache },
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.details || data.error || 'Analyse fehlgeschlagen');
+        throw {
+          type: data.error || 'Analyse fehlgeschlagen',
+          message: data.details || 'Ein unbekannter Fehler ist aufgetreten.',
+          technical: data.technicalError,
+        };
+      }
+
+      // History aktualisieren
+      if (data.status === 'success') {
+        addToHistory(data);
+        setHistory(getAnalysisHistory());
       }
 
       // Loading Message ersetzen mit Ergebnis
@@ -109,22 +169,32 @@ export function ChatInterface() {
           msg.id === loadingId
             ? {
                 ...msg,
-                content: `Analyse für ${data.url} abgeschlossen!`,
+                content: data.fromCache 
+                  ? `✅ Analyse für ${data.url} (aus Cache)`
+                  : `✅ Analyse für ${data.url} abgeschlossen!`,
                 isLoading: false,
                 analysisResult: data as AnalysisResult,
+                analysisSteps: data.analysisSteps,
+                fromCache: data.fromCache,
               }
             : msg
         )
       );
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      const errorInfo = error as { type?: string; message?: string; technical?: string };
+      
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === loadingId
             ? {
                 ...msg,
-                content: `Fehler bei der Analyse: ${errorMessage}`,
+                content: `❌ ${errorInfo.type || 'Fehler bei der Analyse'}`,
                 isLoading: false,
+                error: {
+                  type: errorInfo.type || 'error',
+                  message: errorInfo.message || 'Unbekannter Fehler',
+                  details: errorInfo.technical,
+                },
               }
             : msg
         )
@@ -134,8 +204,17 @@ export function ChatInterface() {
     }
   };
 
+  const handleHistoryClick = (item: AnalysisHistoryItem) => {
+    setShowHistory(false);
+    handleSubmit({ preventDefault: () => {} } as React.FormEvent, item.url);
+  };
+
+  const handleRefresh = (url: string) => {
+    handleSubmit({ preventDefault: () => {} } as React.FormEvent, url, true);
+  };
+
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-5xl mx-auto">
+    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto">
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
@@ -144,7 +223,7 @@ export function ChatInterface() {
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+              className={`max-w-[90%] rounded-2xl px-4 py-3 ${
                 message.role === 'user'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
                   : message.role === 'system'
@@ -153,19 +232,64 @@ export function ChatInterface() {
               }`}
             >
               {message.isLoading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{message.content}</span>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Brain className="w-5 h-5 text-purple-400 animate-pulse" />
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-ping" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm">{message.content}</span>
+                    <span className="text-xs text-slate-400 mt-1">Dies kann bis zu 60 Sekunden dauern...</span>
+                  </div>
+                </div>
+              ) : message.error ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-5 h-5 text-red-400" />
+                    <span className="font-medium text-red-400">{message.error.type}</span>
+                  </div>
+                  <p className="text-sm text-slate-300">{message.error.message}</p>
+                  {message.error.details && (
+                    <p className="text-xs text-slate-500 mt-2 font-mono bg-slate-900/50 p-2 rounded">
+                      {message.error.details}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent, messages[messages.length - 2]?.content)}
+                    className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Erneut versuchen
+                  </button>
                 </div>
               ) : (
                 <>
-                  <p className="text-sm">{message.content}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm">{message.content}</p>
+                    {message.fromCache && (
+                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Cache
+                      </span>
+                    )}
+                  </div>
                   {message.analysisResult && (
-                    <ResultCard result={message.analysisResult} />
+                    <div className="mt-3">
+                      {message.fromCache && (
+                        <button
+                          onClick={() => handleRefresh(message.analysisResult!.url)}
+                          className="mb-3 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Neue Analyse durchführen
+                        </button>
+                      )}
+                      <ResultCard result={message.analysisResult} />
+                    </div>
                   )}
                 </>
               )}
-              <span className="text-xs opacity-50 mt-1 block">
+              <span className="text-xs opacity-50 mt-2 block">
                 {message.timestamp.toLocaleTimeString('de-DE', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -177,9 +301,62 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* History Panel */}
+      {showHistory && history.length > 0 && (
+        <div className="absolute bottom-24 left-4 right-4 max-w-5xl mx-auto bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-80 overflow-y-auto z-50">
+          <div className="sticky top-0 bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
+            <span className="font-medium text-slate-200">Letzte Analysen</span>
+            <button
+              onClick={() => {
+                clearHistory();
+                setHistory([]);
+              }}
+              className="text-xs text-slate-400 hover:text-red-400"
+            >
+              Alle löschen
+            </button>
+          </div>
+          <div className="p-2">
+            {history.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleHistoryClick(item)}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-700/50 rounded-lg transition-colors"
+              >
+                <div className="flex-1 text-left">
+                  <p className="text-sm text-slate-200 truncate">{item.url}</p>
+                  <p className="text-xs text-slate-500">
+                    {new Date(item.timestamp).toLocaleDateString('de-DE')} • Score: {item.score}
+                  </p>
+                </div>
+                <div className={`ml-3 px-2 py-1 rounded text-xs font-medium ${
+                  item.score >= 80 ? 'bg-green-500/20 text-green-400' :
+                  item.score >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  {item.score}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="border-t border-slate-800 p-4 bg-slate-900/50 backdrop-blur">
         <form onSubmit={handleSubmit} className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowHistory(!showHistory)}
+            className={`p-3 rounded-xl border transition-colors ${
+              showHistory 
+                ? 'bg-indigo-600 border-indigo-500 text-white' 
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+            }`}
+            title="Historie anzeigen"
+          >
+            <History className="w-5 h-5" />
+          </button>
           <div className="relative flex-1">
             <Globe className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-500" />
             <input
