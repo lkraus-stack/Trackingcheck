@@ -1,0 +1,133 @@
+// Vantero KI API Client (OpenAI-kompatibel)
+
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface ChatCompletionResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export class VanteroClient {
+  private apiKey: string;
+  private apiUrl: string;
+  private model: string;
+
+  constructor() {
+    this.apiKey = process.env.VANTERO_API_KEY || 'sk_vantero_nzmqq8WzNqkg5O_orLgeC6_1u80Q1xnU';
+    this.apiUrl = process.env.VANTERO_API_URL || 'https://api.vantero.de/v1';
+    this.model = process.env.VANTERO_MODEL || 'gpt-4o-mini';
+  }
+
+  isConfigured(): boolean {
+    return !!this.apiKey && this.apiKey.startsWith('sk_vantero_');
+  }
+
+  async chat(messages: ChatMessage[], options?: {
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<string> {
+    if (!this.isConfigured()) {
+      throw new Error('Vantero API ist nicht konfiguriert. Bitte VANTERO_API_KEY in .env.local setzen.');
+    }
+
+    const response = await fetch(`${this.apiUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        temperature: options?.temperature ?? 0.7,
+        max_tokens: options?.maxTokens ?? 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Vantero API Fehler: ${response.status} - ${errorText}`);
+    }
+
+    const data: ChatCompletionResponse = await response.json();
+    return data.choices[0]?.message?.content || '';
+  }
+
+  async analyzeTrackingResults(analysisData: unknown): Promise<string> {
+    const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
+Analysiere die folgenden Tracking-Checker Ergebnisse und erstelle eine verständliche Zusammenfassung.
+
+Deine Aufgaben:
+1. Fasse die wichtigsten Erkenntnisse zusammen
+2. Identifiziere kritische Probleme
+3. Gib konkrete Handlungsempfehlungen
+4. Erkläre technische Details verständlich
+
+Antworte auf Deutsch und strukturiere deine Antwort mit Überschriften und Aufzählungen.`;
+
+    const userPrompt = `Hier sind die Analyse-Ergebnisse einer Website:
+
+${JSON.stringify(analysisData, null, 2)}
+
+Bitte analysiere diese Daten und erstelle einen verständlichen Bericht mit:
+1. Zusammenfassung des Compliance-Status
+2. Gefundene Tracking-Implementierungen
+3. Probleme und Risiken
+4. Konkrete Handlungsempfehlungen zur Verbesserung`;
+
+    return this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], {
+      temperature: 0.5,
+      maxTokens: 2500,
+    });
+  }
+
+  async answerQuestion(question: string, context: unknown): Promise<string> {
+    const systemPrompt = `Du bist ein Experte für Web-Tracking und DSGVO-Compliance.
+Dir liegen Analyse-Ergebnisse einer Website vor. Beantworte Fragen basierend auf diesen Daten.
+Antworte präzise, hilfreich und auf Deutsch.`;
+
+    const userPrompt = `Analyse-Kontext:
+${JSON.stringify(context, null, 2)}
+
+Frage des Nutzers: ${question}`;
+
+    return this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], {
+      temperature: 0.7,
+      maxTokens: 1500,
+    });
+  }
+}
+
+// Singleton Instance
+let clientInstance: VanteroClient | null = null;
+
+export function getVanteroClient(): VanteroClient {
+  if (!clientInstance) {
+    clientInstance = new VanteroClient();
+  }
+  return clientInstance;
+}
