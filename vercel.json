@@ -1,7 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd tracking-checker && npm run build",
-  "outputDirectory": "tracking-checker/.next",
-  "installCommand": "cd tracking-checker && npm install",
-  "framework": "nextjs"
-}
