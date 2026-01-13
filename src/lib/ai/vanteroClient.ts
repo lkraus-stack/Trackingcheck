@@ -48,19 +48,45 @@ export class VanteroClient {
       throw new Error('Vantero API ist nicht konfiguriert. Bitte VANTERO_API_KEY in .env.local setzen.');
     }
 
-    const response = await fetch(`${this.apiUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        temperature: options?.temperature ?? 0.7,
-        max_tokens: options?.maxTokens ?? 2000,
-      }),
-    });
+    const url = `${this.apiUrl}/chat/completions`;
+    
+    // Timeout Controller für Serverless-Umgebungen
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 Sekunden
+    
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          temperature: options?.temperature ?? 0.7,
+          max_tokens: options?.maxTokens ?? 2000,
+        }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      // Network-Error oder Timeout
+      if (fetchError instanceof Error) {
+        if (fetchError.name === 'AbortError' || fetchError.message.includes('timeout') || fetchError.message.includes('aborted')) {
+          throw new Error(`API-Timeout: Die Anfrage dauerte zu lange (30s). Modell: ${this.model}, URL: ${this.apiUrl}`);
+        }
+        if (fetchError.message.includes('fetch') || fetchError.message.includes('network') || fetchError.message.includes('ECONNREFUSED')) {
+          throw new Error(`Netzwerk-Fehler: Kann die Vantero API nicht erreichen (${this.apiUrl}). Bitte prüfe:\n- Ist die API-URL korrekt?\n- Ist die API erreichbar?\n- Gibt es Firewall/CORS-Probleme?`);
+        }
+        throw new Error(`API-Verbindungsfehler: ${fetchError.message}`);
+      }
+      throw new Error('Unbekannter Netzwerk-Fehler beim Verbinden zur Vantero API');
+    }
 
     if (!response.ok) {
       let errorText = '';

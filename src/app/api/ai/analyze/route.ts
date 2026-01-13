@@ -23,6 +23,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Debug: Log API-Konfiguration (ohne Key)
+    console.log('Vantero API Config:', {
+      url: process.env.VANTERO_API_URL,
+      model: process.env.VANTERO_MODEL,
+      hasKey: !!process.env.VANTERO_API_KEY,
+    });
+
     // KI-Analyse durchführen
     const aiAnalysis = await client.analyzeTrackingResults(analysisResult);
 
