@@ -63,12 +63,44 @@ export class VanteroClient {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Vantero API Fehler: ${response.status} - ${errorText}`);
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch {
+        errorText = 'Keine Fehlerdetails verfügbar';
+      }
+      
+      // Versuche JSON-Fehler zu parsen
+      let errorMessage = `Vantero API Fehler: ${response.status}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error?.message) {
+          errorMessage = `${errorMessage} - ${errorJson.error.message}`;
+        } else if (errorJson.message) {
+          errorMessage = `${errorMessage} - ${errorJson.message}`;
+        } else {
+          errorMessage = `${errorMessage} - ${errorText}`;
+        }
+      } catch {
+        errorMessage = `${errorMessage} - ${errorText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data: ChatCompletionResponse = await response.json();
-    return data.choices[0]?.message?.content || '';
+    
+    // Prüfe ob Antwort-Struktur korrekt ist
+    if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      throw new Error(`Unerwartete API-Antwort-Struktur. Modell: ${this.model}`);
+    }
+    
+    const content = data.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error(`Keine Antwort vom Modell erhalten. Modell: ${this.model}, Finish Reason: ${data.choices[0]?.finish_reason}`);
+    }
+    
+    return content;
   }
 
   async analyzeTrackingResults(analysisData: unknown): Promise<string> {
