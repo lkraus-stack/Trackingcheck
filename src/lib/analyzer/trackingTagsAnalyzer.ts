@@ -1163,7 +1163,7 @@ function analyzeServerSideTracking(
       type: 'cookie_bridging',
       confidence: cookieBridgingResult.confidence,
       description: 'Cookie Bridging erkannt',
-      evidence: cookieBridgingResult.evidence,
+      evidence: cookieBridgingResult.indicators,
     });
   }
 
