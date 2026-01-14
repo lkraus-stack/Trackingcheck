@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, MessageSquare, Send, Bot, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, MessageSquare, Send, Bot, AlertCircle, AlertTriangle } from 'lucide-react';
 import { AnalysisResult } from '@/types';
 import ReactMarkdown from 'react-markdown';
 
@@ -12,6 +12,7 @@ interface AIAnalysisProps {
 
 export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [validation, setValidation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
@@ -40,6 +41,7 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
       }
 
       setAiAnalysis(data.analysis);
+      setValidation(data.validation || null);
       onAnalysisGenerated?.(data.analysis);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
@@ -120,40 +122,69 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
 
       {/* KI-Analyse Ergebnis */}
       {aiAnalysis && (
-        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-500/30 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-purple-500/10 border-b border-purple-500/30">
-            <Bot className="w-5 h-5 text-purple-400" />
-            <span className="font-medium text-purple-300">KI-Auswertung</span>
-          </div>
-          <div className="p-4 prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown
-              components={{
-                h1: ({ children }) => <h1 className="text-lg font-bold text-slate-200 mt-4 mb-2">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-base font-semibold text-slate-200 mt-3 mb-2">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-300 mt-2 mb-1">{children}</h3>,
-                p: ({ children }) => <p className="text-slate-300 text-sm mb-2">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ol>,
-                li: ({ children }) => <li className="text-slate-300">{children}</li>,
-                strong: ({ children }) => <strong className="text-slate-200 font-semibold">{children}</strong>,
-                code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-purple-300">{children}</code>,
-              }}
-            >
-              {aiAnalysis}
-            </ReactMarkdown>
+        <>
+          <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-500/30 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 bg-purple-500/10 border-b border-purple-500/30">
+              <Bot className="w-5 h-5 text-purple-400" />
+              <span className="font-medium text-purple-300">KI-Auswertung</span>
+            </div>
+            <div className="p-4 prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => <h1 className="text-lg font-bold text-slate-200 mt-4 mb-2">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-base font-semibold text-slate-200 mt-3 mb-2">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-300 mt-2 mb-1">{children}</h3>,
+                  p: ({ children }) => <p className="text-slate-300 text-sm mb-2">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ol>,
+                  li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                  strong: ({ children }) => <strong className="text-slate-200 font-semibold">{children}</strong>,
+                  code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-purple-300">{children}</code>,
+                }}
+              >
+                {aiAnalysis}
+              </ReactMarkdown>
+            </div>
+
+            {/* Chat Toggle */}
+            <div className="px-4 py-3 border-t border-purple-500/30">
+              <button
+                onClick={() => setShowChat(!showChat)}
+                className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" />
+                {showChat ? 'Chat ausblenden' : 'Rückfragen stellen'}
+              </button>
+            </div>
           </div>
 
-          {/* Chat Toggle */}
-          <div className="px-4 py-3 border-t border-purple-500/30">
-            <button
-              onClick={() => setShowChat(!showChat)}
-              className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" />
-              {showChat ? 'Chat ausblenden' : 'Rückfragen stellen'}
-            </button>
-          </div>
-        </div>
+          {/* Validierungs-Ergebnisse */}
+          {validation && (
+            <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-500/30 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-amber-500/10 border-b border-amber-500/30">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                <span className="font-medium text-amber-300">KI-Validierung & Überprüfung</span>
+              </div>
+              <div className="p-4 prose prose-invert prose-sm max-w-none">
+                <ReactMarkdown
+                  components={{
+                    h1: ({ children }) => <h1 className="text-lg font-bold text-slate-200 mt-4 mb-2">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-base font-semibold text-slate-200 mt-3 mb-2">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-300 mt-2 mb-1">{children}</h3>,
+                    p: ({ children }) => <p className="text-slate-300 text-sm mb-2">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ol>,
+                    li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                    strong: ({ children }) => <strong className="text-slate-200 font-semibold">{children}</strong>,
+                    code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-amber-300">{children}</code>,
+                  }}
+                >
+                  {validation}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Chat Interface */}

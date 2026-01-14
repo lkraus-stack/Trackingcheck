@@ -65,6 +65,7 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
   const hasAcceptButton = detectAcceptButton(htmlLower);
   const hasRejectButton = detectRejectButton(htmlLower);
   const hasSettingsOption = detectSettingsOption(htmlLower);
+  const hasPrivacyPolicyLink = detectPrivacyPolicyLink(htmlLower, combinedLower);
 
   // Prüfen ob Banner Content blockiert
   const blocksContent = detectContentBlocking(html);
@@ -76,6 +77,7 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
     hasRejectButton,
     hasSettingsOption,
     blocksContent,
+    hasPrivacyPolicyLink,
   };
 }
 
@@ -228,4 +230,32 @@ function detectContentBlocking(html: string): boolean {
   );
 
   return hasOverlay || hasBlockingClass;
+}
+
+function detectPrivacyPolicyLink(htmlLower: string, combinedLower: string): boolean {
+  // Prüfe auf Links zu Datenschutzerklärung
+  const privacyLinkPatterns = [
+    'datenschutz',
+    'privacy',
+    'datenschutzerklärung',
+    'privacy policy',
+    'datenschutzhinweis',
+    'datenschutzinformation',
+  ];
+
+  for (const pattern of privacyLinkPatterns) {
+    // Prüfe ob es ein Link ist (href-Attribut)
+    const linkRegex = new RegExp(`<a[^>]*href[^>]*[^>]*>.*?${pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*?</a>`, 'i');
+    if (linkRegex.test(htmlLower)) {
+      return true;
+    }
+    
+    // Alternative: Prüfe auf href mit datenschutz/privacy im Link
+    const hrefRegex = new RegExp(`href=["'][^"']*(?:datenschutz|privacy)[^"']*["']`, 'i');
+    if (hrefRegex.test(htmlLower) || hrefRegex.test(combinedLower)) {
+      return true;
+    }
+  }
+
+  return false;
 }
