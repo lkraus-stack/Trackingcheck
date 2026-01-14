@@ -59,6 +59,7 @@ export interface CookieBannerResult {
   hasRejectButton: boolean;
   hasSettingsOption: boolean;
   blocksContent: boolean;
+  hasPrivacyPolicyLink?: boolean;
 }
 
 export interface TCFResult {

@@ -202,6 +202,14 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     c => c.category === 'analytics' || c.category === 'marketing'
   );
   
+  // Prüfen ob "Speichern"-Button verwendet wurde und nur essentielle Cookies gesetzt wurden
+  const isSaveButton = testData.afterReject.buttonText && 
+    (testData.afterReject.buttonText.toLowerCase().includes('speichern') || 
+     testData.afterReject.buttonText.toLowerCase().includes('save'));
+  
+  const onlyEssentialCookiesAfterSave = isSaveButton && 
+    afterRejectCookies.every(c => c.category === 'necessary');
+  
   const issues: CookieConsentIssue[] = [];
   
   if (trackingCookiesBefore.length > 0) {
@@ -249,8 +257,8 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     (newCookiesAfterAccept.length > 0 || afterAcceptCookies.length > beforeCookies.length);
   
   const rejectWorksProperly = 
-    testData.afterReject.clickSuccessful && 
-    trackingCookiesAfterReject.length === 0;
+    (testData.afterReject.clickSuccessful && trackingCookiesAfterReject.length === 0) ||
+    (isSaveButton && onlyEssentialCookiesAfterSave);
   
   return {
     beforeConsent: {

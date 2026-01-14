@@ -178,6 +178,73 @@ Frage des Nutzers: ${question}`;
       maxTokens: 1500,
     });
   }
+
+  async explainSection(sectionName: string, sectionData: unknown, fullAnalysis: unknown): Promise<string> {
+    const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
+Erkläre dem Nutzer, wofür eine bestimmte Analyse-Sektion gut ist und wie sie sich auswirkt.
+Antworte präzise, verständlich und auf Deutsch. Maximal 200 Wörter.`;
+
+    const userPrompt = `Erkläre die Sektion "${sectionName}" in einem Tracking-Checker:
+- Was wird hier analysiert?
+- Wofür ist diese Analyse gut?
+- Wie wirkt sich das Ergebnis aus?
+- Was bedeutet das für die DSGVO-Compliance?
+
+Sektions-Daten:
+${JSON.stringify(sectionData, null, 2)}
+
+Vollständige Analyse (für Kontext):
+${JSON.stringify(fullAnalysis, null, 2)}`;
+
+    return this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], {
+      temperature: 0.5,
+      maxTokens: 500,
+    });
+  }
+
+  async validateAndReviewAnalysis(
+    analysisData: unknown,
+    initialAnalysis: string
+  ): Promise<string> {
+    const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
+Deine Aufgabe ist es, die initiale Analyse-Ergebnisse kritisch zu überprüfen und fragliche Punkte oder mögliche Fehler zu identifizieren.
+
+Gehe dabei besonders gründlich vor:
+1. Prüfe auf Widersprüche zwischen den Analyse-Daten
+2. Identifiziere mögliche Fehlinterpretationen
+3. Suche nach fraglichen Punkten, die nochmal überprüft werden sollten
+4. Achte auf inkonsistente Daten oder unlogische Schlussfolgerungen
+5. Empfehle konkrete Verbesserungen
+
+Antworte auf Deutsch und strukturiere deine Antwort mit Überschriften und Aufzählungen.`;
+
+    const userPrompt = `Hier sind die original Analyse-Ergebnisse einer Website:
+
+${JSON.stringify(analysisData, null, 2)}
+
+Und hier ist die initiale KI-Analyse:
+
+${initialAnalysis}
+
+Bitte überprüfe diese Analyse kritisch und identifiziere:
+1. **Widersprüche**: Gibt es Daten, die nicht zusammenpassen?
+2. **Fragliche Punkte**: Was könnte nochmal überprüft werden?
+3. **Mögliche Fehler**: Gibt es Fehlinterpretationen oder unlogische Schlussfolgerungen?
+4. **Verbesserungsvorschläge**: Was könnte an der Analyse präziser sein?
+
+Sei dabei kritisch aber konstruktiv.`;
+
+    return this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], {
+      temperature: 0.3, // Niedrigere Temperatur für kritischere Überprüfung
+      maxTokens: 2000,
+    });
+  }
 }
 
 // Singleton Instance

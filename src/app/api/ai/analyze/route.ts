@@ -33,9 +33,19 @@ export async function POST(request: NextRequest) {
     // KI-Analyse durchführen
     const aiAnalysis = await client.analyzeTrackingResults(analysisResult);
 
+    // Automatische Validierung und Überprüfung
+    let validation = null;
+    try {
+      validation = await client.validateAndReviewAnalysis(analysisResult, aiAnalysis);
+    } catch (validationError) {
+      console.warn('Validierung fehlgeschlagen:', validationError);
+      // Validierung ist optional, wir fahren auch ohne fort
+    }
+
     return NextResponse.json({
       success: true,
       analysis: aiAnalysis,
+      validation: validation, // Validierungsergebnis hinzufügen
     });
   } catch (error) {
     console.error('KI-Analyse Fehler:', error);

@@ -437,8 +437,13 @@ function evaluateGDPRCheck(
 
     case 'rights_access':
       if (cookieBanner.detected) {
-        status = 'warning';
-        details = 'Prüfen Sie, ob Datenschutzinfos im Banner verlinkt sind.';
+        if (cookieBanner.hasPrivacyPolicyLink) {
+          status = 'passed';
+          details = 'Datenschutzerklärung ist im Cookie-Banner verlinkt.';
+        } else {
+          status = 'warning';
+          details = 'Datenschutzinfos sollten im Banner verlinkt sein.';
+        }
       } else {
         status = 'not_applicable';
         details = 'Kein Banner erkannt.';

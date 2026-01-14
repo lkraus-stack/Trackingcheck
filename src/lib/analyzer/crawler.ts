@@ -462,6 +462,8 @@ export class WebCrawler {
       'button:has-text("Nur essenzielle")',
       'button:has-text("Nur erforderliche")',
       'button:has-text("Nein, danke")',
+      'button:has-text("Speichern")',
+      'button:has-text("Save")',
       
       // Englische Texte
       'button:has-text("Reject all")',
@@ -485,7 +487,7 @@ export class WebCrawler {
     const selectors = type === 'accept' ? acceptSelectors : rejectSelectors;
     const textPatterns = type === 'accept' 
       ? ['akzeptieren', 'accept', 'zustimmen', 'agree', 'allow', 'einverstanden', 'verstanden', 'ok']
-      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential'];
+      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential', 'speichern', 'save'];
 
     // Versuche verschiedene Selektoren
     for (const selector of selectors) {
@@ -625,18 +627,39 @@ export class WebCrawler {
 
       // Ablehnen-Button finden und klicken
       const rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
-      result.afterReject.buttonFound = rejectResult.found;
-      result.afterReject.clickSuccessful = rejectResult.clicked;
-      result.afterReject.buttonText = rejectResult.buttonText;
+      
+      // Wenn kein Ablehnen-Button gefunden wurde, versuche "Speichern"-Button (der nur essenzielle Cookies zulässt)
+      if (!rejectResult.found) {
+        const saveResult = await this.findAndClickConsentButton(pageReject, 'reject'); // "Speichern" wird auch als reject behandelt
+        if (saveResult.found && (saveResult.buttonText?.toLowerCase().includes('speichern') || saveResult.buttonText?.toLowerCase().includes('save'))) {
+          result.afterReject.buttonFound = saveResult.found;
+          result.afterReject.clickSuccessful = saveResult.clicked;
+          result.afterReject.buttonText = saveResult.buttonText;
+          
+          if (saveResult.clicked) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const cookiesAfterSave = await pageReject.cookies();
+            result.afterReject.cookies = cookiesAfterSave.map(c => this.mapCookie(c));
+          }
+        } else {
+          result.afterReject.buttonFound = rejectResult.found;
+          result.afterReject.clickSuccessful = rejectResult.clicked;
+          result.afterReject.buttonText = rejectResult.buttonText;
+        }
+      } else {
+        result.afterReject.buttonFound = rejectResult.found;
+        result.afterReject.clickSuccessful = rejectResult.clicked;
+        result.afterReject.buttonText = rejectResult.buttonText;
 
-      // Warten auf Cookie-Änderungen
-      if (rejectResult.clicked) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Warten auf Cookie-Änderungen
+        if (rejectResult.clicked) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        // Cookies NACH Ablehnen sammeln
+        const cookiesAfterReject = await pageReject.cookies();
+        result.afterReject.cookies = cookiesAfterReject.map(c => this.mapCookie(c));
       }
-
-      // Cookies NACH Ablehnen sammeln
-      const cookiesAfterReject = await pageReject.cookies();
-      result.afterReject.cookies = cookiesAfterReject.map(c => this.mapCookie(c));
 
     } finally {
       await pageReject.close();

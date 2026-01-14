@@ -23,10 +23,12 @@ import {
   Filter,
   ArrowUpDown,
   Zap,
+  HelpCircle,
 } from 'lucide-react';
 import { AnalysisResult, Issue, CookieResult } from '@/types';
 import { AIAnalysis } from './AIAnalysis';
 import { exportAnalysisToPDF } from '@/lib/pdf/exportToPdf';
+import { SectionInfoPopup } from './SectionInfoPopup';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -128,6 +130,9 @@ export function ResultCard({ result }: ResultCardProps) {
               ? 'text-green-400'
               : 'text-yellow-400'
           }
+          sectionName="Cookie-Consent Test"
+          sectionData={result.cookieConsentTest}
+          fullAnalysis={result}
         >
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
@@ -194,6 +199,9 @@ export function ResultCard({ result }: ResultCardProps) {
         status={result.cookieBanner.detected}
         expanded={expandedSections.cookieBanner}
         onToggle={() => toggleSection('cookieBanner')}
+        sectionName="Cookie Banner"
+        sectionData={result.cookieBanner}
+        fullAnalysis={result}
       >
         <div className="grid grid-cols-2 gap-3">
           <StatusItem
@@ -232,6 +240,9 @@ export function ResultCard({ result }: ResultCardProps) {
         status={result.googleConsentMode.detected}
         expanded={expandedSections.googleConsentMode}
         onToggle={() => toggleSection('googleConsentMode')}
+        sectionName="Google Consent Mode"
+        sectionData={result.googleConsentMode}
+        fullAnalysis={result}
       >
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -296,6 +307,9 @@ export function ResultCard({ result }: ResultCardProps) {
               ? 'text-green-400'
               : 'text-yellow-400'
           }
+          sectionName="E-Commerce Tracking"
+          sectionData={result.dataLayerAnalysis.ecommerce}
+          fullAnalysis={result}
         >
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -362,6 +376,9 @@ export function ResultCard({ result }: ResultCardProps) {
         }
         expanded={expandedSections.tracking}
         onToggle={() => toggleSection('tracking')}
+        sectionName="Tracking Tags"
+        sectionData={result.trackingTags}
+        fullAnalysis={result}
       >
         <div className="space-y-3">
           <TrackingItem
@@ -462,6 +479,9 @@ export function ResultCard({ result }: ResultCardProps) {
           status={result.thirdPartyDomains.totalCount > 0}
           expanded={expandedSections.thirdParty}
           onToggle={() => toggleSection('thirdParty')}
+          sectionName="Third-Party Domains"
+          sectionData={result.thirdPartyDomains}
+          fullAnalysis={result}
         >
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
@@ -521,6 +541,9 @@ export function ResultCard({ result }: ResultCardProps) {
         status={result.cookies.length > 0}
         expanded={expandedSections.cookies}
         onToggle={() => toggleSection('cookies')}
+        sectionName="Cookies"
+        sectionData={{ cookies: result.cookies, count: result.cookies.length }}
+        fullAnalysis={result}
       >
         <div className="space-y-3">
           {/* Filter und Suche */}
@@ -607,6 +630,9 @@ export function ResultCard({ result }: ResultCardProps) {
             result.gdprChecklist.score >= 50 ? 'text-yellow-400' :
             'text-red-400'
           }
+          sectionName="DSGVO-Checkliste"
+          sectionData={result.gdprChecklist}
+          fullAnalysis={result}
         >
           <div className="space-y-3">
             <div className="grid grid-cols-4 gap-2 text-center">
@@ -655,6 +681,9 @@ export function ResultCard({ result }: ResultCardProps) {
           status={result.dmaCheck.summary.nonCompliant === 0}
           expanded={expandedSections.dma}
           onToggle={() => toggleSection('dma')}
+          sectionName="DMA-Compliance"
+          sectionData={result.dmaCheck}
+          fullAnalysis={result}
         >
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -689,6 +718,9 @@ export function ResultCard({ result }: ResultCardProps) {
           expanded={expandedSections.issues}
           onToggle={() => toggleSection('issues')}
           statusColor="text-yellow-400"
+          sectionName="Probleme & Hinweise"
+          sectionData={{ issues: result.issues, count: result.issues.length }}
+          fullAnalysis={result}
         >
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {result.issues.map((issue, index) => (
@@ -733,6 +765,9 @@ function Section({
   onToggle,
   children,
   statusColor,
+  sectionName,
+  sectionData,
+  fullAnalysis,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -741,6 +776,9 @@ function Section({
   onToggle: () => void;
   children: React.ReactNode;
   statusColor?: string;
+  sectionName?: string;
+  sectionData?: unknown;
+  fullAnalysis?: AnalysisResult;
 }) {
   return (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
@@ -753,6 +791,14 @@ function Section({
             {icon}
           </span>
           <span className="font-medium text-slate-200">{title}</span>
+          {sectionName && sectionData && fullAnalysis && (
+            <SectionInfoPopup
+              sectionName={sectionName}
+              sectionData={sectionData}
+              fullAnalysis={fullAnalysis}
+              trigger={<HelpCircle className="w-4 h-4" />}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2">
           {!statusColor && (
