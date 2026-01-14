@@ -202,13 +202,22 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     c => c.category === 'analytics' || c.category === 'marketing'
   );
   
-  // Prüfen ob "Speichern"-Button verwendet wurde und nur essentielle Cookies gesetzt wurden
+  // Prüfen ob "Speichern"-Button verwendet wurde
   const isSaveButton = Boolean(testData.afterReject.buttonText && 
     (testData.afterReject.buttonText.toLowerCase().includes('speichern') || 
      testData.afterReject.buttonText.toLowerCase().includes('save')));
   
+  // WICHTIG: "Speichern" kann sowohl Akzeptieren als auch Ablehnen sein
+  // Nur wenn NUR essentielle Cookies gesetzt wurden, ist es eine Ablehnung für Marketing
+  // Wenn auch Marketing/Analytics Cookies gesetzt wurden, ist es eine Akzeptanz
   const onlyEssentialCookiesAfterSave = isSaveButton && 
+    afterRejectCookies.length > 0 &&
     afterRejectCookies.every(c => c.category === 'necessary');
+  
+  // Wenn "Speichern" verwendet wurde, aber auch Marketing/Analytics Cookies gesetzt wurden,
+  // dann war es KEINE Ablehnung, sondern eine Akzeptanz
+  const saveButtonAcceptedMarketing = isSaveButton && 
+    afterRejectCookies.some(c => c.category === 'analytics' || c.category === 'marketing');
   
   const issues: CookieConsentIssue[] = [];
   
@@ -220,7 +229,9 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     });
   }
   
-  if (trackingCookiesAfterReject.length > 0) {
+  // Nur Fehler melden, wenn es wirklich eine Ablehnung war
+  // Wenn "Speichern" verwendet wurde und Marketing-Cookies gesetzt wurden, war es eine Akzeptanz
+  if (trackingCookiesAfterReject.length > 0 && !saveButtonAcceptedMarketing) {
     issues.push({
       severity: 'error',
       title: 'Tracking-Cookies trotz Ablehnung',
@@ -244,7 +255,8 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     });
   }
   
-  if (!testData.afterReject.buttonFound) {
+  // Warnung nur ausgeben, wenn kein Button gefunden wurde UND es kein "Speichern"-Button war
+  if (!testData.afterReject.buttonFound && !isSaveButton) {
     issues.push({
       severity: 'warning',
       title: 'Ablehnen-Button nicht gefunden',
@@ -252,12 +264,30 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     });
   }
   
+  // Info hinzufügen, wenn "Speichern"-Button verwendet wurde
+  if (isSaveButton) {
+    if (onlyEssentialCookiesAfterSave) {
+      // "Speichern" mit nur essentiellen Cookies = Ablehnung für Marketing (korrekt)
+    } else if (saveButtonAcceptedMarketing) {
+      // "Speichern" mit Marketing-Cookies = Akzeptanz (nicht als Ablehnung werten)
+      issues.push({
+        severity: 'info',
+        title: '"Speichern"-Button verwendet',
+        description: 'Ein "Speichern"-Button wurde verwendet. Da auch Marketing/Analytics Cookies gesetzt wurden, wurde dies als Akzeptanz gewertet, nicht als Ablehnung.',
+      });
+    }
+  }
+  
   const consentWorksProperly = 
     testData.afterAccept.clickSuccessful && 
     (newCookiesAfterAccept.length > 0 || afterAcceptCookies.length > beforeCookies.length);
   
+  // Ablehnung funktioniert korrekt, wenn:
+  // 1. Expliziter Ablehnen-Button geklickt wurde und keine Tracking-Cookies gesetzt wurden
+  // 2. ODER "Speichern"-Button wurde verwendet und NUR essentielle Cookies gesetzt wurden
+  // NICHT als Ablehnung werten, wenn "Speichern" Marketing-Cookies gesetzt hat
   const rejectWorksProperly = 
-    (testData.afterReject.clickSuccessful && trackingCookiesAfterReject.length === 0) ||
+    (testData.afterReject.clickSuccessful && trackingCookiesAfterReject.length === 0 && !saveButtonAcceptedMarketing) ||
     Boolean(isSaveButton && onlyEssentialCookiesAfterSave);
   
   return {

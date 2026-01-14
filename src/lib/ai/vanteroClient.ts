@@ -181,27 +181,45 @@ Frage des Nutzers: ${question}`;
 
   async explainSection(sectionName: string, sectionData: unknown, fullAnalysis: unknown): Promise<string> {
     const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
-Erkläre dem Nutzer, wofür eine bestimmte Analyse-Sektion gut ist und wie sie sich auswirkt.
-Antworte präzise, verständlich und auf Deutsch. Maximal 200 Wörter.`;
+Erkläre dem Nutzer ausführlich, wofür eine bestimmte Analyse-Sektion gut ist, was sie uns sagt und welche Erkenntnisse wir daraus gewinnen können.
+Antworte detailliert, verständlich und auf Deutsch. Strukturiere deine Antwort mit klaren Abschnitten.`;
 
-    const userPrompt = `Erkläre die Sektion "${sectionName}" in einem Tracking-Checker:
-- Was wird hier analysiert?
-- Wofür ist diese Analyse gut?
-- Wie wirkt sich das Ergebnis aus?
-- Was bedeutet das für die DSGVO-Compliance?
+    const userPrompt = `Erkläre die Sektion "${sectionName}" in einem Tracking-Checker ausführlich:
+
+1. **Was wird hier analysiert?**
+   - Beschreibe detailliert, welche Daten und Aspekte in dieser Sektion untersucht werden
+   - Welche Technologien, Standards oder Mechanismen werden geprüft?
+
+2. **Wofür ist diese Analyse gut?**
+   - Welchen praktischen Nutzen hat diese Analyse?
+   - Welche Probleme kann sie identifizieren?
+   - Welche Compliance-Anforderungen werden damit überprüft?
+
+3. **Was sagt uns das Ergebnis?**
+   - Was können wir aus den Analyse-Ergebnissen lernen?
+   - Welche Erkenntnisse gewinnen wir über die Website?
+   - Welche Rückschlüsse können wir auf die Tracking-Implementierung ziehen?
+   - Was bedeutet das für die Datenschutz-Compliance?
+
+4. **Praktische Auswirkungen**
+   - Wie wirkt sich das Ergebnis auf die DSGVO-Compliance aus?
+   - Welche Risiken oder Chancen ergeben sich daraus?
+   - Was sollte der Website-Betreiber daraus ableiten?
 
 Sektions-Daten:
 ${JSON.stringify(sectionData, null, 2)}
 
 Vollständige Analyse (für Kontext):
-${JSON.stringify(fullAnalysis, null, 2)}`;
+${JSON.stringify(fullAnalysis, null, 2)}
+
+Erstelle eine ausführliche, strukturierte Erklärung mit konkreten Beispielen und praktischen Hinweisen.`;
 
     return this.chat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ], {
       temperature: 0.5,
-      maxTokens: 500,
+      maxTokens: 1200,
     });
   }
 

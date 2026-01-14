@@ -462,8 +462,6 @@ export class WebCrawler {
       'button:has-text("Nur essenzielle")',
       'button:has-text("Nur erforderliche")',
       'button:has-text("Nein, danke")',
-      'button:has-text("Speichern")',
-      'button:has-text("Save")',
       
       // Englische Texte
       'button:has-text("Reject all")',
@@ -487,7 +485,7 @@ export class WebCrawler {
     const selectors = type === 'accept' ? acceptSelectors : rejectSelectors;
     const textPatterns = type === 'accept' 
       ? ['akzeptieren', 'accept', 'zustimmen', 'agree', 'allow', 'einverstanden', 'verstanden', 'ok']
-      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential', 'speichern', 'save'];
+      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential'];
 
     // Versuche verschiedene Selektoren
     for (const selector of selectors) {
@@ -570,6 +568,98 @@ export class WebCrawler {
     return { found: false, clicked: false };
   }
 
+  // "Speichern"-Button finden (kann sowohl Akzeptieren als auch Ablehnen sein, je nach Auswahl)
+  private async findAndClickSaveButton(
+    page: Page
+  ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
+    const saveSelectors = [
+      'button:has-text("Speichern")',
+      'button:has-text("Save")',
+      'button[id*="save"]',
+      'button[class*="save"]',
+    ];
+
+    const savePatterns = ['speichern', 'save'];
+
+    // Versuche verschiedene Selektoren
+    for (const selector of saveSelectors) {
+      try {
+        if (selector.includes(':has-text')) {
+          const textMatch = selector.match(/:has-text\("([^"]+)"\)/);
+          if (textMatch) {
+            const searchText = textMatch[1].toLowerCase();
+            const tagType = selector.split(':')[0];
+            
+            const result = await page.evaluate((tag, text) => {
+              const elements = document.querySelectorAll(tag);
+              for (const el of elements) {
+                const elText = el.textContent?.toLowerCase() || '';
+                if (elText.includes(text.toLowerCase())) {
+                  (el as HTMLElement).click();
+                  return { found: true, text: el.textContent?.trim() };
+                }
+              }
+              return { found: false };
+            }, tagType, searchText);
+            
+            if (result.found) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              return { found: true, clicked: true, buttonText: result.text };
+            }
+          }
+        } else {
+          const element = await page.$(selector);
+          if (element) {
+            const isVisible = await element.isIntersectingViewport();
+            if (isVisible) {
+              const buttonText = await element.evaluate(el => el.textContent?.trim());
+              await element.click();
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              return { found: true, clicked: true, buttonText: buttonText || undefined };
+            }
+          }
+        }
+      } catch {
+        // Selector fehlgeschlagen, nächsten versuchen
+      }
+    }
+
+    // Fallback: Alle Buttons durchsuchen
+    try {
+      const result = await page.evaluate((patterns: string[]) => {
+        const allButtons = document.querySelectorAll('button, a[role="button"], [role="button"], input[type="button"], input[type="submit"]');
+        
+        for (const button of allButtons) {
+          const text = button.textContent?.toLowerCase() || '';
+          const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
+          const title = button.getAttribute('title')?.toLowerCase() || '';
+          
+          const combinedText = `${text} ${ariaLabel} ${title}`;
+          
+          for (const pattern of patterns) {
+            if (combinedText.includes(pattern)) {
+              const rect = button.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) {
+                (button as HTMLElement).click();
+                return { found: true, text: button.textContent?.trim() };
+              }
+            }
+          }
+        }
+        return { found: false };
+      }, savePatterns);
+
+      if (result.found) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return { found: true, clicked: true, buttonText: result.text };
+      }
+    } catch {
+      // Fallback fehlgeschlagen
+    }
+
+    return { found: false, clicked: false };
+  }
+
   // Cookie-Consent-Test durchführen
   async performCookieConsentTest(url: string): Promise<CookieConsentTestData> {
     if (!this.browser) {
@@ -628,10 +718,12 @@ export class WebCrawler {
       // Ablehnen-Button finden und klicken
       const rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
       
-      // Wenn kein Ablehnen-Button gefunden wurde, versuche "Speichern"-Button (der nur essenzielle Cookies zulässt)
+      // Wenn kein expliziter Ablehnen-Button gefunden wurde, versuche "Speichern"-Button
+      // WICHTIG: "Speichern" kann sowohl Akzeptieren als auch Ablehnen sein, je nach Auswahl
+      // Wir prüfen nach dem Klick, welche Cookies gesetzt wurden
       if (!rejectResult.found) {
-        const saveResult = await this.findAndClickConsentButton(pageReject, 'reject'); // "Speichern" wird auch als reject behandelt
-        if (saveResult.found && (saveResult.buttonText?.toLowerCase().includes('speichern') || saveResult.buttonText?.toLowerCase().includes('save'))) {
+        const saveResult = await this.findAndClickSaveButton(pageReject);
+        if (saveResult.found) {
           result.afterReject.buttonFound = saveResult.found;
           result.afterReject.clickSuccessful = saveResult.clicked;
           result.afterReject.buttonText = saveResult.buttonText;
