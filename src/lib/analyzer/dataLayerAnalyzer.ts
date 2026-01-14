@@ -1,5 +1,5 @@
 import { CrawlResult, WindowObjectData } from './crawler';
-import { DataLayerAnalysisResult, DataLayerEvent, EcommerceAnalysis, EcommerceEvent, EcommerceIssue } from '@/types';
+import { DataLayerAnalysisResult, DataLayerEvent, EcommerceAnalysis, EcommerceEvent, EcommerceIssue, DataLayerEntry } from '@/types';
 
 // GA4 E-Commerce Events
 const GA4_ECOMMERCE_EVENTS = [
@@ -75,13 +75,79 @@ export function analyzeDataLayer(crawlResult: CrawlResult): DataLayerAnalysisRes
   // User Properties finden
   const userProperties = findUserProperties(dataLayerContent, combinedContent);
 
+  // Raw DataLayer parsen für Anzeige
+  const rawDataLayer = parseRawDataLayer(dataLayerContent);
+
   return {
     hasDataLayer,
     events,
     ecommerce,
     customDimensions,
     userProperties,
+    rawDataLayer,
   };
+}
+
+// Parst den rohen DataLayer Inhalt für die Anzeige
+function parseRawDataLayer(dataLayerContent: unknown[]): DataLayerEntry[] {
+  const entries: DataLayerEntry[] = [];
+  
+  for (let i = 0; i < dataLayerContent.length; i++) {
+    const item = dataLayerContent[i];
+    
+    if (typeof item !== 'object' || item === null) continue;
+    
+    const obj = item as Record<string, unknown>;
+    const eventName = typeof obj.event === 'string' ? obj.event : undefined;
+    
+    // Bestimme den Typ des Eintrags
+    let type: DataLayerEntry['type'] = 'custom';
+    if (eventName === 'gtm.js') type = 'gtm.js';
+    else if (eventName === 'gtm.dom') type = 'gtm.dom';
+    else if (eventName === 'gtm.load') type = 'gtm.load';
+    else if (eventName?.includes('consent') || obj[0] === 'consent') type = 'consent';
+    else if (obj.ecommerce || GA4_ECOMMERCE_EVENTS.includes(eventName || '')) type = 'ecommerce';
+    else if (eventName === 'page_view' || eventName === 'pageview' || obj.pagePath || obj.pageTitle) type = 'pageview';
+    else if (obj[0] === 'config' || obj[0] === 'js') type = 'config';
+    
+    // Prüfe auf E-Commerce und Consent Daten
+    const hasEcommerce = Boolean(
+      obj.ecommerce || 
+      obj.items || 
+      obj.value !== undefined || 
+      GA4_ECOMMERCE_EVENTS.includes(eventName || '')
+    );
+    
+    const hasConsent = Boolean(
+      obj[0] === 'consent' || 
+      eventName?.includes('consent') ||
+      obj.ad_storage !== undefined ||
+      obj.analytics_storage !== undefined
+    );
+    
+    // Bereinige die Daten für die Anzeige (entferne sehr lange Werte)
+    const cleanedData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'string' && value.length > 500) {
+        cleanedData[key] = value.substring(0, 500) + '... (gekürzt)';
+      } else if (Array.isArray(value) && value.length > 10) {
+        cleanedData[key] = [...value.slice(0, 10), `... und ${value.length - 10} weitere`];
+      } else {
+        cleanedData[key] = value;
+      }
+    }
+    
+    entries.push({
+      index: i,
+      event: eventName,
+      data: cleanedData,
+      type,
+      hasEcommerce,
+      hasConsent,
+    });
+  }
+  
+  return entries;
 }
 
 function analyzeEvents(dataLayerContent: unknown[], content: string): DataLayerEvent[] {
