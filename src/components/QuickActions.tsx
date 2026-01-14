@@ -16,8 +16,14 @@ import {
   FileCode,
   Table,
   Layers,
+  Eye,
+  Filter,
+  Tag,
+  ShoppingCart,
+  Shield,
+  FileText,
 } from 'lucide-react';
-import { AnalysisResult } from '@/types';
+import { AnalysisResult, DataLayerAnalysisResult, DataLayerEntry } from '@/types';
 import {
   standardEvents,
   generateExampleCode,
@@ -34,6 +40,7 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [showDataLayerModal, setShowDataLayerModal] = useState(false);
+  const [showDataLayerViewerModal, setShowDataLayerViewerModal] = useState(false);
 
   const copyToClipboard = async (text: string, actionId: string) => {
     await navigator.clipboard.writeText(text);
@@ -151,6 +158,22 @@ export function QuickActions({ result }: QuickActionsProps) {
             </div>
           </button>
 
+          {/* DataLayer Viewer */}
+          {result.dataLayerAnalysis?.hasDataLayer && (
+            <button
+              onClick={() => setShowDataLayerViewerModal(true)}
+              className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
+            >
+              <Eye className="w-5 h-5 text-sky-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-slate-200">DataLayer Viewer</p>
+                <p className="text-xs text-slate-500">
+                  {result.dataLayerAnalysis.rawDataLayer?.length || result.dataLayerAnalysis.events.length} Einträge
+                </p>
+              </div>
+            </button>
+          )}
+
           {/* Cookies Export */}
           <button
             onClick={exportCookiesCSV}
@@ -248,6 +271,16 @@ export function QuickActions({ result }: QuickActionsProps) {
       {showDataLayerModal && (
         <DataLayerGeneratorModal
           onClose={() => setShowDataLayerModal(false)}
+          onCopy={(text, id) => copyToClipboard(text, id)}
+          copiedAction={copiedAction}
+        />
+      )}
+
+      {/* DataLayer Viewer Modal */}
+      {showDataLayerViewerModal && result.dataLayerAnalysis && (
+        <DataLayerViewerModal
+          dataLayerAnalysis={result.dataLayerAnalysis}
+          onClose={() => setShowDataLayerViewerModal(false)}
           onCopy={(text, id) => copyToClipboard(text, id)}
           copiedAction={copiedAction}
         />
@@ -1106,6 +1139,299 @@ function DataLayerGeneratorModal({
           <p className="text-xs text-slate-500 text-center">
             💡 Tipp: Passe die Beispiel-Werte an deine Produkte/Events an. Für E-Commerce muss der DataLayer VOR dem GTM gefüllt werden.
           </p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// DataLayer Viewer Modal - Zeigt den tatsächlichen DataLayer der Website
+function DataLayerViewerModal({
+  dataLayerAnalysis,
+  onClose,
+  onCopy,
+  copiedAction,
+}: {
+  dataLayerAnalysis: DataLayerAnalysisResult;
+  onClose: () => void;
+  onCopy: (text: string, id: string) => void;
+  copiedAction: string | null;
+}) {
+  const [filter, setFilter] = useState<'all' | 'ecommerce' | 'consent' | 'pageview' | 'custom'>('all');
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const rawDataLayer = dataLayerAnalysis.rawDataLayer || [];
+  
+  // Fallback: Erstelle Einträge aus Events wenn rawDataLayer leer ist
+  const entries: DataLayerEntry[] = rawDataLayer.length > 0 
+    ? rawDataLayer 
+    : dataLayerAnalysis.events.map((e, i) => ({
+        index: i,
+        event: e.event,
+        data: { event: e.event, count: e.count, parameters: e.parameters },
+        type: e.hasEcommerceData ? 'ecommerce' as const : 'custom' as const,
+        hasEcommerce: e.hasEcommerceData,
+        hasConsent: e.event.toLowerCase().includes('consent'),
+      }));
+
+  // Filter anwenden
+  const filteredEntries = entries.filter(entry => {
+    // Filter nach Typ
+    if (filter !== 'all') {
+      if (filter === 'ecommerce' && !entry.hasEcommerce) return false;
+      if (filter === 'consent' && !entry.hasConsent) return false;
+      if (filter === 'pageview' && entry.type !== 'pageview') return false;
+      if (filter === 'custom' && entry.type !== 'custom') return false;
+    }
+    
+    // Suche
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const eventMatch = entry.event?.toLowerCase().includes(searchLower);
+      const dataMatch = JSON.stringify(entry.data).toLowerCase().includes(searchLower);
+      if (!eventMatch && !dataMatch) return false;
+    }
+    
+    return true;
+  });
+
+  // Statistiken
+  const stats = {
+    total: entries.length,
+    ecommerce: entries.filter(e => e.hasEcommerce).length,
+    consent: entries.filter(e => e.hasConsent).length,
+    pageviews: entries.filter(e => e.type === 'pageview').length,
+    gtmEvents: entries.filter(e => e.type === 'gtm.js' || e.type === 'gtm.dom' || e.type === 'gtm.load').length,
+  };
+
+  const getTypeIcon = (type: DataLayerEntry['type']) => {
+    switch (type) {
+      case 'ecommerce': return <ShoppingCart className="w-4 h-4 text-green-400" />;
+      case 'consent': return <Shield className="w-4 h-4 text-purple-400" />;
+      case 'pageview': return <FileText className="w-4 h-4 text-blue-400" />;
+      case 'gtm.js':
+      case 'gtm.dom':
+      case 'gtm.load': return <Tag className="w-4 h-4 text-orange-400" />;
+      case 'config': return <Settings className="w-4 h-4 text-slate-400" />;
+      default: return <Code className="w-4 h-4 text-slate-400" />;
+    }
+  };
+
+  const getTypeBadge = (type: DataLayerEntry['type']) => {
+    const colors: Record<string, string> = {
+      'ecommerce': 'bg-green-500/20 text-green-400',
+      'consent': 'bg-purple-500/20 text-purple-400',
+      'pageview': 'bg-blue-500/20 text-blue-400',
+      'gtm.js': 'bg-orange-500/20 text-orange-400',
+      'gtm.dom': 'bg-orange-500/20 text-orange-400',
+      'gtm.load': 'bg-orange-500/20 text-orange-400',
+      'config': 'bg-slate-500/20 text-slate-400',
+      'custom': 'bg-cyan-500/20 text-cyan-400',
+    };
+    return colors[type] || 'bg-slate-500/20 text-slate-400';
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-5xl max-h-[90vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+          <div className="flex items-center gap-2">
+            <Eye className="w-5 h-5 text-sky-400" />
+            <h3 className="font-medium text-slate-200">DataLayer Viewer</h3>
+            <span className="text-xs text-slate-500">({entries.length} Einträge)</span>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            ✕
+          </button>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="px-4 py-2 bg-slate-700/30 border-b border-slate-600 flex gap-4 text-xs">
+          <span className="text-slate-400">
+            <span className="font-medium text-slate-200">{stats.total}</span> Gesamt
+          </span>
+          {stats.ecommerce > 0 && (
+            <span className="text-green-400">
+              <span className="font-medium">{stats.ecommerce}</span> E-Commerce
+            </span>
+          )}
+          {stats.consent > 0 && (
+            <span className="text-purple-400">
+              <span className="font-medium">{stats.consent}</span> Consent
+            </span>
+          )}
+          {stats.pageviews > 0 && (
+            <span className="text-blue-400">
+              <span className="font-medium">{stats.pageviews}</span> Pageviews
+            </span>
+          )}
+          {stats.gtmEvents > 0 && (
+            <span className="text-orange-400">
+              <span className="font-medium">{stats.gtmEvents}</span> GTM Events
+            </span>
+          )}
+        </div>
+
+        {/* Filter & Search */}
+        <div className="px-4 py-3 border-b border-slate-600 flex gap-3">
+          <div className="flex gap-1">
+            {(['all', 'ecommerce', 'consent', 'pageview', 'custom'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  filter === f
+                    ? 'bg-sky-500/20 text-sky-400'
+                    : 'bg-slate-600/50 text-slate-400 hover:bg-slate-600'
+                }`}
+              >
+                {f === 'all' ? 'Alle' : 
+                 f === 'ecommerce' ? 'E-Commerce' :
+                 f === 'consent' ? 'Consent' :
+                 f === 'pageview' ? 'Pageviews' : 'Custom'}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Events durchsuchen..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-1 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500"
+            />
+          </div>
+          <button
+            onClick={() => onCopy(JSON.stringify(entries, null, 2), 'full-datalayer')}
+            className="flex items-center gap-1 px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded-lg text-xs text-slate-200 transition-colors"
+          >
+            {copiedAction === 'full-datalayer' ? (
+              <>
+                <Check className="w-3 h-3" />
+                Kopiert
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                Alle kopieren
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* DataLayer Entries */}
+        <div className="flex-1 overflow-auto p-4 space-y-2">
+          {filteredEntries.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <Eye className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>Keine Einträge gefunden</p>
+              {filter !== 'all' && (
+                <button
+                  onClick={() => setFilter('all')}
+                  className="text-sky-400 text-sm mt-2 hover:underline"
+                >
+                  Filter zurücksetzen
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredEntries.map((entry) => (
+              <div
+                key={entry.index}
+                className={`bg-slate-700/30 rounded-lg border transition-colors ${
+                  expandedIndex === entry.index 
+                    ? 'border-sky-500/50' 
+                    : 'border-slate-600 hover:border-slate-500'
+                }`}
+              >
+                {/* Entry Header */}
+                <button
+                  onClick={() => setExpandedIndex(expandedIndex === entry.index ? null : entry.index)}
+                  className="w-full flex items-center gap-3 p-3 text-left"
+                >
+                  <span className="text-xs text-slate-500 font-mono w-6">#{entry.index}</span>
+                  {getTypeIcon(entry.type)}
+                  <span className="font-medium text-slate-200 flex-1">
+                    {entry.event || '(kein Event)'}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {entry.hasEcommerce && (
+                      <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
+                        E-Commerce
+                      </span>
+                    )}
+                    {entry.hasConsent && (
+                      <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                        Consent
+                      </span>
+                    )}
+                    <span className={`text-xs px-2 py-0.5 rounded ${getTypeBadge(entry.type)}`}>
+                      {entry.type}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${
+                      expandedIndex === entry.index ? 'rotate-180' : ''
+                    }`} />
+                  </div>
+                </button>
+
+                {/* Expanded Content */}
+                {expandedIndex === entry.index && (
+                  <div className="px-3 pb-3 border-t border-slate-600">
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-xs text-slate-500">Daten:</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCopy(JSON.stringify(entry.data, null, 2), `entry-${entry.index}`);
+                        }}
+                        className="flex items-center gap-1 px-2 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs text-slate-200 transition-colors"
+                      >
+                        {copiedAction === `entry-${entry.index}` ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            Kopiert
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            Kopieren
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="text-xs text-slate-300 bg-slate-900/50 p-3 rounded-lg overflow-x-auto max-h-64">
+                      <code>{JSON.stringify(entry.data, null, 2)}</code>
+                    </pre>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-slate-700 bg-slate-700/30">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              💡 Der DataLayer zeigt alle Daten, die an Google Tag Manager übertragen werden.
+            </p>
+            <div className="flex gap-2">
+              {dataLayerAnalysis.ecommerce.detected && (
+                <span className="text-xs px-2 py-1 bg-green-500/10 text-green-400 rounded">
+                  ✓ E-Commerce aktiv
+                </span>
+              )}
+              {dataLayerAnalysis.customDimensions.length > 0 && (
+                <span className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 rounded">
+                  {dataLayerAnalysis.customDimensions.length} Custom Dimensions
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </>

@@ -122,6 +122,19 @@ export interface DataLayerAnalysisResult {
   ecommerce: EcommerceAnalysis;
   customDimensions: string[];
   userProperties: string[];
+  // NEU: Roher DataLayer Inhalt für Anzeige
+  rawDataLayer?: DataLayerEntry[];
+}
+
+// Einzelner DataLayer Eintrag
+export interface DataLayerEntry {
+  index: number;
+  event?: string;
+  timestamp?: string;
+  data: Record<string, unknown>;
+  type: 'gtm.js' | 'gtm.dom' | 'gtm.load' | 'consent' | 'ecommerce' | 'pageview' | 'custom' | 'config';
+  hasEcommerce: boolean;
+  hasConsent: boolean;
 }
 
 export interface DataLayerEvent {
