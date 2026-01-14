@@ -203,9 +203,9 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
   );
   
   // Prüfen ob "Speichern"-Button verwendet wurde und nur essentielle Cookies gesetzt wurden
-  const isSaveButton = testData.afterReject.buttonText && 
+  const isSaveButton = Boolean(testData.afterReject.buttonText && 
     (testData.afterReject.buttonText.toLowerCase().includes('speichern') || 
-     testData.afterReject.buttonText.toLowerCase().includes('save'));
+     testData.afterReject.buttonText.toLowerCase().includes('save')));
   
   const onlyEssentialCookiesAfterSave = isSaveButton && 
     afterRejectCookies.every(c => c.category === 'necessary');
@@ -258,7 +258,7 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
   
   const rejectWorksProperly = 
     (testData.afterReject.clickSuccessful && trackingCookiesAfterReject.length === 0) ||
-    (isSaveButton && onlyEssentialCookiesAfterSave);
+    Boolean(isSaveButton && onlyEssentialCookiesAfterSave);
   
   return {
     beforeConsent: {
