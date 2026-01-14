@@ -158,21 +158,21 @@ export function QuickActions({ result }: QuickActionsProps) {
             </div>
           </button>
 
-          {/* DataLayer Viewer */}
-          {result.dataLayerAnalysis?.hasDataLayer && (
-            <button
-              onClick={() => setShowDataLayerViewerModal(true)}
-              className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
-            >
-              <Eye className="w-5 h-5 text-sky-400 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-slate-200">DataLayer Viewer</p>
-                <p className="text-xs text-slate-500">
-                  {result.dataLayerAnalysis.rawDataLayer?.length || result.dataLayerAnalysis.events.length} Einträge
-                </p>
-              </div>
-            </button>
-          )}
+          {/* DataLayer Viewer - Immer anzeigen */}
+          <button
+            onClick={() => setShowDataLayerViewerModal(true)}
+            className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
+          >
+            <Eye className={`w-5 h-5 flex-shrink-0 ${result.dataLayerAnalysis?.hasDataLayer ? 'text-sky-400' : 'text-slate-500'}`} />
+            <div>
+              <p className="text-sm font-medium text-slate-200">DataLayer Viewer</p>
+              <p className="text-xs text-slate-500">
+                {result.dataLayerAnalysis?.hasDataLayer 
+                  ? `${result.dataLayerAnalysis.rawDataLayer?.length || result.dataLayerAnalysis.events.length} Einträge`
+                  : 'Kein DataLayer erkannt'}
+              </p>
+            </div>
+          </button>
 
           {/* Cookies Export */}
           <button
@@ -277,7 +277,7 @@ export function QuickActions({ result }: QuickActionsProps) {
       )}
 
       {/* DataLayer Viewer Modal */}
-      {showDataLayerViewerModal && result.dataLayerAnalysis && (
+      {showDataLayerViewerModal && (
         <DataLayerViewerModal
           dataLayerAnalysis={result.dataLayerAnalysis}
           onClose={() => setShowDataLayerViewerModal(false)}
@@ -1152,7 +1152,7 @@ function DataLayerViewerModal({
   onCopy,
   copiedAction,
 }: {
-  dataLayerAnalysis: DataLayerAnalysisResult;
+  dataLayerAnalysis: DataLayerAnalysisResult | undefined;
   onClose: () => void;
   onCopy: (text: string, id: string) => void;
   copiedAction: string | null;
@@ -1160,6 +1160,80 @@ function DataLayerViewerModal({
   const [filter, setFilter] = useState<'all' | 'ecommerce' | 'consent' | 'pageview' | 'custom'>('all');
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Kein DataLayer vorhanden
+  if (!dataLayerAnalysis || !dataLayerAnalysis.hasDataLayer) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-xl bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+            <div className="flex items-center gap-2">
+              <Eye className="w-5 h-5 text-slate-500" />
+              <h3 className="font-medium text-slate-200">DataLayer Viewer</h3>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+              ✕
+            </button>
+          </div>
+
+          {/* Kein DataLayer Meldung */}
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-500/10 flex items-center justify-center">
+              <Eye className="w-8 h-8 text-yellow-500" />
+            </div>
+            <h4 className="text-lg font-medium text-slate-200 mb-2">
+              Kein DataLayer erkannt
+            </h4>
+            <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
+              Auf dieser Website wurde kein <code className="px-1 py-0.5 bg-slate-700 rounded text-xs">window.dataLayer</code> gefunden. 
+              Das kann folgende Gründe haben:
+            </p>
+            
+            <div className="text-left bg-slate-700/30 rounded-lg p-4 mb-6">
+              <ul className="space-y-2 text-sm text-slate-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">•</span>
+                  <span><strong>GTM nicht installiert:</strong> Der Google Tag Manager erstellt den DataLayer automatisch.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">•</span>
+                  <span><strong>DataLayer wird später initialisiert:</strong> Manchmal wird der DataLayer erst nach User-Interaktion erstellt.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">•</span>
+                  <span><strong>Anderer Variablenname:</strong> Der DataLayer könnte einen anderen Namen haben (z.B. <code className="px-1 py-0.5 bg-slate-600 rounded text-xs">dataLayer1</code>).</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-yellow-400 mt-0.5">•</span>
+                  <span><strong>Consent erforderlich:</strong> Einige CMPs laden GTM erst nach Cookie-Consent.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg transition-colors"
+              >
+                Schließen
+              </button>
+              <a
+                href="https://developers.google.com/tag-manager/devguide"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+              >
+                GTM Doku
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const rawDataLayer = dataLayerAnalysis.rawDataLayer || [];
   
