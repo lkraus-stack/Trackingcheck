@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Code,
   FileSpreadsheet,
@@ -15,8 +15,14 @@ import {
   Settings,
   FileCode,
   Table,
+  Layers,
 } from 'lucide-react';
 import { AnalysisResult } from '@/types';
+import {
+  standardEvents,
+  generateExampleCode,
+  generateConsentUpdateCode,
+} from '@/lib/templates/dataLayerGenerator';
 
 interface QuickActionsProps {
   result: AnalysisResult;
@@ -27,6 +33,7 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [copiedAction, setCopiedAction] = useState<string | null>(null);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showChecklistModal, setShowChecklistModal] = useState(false);
+  const [showDataLayerModal, setShowDataLayerModal] = useState(false);
 
   const copyToClipboard = async (text: string, actionId: string) => {
     await navigator.clipboard.writeText(text);
@@ -132,6 +139,18 @@ export function QuickActions({ result }: QuickActionsProps) {
             </div>
           </button>
 
+          {/* DataLayer Generator */}
+          <button
+            onClick={() => setShowDataLayerModal(true)}
+            className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
+          >
+            <Layers className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-slate-200">DataLayer Generator</p>
+              <p className="text-xs text-slate-500">GA4 E-Commerce Events</p>
+            </div>
+          </button>
+
           {/* Cookies Export */}
           <button
             onClick={exportCookiesCSV}
@@ -222,6 +241,15 @@ export function QuickActions({ result }: QuickActionsProps) {
         <ChecklistModal
           result={result}
           onClose={() => setShowChecklistModal(false)}
+        />
+      )}
+
+      {/* DataLayer Generator Modal */}
+      {showDataLayerModal && (
+        <DataLayerGeneratorModal
+          onClose={() => setShowDataLayerModal(false)}
+          onCopy={(text, id) => copyToClipboard(text, id)}
+          copiedAction={copiedAction}
         />
       )}
     </div>
@@ -903,6 +931,181 @@ function ChecklistModal({
             <Download className="w-4 h-4" />
             Drucken / PDF
           </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// DataLayer Generator Modal
+function DataLayerGeneratorModal({
+  onClose,
+  onCopy,
+  copiedAction,
+}: {
+  onClose: () => void;
+  onCopy: (text: string, id: string) => void;
+  copiedAction: string | null;
+}) {
+  const [selectedEvent, setSelectedEvent] = useState('purchase');
+  const [generatedCode, setGeneratedCode] = useState('');
+
+  useEffect(() => {
+    setGeneratedCode(generateExampleCode(selectedEvent));
+  }, [selectedEvent]);
+
+  const eventCategories = useMemo(() => ({
+    ecommerce: standardEvents.filter(e => e.category === 'ecommerce'),
+    engagement: standardEvents.filter(e => e.category === 'engagement'),
+    conversion: standardEvents.filter(e => e.category === 'conversion'),
+  }), []);
+
+  const consentCode = generateConsentUpdateCode(true, true);
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
+      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-emerald-400" />
+            <h3 className="font-medium text-slate-200">DataLayer Generator</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-4">
+          <div className="grid grid-cols-3 gap-4">
+            {/* Event Auswahl */}
+            <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600">
+              <h4 className="font-medium text-slate-200 mb-3">Event auswählen</h4>
+              
+              <div className="space-y-4 max-h-80 overflow-y-auto">
+                <div>
+                  <p className="text-xs text-slate-500 uppercase mb-2">E-Commerce</p>
+                  {eventCategories.ecommerce.map((event) => (
+                    <button
+                      key={event.event}
+                      onClick={() => setSelectedEvent(event.event)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                        selectedEvent === event.event
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'text-slate-300 hover:bg-slate-600/50'
+                      }`}
+                    >
+                      {event.event}
+                    </button>
+                  ))}
+                </div>
+                
+                <div>
+                  <p className="text-xs text-slate-500 uppercase mb-2">Engagement</p>
+                  {eventCategories.engagement.map((event) => (
+                    <button
+                      key={event.event}
+                      onClick={() => setSelectedEvent(event.event)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                        selectedEvent === event.event
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'text-slate-300 hover:bg-slate-600/50'
+                      }`}
+                    >
+                      {event.event}
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500 uppercase mb-2">Conversion</p>
+                  {eventCategories.conversion.map((event) => (
+                    <button
+                      key={event.event}
+                      onClick={() => setSelectedEvent(event.event)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                        selectedEvent === event.event
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'text-slate-300 hover:bg-slate-600/50'
+                      }`}
+                    >
+                      {event.event}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Code Output */}
+            <div className="col-span-2 flex flex-col gap-4">
+              <div className="bg-slate-700/30 rounded-xl border border-slate-600 overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-600/50 border-b border-slate-500">
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">
+                      {standardEvents.find(e => e.event === selectedEvent)?.event || selectedEvent}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {standardEvents.find(e => e.event === selectedEvent)?.description}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => onCopy(generatedCode, 'datalayer')}
+                    className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs text-white transition-colors"
+                  >
+                    {copiedAction === 'datalayer' ? (
+                      <>
+                        <Check className="w-3 h-3" />
+                        Kopiert
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        Kopieren
+                      </>
+                    )}
+                  </button>
+                </div>
+                <pre className="p-4 text-xs text-slate-300 overflow-auto max-h-52 bg-slate-900/50">
+                  <code>{generatedCode}</code>
+                </pre>
+              </div>
+
+              {/* Consent Update Code */}
+              <div className="bg-slate-700/30 rounded-xl border border-slate-600 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-600/50 border-b border-slate-500">
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">Consent Update Code</p>
+                    <p className="text-xs text-slate-400">Nach CMP-Interaktion aufrufen</p>
+                  </div>
+                  <button
+                    onClick={() => onCopy(consentCode, 'consent')}
+                    className="flex items-center gap-1 px-3 py-1 bg-slate-500 hover:bg-slate-400 rounded text-xs text-white transition-colors"
+                  >
+                    {copiedAction === 'consent' ? (
+                      <>
+                        <Check className="w-3 h-3" />
+                        Kopiert
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        Kopieren
+                      </>
+                    )}
+                  </button>
+                </div>
+                <pre className="p-4 text-xs text-slate-300 overflow-auto max-h-36 bg-slate-900/50">
+                  <code>{consentCode}</code>
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-700">
+          <p className="text-xs text-slate-500 text-center">
+            💡 Tipp: Passe die Beispiel-Werte an deine Produkte/Events an. Für E-Commerce muss der DataLayer VOR dem GTM gefüllt werden.
+          </p>
         </div>
       </div>
     </>
