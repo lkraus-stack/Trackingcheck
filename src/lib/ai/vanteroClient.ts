@@ -130,33 +130,109 @@ export class VanteroClient {
   }
 
   async analyzeTrackingResults(analysisData: unknown): Promise<string> {
-    const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
-Analysiere die folgenden Tracking-Checker Ergebnisse und erstelle eine verständliche Zusammenfassung.
+    const systemPrompt = `Du bist ein erfahrener Experte für Web-Tracking, DSGVO-Compliance, Consent Management und Datenschutz-Audits.
+Du erstellst ausführliche, professionelle Analyse-Berichte für Website-Betreiber, Marketing-Verantwortliche und Datenschutzbeauftragte.
 
-Deine Aufgaben:
-1. Fasse die wichtigsten Erkenntnisse zusammen
-2. Identifiziere kritische Probleme
-3. Gib konkrete Handlungsempfehlungen
-4. Erkläre technische Details verständlich
+Deine Berichte sind:
+- Ausführlich und detailliert - jeder Punkt wird erklärt
+- Verständlich - auch für Nicht-Techniker nachvollziehbar
+- Handlungsorientiert - mit konkreten Schritt-für-Schritt Anleitungen
+- Priorisiert - kritische Probleme werden zuerst behandelt
 
-Antworte auf Deutsch und strukturiere deine Antwort mit Überschriften und Aufzählungen.`;
+Antworte immer auf Deutsch und strukturiere deine Antwort klar mit Überschriften (##), Unterüberschriften (###), Aufzählungen und nummerierten Listen.`;
 
     const userPrompt = `Hier sind die Analyse-Ergebnisse einer Website:
 
 ${JSON.stringify(analysisData, null, 2)}
 
-Bitte analysiere diese Daten und erstelle einen verständlichen Bericht mit:
-1. Zusammenfassung des Compliance-Status
-2. Gefundene Tracking-Implementierungen
-3. Probleme und Risiken
-4. Konkrete Handlungsempfehlungen zur Verbesserung`;
+Erstelle einen **ausführlichen und professionellen Analyse-Bericht** mit folgender Struktur:
+
+## 1. Executive Summary
+- Gesamtbewertung der Datenschutz-Compliance (gut/mittel/kritisch)
+- Die 3 wichtigsten Erkenntnisse in einem Satz
+- Dringendster Handlungsbedarf
+
+## 2. Cookie-Banner & Consent Management
+### Was wurde gefunden?
+- Beschreibe detailliert, welches Cookie-Banner/CMP erkannt wurde
+- Erkläre, was ein Cookie-Banner macht und warum es wichtig ist
+### Bewertung
+- Ist das Banner DSGVO-konform implementiert?
+- Werden alle Anforderungen erfüllt (Ablehnen-Button, granulare Einwilligung, etc.)?
+### Handlungsempfehlungen
+- Konkrete Schritte zur Verbesserung mit Priorität (Hoch/Mittel/Niedrig)
+
+## 3. Google Consent Mode V2
+### Was ist Google Consent Mode?
+- Kurze Erklärung der Funktionsweise und warum es wichtig ist (ab März 2024 Pflicht für personalisierte Werbung)
+### Was wurde gefunden?
+- Welche Consent-Signale werden gesendet?
+- Werden ad_storage, analytics_storage, ad_user_data, ad_personalization korrekt implementiert?
+### Handlungsempfehlungen
+- Falls nicht implementiert: Schritt-für-Schritt Anleitung zur Implementierung
+- Falls implementiert: Optimierungsmöglichkeiten
+
+## 4. TCF 2.2 (Transparency & Consent Framework)
+### Was ist TCF?
+- Erklärung des IAB TCF Standards und wann er benötigt wird
+### Analyseergebnis
+- Ist TCF implementiert? Welche Version?
+- Werden alle Vendor-Consent-Strings korrekt generiert?
+### Handlungsempfehlungen
+- Konkrete Schritte je nach Ergebnis
+
+## 5. Tracking-Tags & Drittanbieter
+### Gefundene Tracking-Implementierungen
+- Liste alle gefundenen Tags mit Erklärung (z.B. "Google Analytics 4 - misst Besucherverhalten")
+- Kategorisierung: Analytics, Marketing, Funktional, Unbekannt
+### Datenschutz-Bewertung
+- Welche Tags sind kritisch? Warum?
+- Werden Tags vor Consent geladen (Problem!)?
+### Handlungsempfehlungen
+- Welche Tags müssen angepasst werden?
+- Wie integriert man Tags korrekt mit dem Consent-Management?
+
+## 6. DataLayer-Analyse
+### Was ist der DataLayer?
+- Kurze Erklärung für Nicht-Techniker
+### Gefundene Daten
+- Welche Events und Variablen wurden gefunden?
+- Werden sensible Daten übertragen?
+### Handlungsempfehlungen
+- Optimierungen für besseres Tracking bei gleichzeitiger Compliance
+
+## 7. Drittanbieter-Requests
+### Externe Verbindungen
+- Zu welchen externen Servern werden Daten gesendet?
+- Welche davon sind problematisch (z.B. USA ohne Standardvertragsklauseln)?
+### Handlungsempfehlungen
+- Welche Verbindungen sollten überprüft oder entfernt werden?
+
+## 8. Prioritäten-Matrix
+Erstelle eine klare Prioritätenliste:
+
+### 🔴 Sofort erledigen (Kritisch)
+- Punkte die rechtliche Risiken bergen und sofort behoben werden müssen
+
+### 🟡 Zeitnah umsetzen (Wichtig)  
+- Verbesserungen die innerhalb von 2-4 Wochen erfolgen sollten
+
+### 🟢 Optimierung (Nice-to-have)
+- Empfehlungen für eine optimale Umsetzung
+
+## 9. Konkrete nächste Schritte
+Nummerierte Liste mit den genauen Aktionen, die der Website-Betreiber durchführen sollte:
+1. [Schritt] - [Verantwortlich] - [Zeitrahmen]
+2. ...
+
+Sei ausführlich, erkläre Fachbegriffe und gib konkrete, umsetzbare Handlungsempfehlungen!`;
 
     return this.chat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ], {
       temperature: 0.5,
-      maxTokens: 2500,
+      maxTokens: 6000,
     });
   }
 
@@ -227,40 +303,59 @@ Erstelle eine ausführliche, strukturierte Erklärung mit konkreten Beispielen u
     analysisData: unknown,
     initialAnalysis: string
   ): Promise<string> {
-    const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
-Deine Aufgabe ist es, die initiale Analyse-Ergebnisse kritisch zu überprüfen und fragliche Punkte oder mögliche Fehler zu identifizieren.
+    const systemPrompt = `Du bist ein kritischer Datenschutz-Auditor und QA-Experte für Web-Tracking und DSGVO-Compliance.
+Deine Aufgabe ist es, Analyse-Berichte kritisch zu überprüfen und zusätzliche wichtige Hinweise zu geben.
 
-Gehe dabei besonders gründlich vor:
-1. Prüfe auf Widersprüche zwischen den Analyse-Daten
-2. Identifiziere mögliche Fehlinterpretationen
-3. Suche nach fraglichen Punkten, die nochmal überprüft werden sollten
-4. Achte auf inkonsistente Daten oder unlogische Schlussfolgerungen
-5. Empfehle konkrete Verbesserungen
+Du bist:
+- Gründlich und detailorientiert
+- Konstruktiv aber kritisch
+- Praxisorientiert mit Fokus auf umsetzbare Verbesserungen
 
-Antworte auf Deutsch und strukturiere deine Antwort mit Überschriften und Aufzählungen.`;
+Antworte auf Deutsch mit klarer Struktur.`;
 
     const userPrompt = `Hier sind die original Analyse-Ergebnisse einer Website:
 
 ${JSON.stringify(analysisData, null, 2)}
 
-Und hier ist die initiale KI-Analyse:
+Und hier ist der Analyse-Bericht:
 
 ${initialAnalysis}
 
-Bitte überprüfe diese Analyse kritisch und identifiziere:
-1. **Widersprüche**: Gibt es Daten, die nicht zusammenpassen?
-2. **Fragliche Punkte**: Was könnte nochmal überprüft werden?
-3. **Mögliche Fehler**: Gibt es Fehlinterpretationen oder unlogische Schlussfolgerungen?
-4. **Verbesserungsvorschläge**: Was könnte an der Analyse präziser sein?
+Erstelle eine **Qualitätssicherungs-Überprüfung** mit folgender Struktur:
 
-Sei dabei kritisch aber konstruktiv.`;
+## ✅ Bestätigte Erkenntnisse
+- Welche Punkte im Bericht sind korrekt und wichtig?
+- Was wurde besonders gut erkannt?
+
+## ⚠️ Zusätzliche Hinweise
+- Gibt es Aspekte, die im Bericht noch ergänzt werden sollten?
+- Welche zusätzlichen Risiken oder Chancen wurden möglicherweise übersehen?
+- Gibt es branchenspezifische Anforderungen zu beachten?
+
+## 🔍 Manuelle Prüfung empfohlen
+- Welche Punkte sollte der Website-Betreiber zusätzlich manuell prüfen?
+- Welche Informationen können durch automatische Analyse nicht erfasst werden?
+- z.B.: Datenschutzerklärung prüfen, Auftragsverarbeitungsverträge checken, etc.
+
+## 📋 Compliance-Checkliste
+Erstelle eine kurze Checkliste zum Abhaken:
+- [ ] Punkt 1
+- [ ] Punkt 2
+- usw.
+
+## 💡 Profi-Tipps
+- Zusätzliche Best Practices und Expertentipps
+- Tools und Ressourcen die helfen können
+- Häufige Fehler die vermieden werden sollten
+
+Halte diese Überprüfung kompakt aber informativ!`;
 
     return this.chat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ], {
-      temperature: 0.3, // Niedrigere Temperatur für kritischere Überprüfung
-      maxTokens: 2000,
+      temperature: 0.3,
+      maxTokens: 3000,
     });
   }
 }
