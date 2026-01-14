@@ -221,6 +221,13 @@ export function ResultCard({ result }: ResultCardProps) {
             label="Ablehnen-Button"
             value={result.cookieBanner.hasRejectButton}
           />
+          {/* Zeige "Essenziell speichern" nur wenn kein expliziter Ablehnen-Button vorhanden ist */}
+          {!result.cookieBanner.hasRejectButton && result.cookieBanner.hasEssentialSaveButton && (
+            <StatusItem
+              label="Essenziell speichern"
+              value={result.cookieBanner.hasEssentialSaveButton}
+            />
+          )}
           <StatusItem
             label="Einstellungen-Option"
             value={result.cookieBanner.hasSettingsOption}

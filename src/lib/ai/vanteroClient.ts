@@ -256,46 +256,104 @@ Frage des Nutzers: ${question}`;
   }
 
   async explainSection(sectionName: string, sectionData: unknown, fullAnalysis: unknown): Promise<string> {
-    const systemPrompt = `Du bist ein Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
-Erkläre dem Nutzer ausführlich, wofür eine bestimmte Analyse-Sektion gut ist, was sie uns sagt und welche Erkenntnisse wir daraus gewinnen können.
-Antworte detailliert, verständlich und auf Deutsch. Strukturiere deine Antwort mit klaren Abschnitten.`;
+    const systemPrompt = `Du bist ein geduldiger, erfahrener Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
+Deine Aufgabe ist es, komplexe technische Themen so zu erklären, dass auch absolute Anfänger ohne technisches Vorwissen sie verstehen können.
 
-    const userPrompt = `Erkläre die Sektion "${sectionName}" in einem Tracking-Checker ausführlich:
+Deine Erklärungen sind:
+- **Anfängerfreundlich**: Keine Fachbegriffe ohne Erklärung, einfache Sprache
+- **Ausführlich**: Jeder Punkt wird detailliert erklärt, keine Abkürzungen
+- **Praktisch**: Konkrete Beispiele und reale Situationen
+- **Strukturiert**: Klare Abschnitte mit Überschriften für bessere Lesbarkeit
+- **Handlungsorientiert**: Klare Anweisungen, was zu tun ist
 
-1. **Was wird hier analysiert?**
-   - Beschreibe detailliert, welche Daten und Aspekte in dieser Sektion untersucht werden
-   - Welche Technologien, Standards oder Mechanismen werden geprüft?
+Antworte immer auf Deutsch und verwende Markdown-Formatierung (## für Überschriften, ** für Fettdruck, - für Aufzählungen).`;
 
-2. **Wofür ist diese Analyse gut?**
-   - Welchen praktischen Nutzen hat diese Analyse?
-   - Welche Probleme kann sie identifizieren?
-   - Welche Compliance-Anforderungen werden damit überprüft?
+    const userPrompt = `Erkläre die Sektion "${sectionName}" in einem Tracking-Checker so ausführlich und anfängerfreundlich wie möglich.
 
-3. **Was sagt uns das Ergebnis?**
-   - Was können wir aus den Analyse-Ergebnissen lernen?
-   - Welche Erkenntnisse gewinnen wir über die Website?
-   - Welche Rückschlüsse können wir auf die Tracking-Implementierung ziehen?
-   - Was bedeutet das für die Datenschutz-Compliance?
+## Struktur deiner Erklärung:
 
-4. **Praktische Auswirkungen**
-   - Wie wirkt sich das Ergebnis auf die DSGVO-Compliance aus?
-   - Welche Risiken oder Chancen ergeben sich daraus?
-   - Was sollte der Website-Betreiber daraus ableiten?
+### 1. Einführung: Was ist diese Sektion?
+Beginne mit einer einfachen, verständlichen Erklärung:
+- Was bedeutet der Name dieser Sektion in einfachen Worten?
+- Warum gibt es diese Sektion überhaupt?
+- Was ist das Ziel dieser Analyse?
 
-Sektions-Daten:
+### 2. Was wird hier genau analysiert?
+Erkläre detailliert, aber verständlich:
+- Welche Daten werden in dieser Sektion gesammelt und untersucht?
+- Welche Technologien, Standards oder Mechanismen werden geprüft?
+- Wie funktioniert die Analyse technisch? (in einfachen Worten)
+- Welche konkreten Elemente der Website werden dabei betrachtet?
+
+**Wichtig**: Erkläre jeden Fachbegriff, als ob der Leser noch nie davon gehört hätte.
+
+### 3. Wofür ist diese Analyse wichtig?
+Erkläre den praktischen Nutzen:
+- Welche Probleme kann diese Analyse identifizieren?
+- Welche rechtlichen Anforderungen werden damit überprüft? (z.B. DSGVO, ePrivacy-Richtlinie)
+- Warum ist das für Website-Betreiber wichtig?
+- Was passiert, wenn diese Analyse nicht durchgeführt wird?
+- Welche Risiken können dadurch entstehen?
+
+### 4. Welche Funktion hat diese Sektion?
+Erkläre die praktische Funktion:
+- Was kann der Website-Betreiber mit den Ergebnissen dieser Sektion machen?
+- Wie hilft diese Analyse bei der Verbesserung der Datenschutz-Compliance?
+- Welche Entscheidungen können basierend auf diesen Daten getroffen werden?
+- Wie integriert sich diese Sektion in den Gesamtprozess der Datenschutz-Prüfung?
+
+### 5. Wie bewertet man die Ergebnisse?
+Gib eine klare Anleitung zur Bewertung:
+- Was sind "gute" Ergebnisse in dieser Sektion? Was bedeutet das?
+- Was sind "schlechte" oder "problematische" Ergebnisse? Warum?
+- Welche Werte/Status sind kritisch und erfordern sofortiges Handeln?
+- Welche Werte/Status sind akzeptabel?
+- Wie interpretiert man die verschiedenen Status-Indikatoren (z.B. grüne/rote/gelbe Markierungen)?
+- Gibt es Schwellenwerte oder Richtlinien, an denen man sich orientieren kann?
+
+### 6. Konkrete Beispiele aus den aktuellen Daten
+Analysiere die tatsächlichen Daten dieser Website:
+- Was zeigt die aktuelle Analyse konkret?
+- Ist das Ergebnis gut, mittelmäßig oder problematisch? Warum?
+- Was bedeutet das spezifisch für diese Website?
+- Gibt es konkrete Probleme, die identifiziert wurden?
+
+### 7. Was sollte der Website-Betreiber jetzt tun?
+Gib konkrete, umsetzbare Handlungsempfehlungen:
+- Wenn die Ergebnisse gut sind: Was sollte beibehalten werden?
+- Wenn die Ergebnisse problematisch sind: Welche konkreten Schritte müssen unternommen werden?
+- Wer ist für die Umsetzung verantwortlich? (z.B. Entwickler, Datenschutzbeauftragter, Marketing)
+- Wie dringend ist das? (Sofort, innerhalb einer Woche, kann warten)
+
+### 8. Häufige Fragen (FAQ)
+Beantworte typische Fragen, die Anfänger haben könnten:
+- "Was bedeutet [Fachbegriff] in einfachen Worten?"
+- "Ist das jetzt gut oder schlecht?"
+- "Muss ich sofort etwas ändern?"
+- "Kann ich das selbst umsetzen oder brauche ich Hilfe?"
+
+---
+
+**Sektions-Daten für diese Website:**
 ${JSON.stringify(sectionData, null, 2)}
 
-Vollständige Analyse (für Kontext):
+**Vollständige Analyse (für Kontext):**
 ${JSON.stringify(fullAnalysis, null, 2)}
 
-Erstelle eine ausführliche, strukturierte Erklärung mit konkreten Beispielen und praktischen Hinweisen.`;
+**Wichtig**: 
+- Sei SEHR ausführlich - mindestens 800-1000 Wörter
+- Erkläre jeden Fachbegriff beim ersten Auftreten
+- Verwende einfache, verständliche Sprache
+- Gib konkrete Beispiele
+- Strukturiere mit Markdown-Überschriften (##, ###)
+- Stelle sicher, dass auch jemand ohne technisches Vorwissen alles versteht`;
 
     return this.chat([
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ], {
       temperature: 0.5,
-      maxTokens: 1200,
+      maxTokens: 2500,
     });
   }
 
