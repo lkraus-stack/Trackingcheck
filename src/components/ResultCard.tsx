@@ -791,7 +791,7 @@ function Section({
             {icon}
           </span>
           <span className="font-medium text-slate-200">{title}</span>
-          {sectionName && sectionData && fullAnalysis && (
+          {sectionName && sectionData !== undefined && sectionData !== null && fullAnalysis && (
             <SectionInfoPopup
               sectionName={sectionName}
               sectionData={sectionData}
