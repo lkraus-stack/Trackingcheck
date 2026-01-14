@@ -771,7 +771,9 @@ function calculateScore(
   score -= warnings * 5;
 
   // Bonus für gute Implementierung
-  if (cookieBanner.detected && cookieBanner.hasAcceptButton && cookieBanner.hasRejectButton) {
+  // Auch "Essenziell speichern"-Button wird als Ablehnen-Option gewertet
+  const hasRejectOption = cookieBanner.hasRejectButton || cookieBanner.hasEssentialSaveButton;
+  if (cookieBanner.detected && cookieBanner.hasAcceptButton && hasRejectOption) {
     score += 5;
   }
 

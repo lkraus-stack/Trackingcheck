@@ -64,6 +64,7 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
   // Button-Analyse
   const hasAcceptButton = detectAcceptButton(htmlLower);
   const hasRejectButton = detectRejectButton(htmlLower);
+  const hasEssentialSaveButton = detectEssentialSaveButton(htmlLower);
   const hasSettingsOption = detectSettingsOption(htmlLower);
   const hasPrivacyPolicyLink = detectPrivacyPolicyLink(htmlLower, combinedLower);
 
@@ -75,6 +76,7 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
     provider: detectedProvider,
     hasAcceptButton,
     hasRejectButton,
+    hasEssentialSaveButton,
     hasSettingsOption,
     blocksContent,
     hasPrivacyPolicyLink,
@@ -167,6 +169,34 @@ function detectRejectButton(htmlLower: string): boolean {
   ];
 
   for (const pattern of rejectPatterns) {
+    const buttonRegex = new RegExp(
+      `<(button|a|div|span)[^>]*>([^<]*${pattern}[^<]*)</(button|a|div|span)>`,
+      'i'
+    );
+    if (buttonRegex.test(htmlLower)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function detectEssentialSaveButton(htmlLower: string): boolean {
+  // Prüfe auf "Speichern"-Button oder "Auswahl speichern"-Button
+  // Diese werden oft verwendet, um nur essentielle Cookies zu speichern (wenn nichts ausgewählt ist)
+  const savePatterns = [
+    'speichern',
+    'save',
+    'auswahl speichern',
+    'save selection',
+    'save preferences',
+    'einstellungen speichern',
+    'save settings',
+    'auswahl bestätigen',
+    'confirm selection',
+  ];
+
+  for (const pattern of savePatterns) {
     const buttonRegex = new RegExp(
       `<(button|a|div|span)[^>]*>([^<]*${pattern}[^<]*)</(button|a|div|span)>`,
       'i'

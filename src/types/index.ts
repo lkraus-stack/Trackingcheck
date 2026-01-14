@@ -57,6 +57,7 @@ export interface CookieBannerResult {
   provider?: string;
   hasAcceptButton: boolean;
   hasRejectButton: boolean;
+  hasEssentialSaveButton?: boolean; // "Speichern" Button der nur essentielle Cookies zulässt
   hasSettingsOption: boolean;
   blocksContent: boolean;
   hasPrivacyPolicyLink?: boolean;

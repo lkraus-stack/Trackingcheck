@@ -119,11 +119,11 @@ export function SectionInfoPopup({ sectionName, sectionData, fullAnalysis, trigg
             </div>
 
             {/* Content */}
-            <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+            <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]" style={{ scrollbarWidth: 'thin', scrollbarColor: '#475569 #1e293b' }}>
               {isLoading && (
                 <div className="flex items-center justify-center gap-3 py-8">
                   <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
-                  <span className="text-slate-300">KI generiert Erklärung...</span>
+                  <span className="text-slate-300">KI generiert ausführliche Erklärung...</span>
                 </div>
               )}
 
@@ -141,15 +141,16 @@ export function SectionInfoPopup({ sectionName, sectionData, fullAnalysis, trigg
                 <div className="prose prose-invert prose-sm max-w-none">
                   <ReactMarkdown
                     components={{
-                      h1: ({ children }) => <h1 className="text-lg font-bold text-slate-200 mt-4 mb-2">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-base font-semibold text-slate-200 mt-3 mb-2">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-300 mt-2 mb-1">{children}</h3>,
-                      p: ({ children }) => <p className="text-slate-300 text-sm mb-2 leading-relaxed">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ol>,
-                      li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-xl font-bold text-slate-200 mt-6 mb-3 pb-2 border-b border-slate-700">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-lg font-semibold text-slate-200 mt-5 mb-3 pt-2">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-base font-semibold text-slate-300 mt-4 mb-2">{children}</h3>,
+                      p: ({ children }) => <p className="text-slate-300 text-sm mb-3 leading-relaxed">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc list-outside text-slate-300 text-sm mb-3 ml-4 space-y-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-outside text-slate-300 text-sm mb-3 ml-4 space-y-2">{children}</ol>,
+                      li: ({ children }) => <li className="text-slate-300 leading-relaxed">{children}</li>,
                       strong: ({ children }) => <strong className="text-slate-200 font-semibold">{children}</strong>,
-                      code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-blue-300">{children}</code>,
+                      code: ({ children }) => <code className="bg-slate-700 px-1.5 py-0.5 rounded text-xs text-blue-300 font-mono">{children}</code>,
+                      blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-4 my-3 italic text-slate-400">{children}</blockquote>,
                     }}
                   >
                     {explanation}

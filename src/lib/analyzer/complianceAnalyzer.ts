@@ -268,6 +268,9 @@ function evaluateGDPRCheck(
       } else if (cookieBanner.hasRejectButton) {
         status = 'passed';
         details = 'Ablehnen-Option im Banner gefunden.';
+      } else if (cookieBanner.hasEssentialSaveButton) {
+        status = 'passed';
+        details = 'Essenziell-Speichern-Option im Banner gefunden (ersetzt Ablehnen-Button).';
       } else {
         status = 'failed';
         details = 'Keine gleichwertige Ablehnen-Option erkannt.';
