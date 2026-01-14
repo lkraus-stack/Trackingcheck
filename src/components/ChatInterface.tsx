@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Globe, Loader2, History, RefreshCw, Brain, CheckCircle2, XCircle, Clock, Sparkles, LayoutDashboard, Save } from 'lucide-react';
+import { Send, Globe, Loader2, History, RefreshCw, Brain, CheckCircle2, XCircle, Clock, Sparkles, LayoutDashboard, Save, BookOpen } from 'lucide-react';
 import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
+import { SetupWizard } from './SetupWizard';
 import { getAnalysisHistory, addToHistory, removeFromHistory, clearHistory } from '@/lib/cache/analysisCache';
 import { saveAnalysis } from '@/lib/storage/projectStorage';
 
@@ -37,6 +38,7 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -366,6 +368,14 @@ export function ChatInterface() {
         />
       )}
 
+      {/* Setup Wizard Modal */}
+      {showSetupWizard && (
+        <SetupWizard
+          onClose={() => setShowSetupWizard(false)}
+          analysis={currentAnalysis}
+        />
+      )}
+
       {/* Input Area */}
       <div className="border-t border-slate-800 p-4 bg-slate-900/50 backdrop-blur">
         <form onSubmit={handleSubmit} className="flex gap-3">
@@ -376,6 +386,14 @@ export function ChatInterface() {
             title="Dashboard öffnen"
           >
             <LayoutDashboard className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSetupWizard(true)}
+            className="p-3 rounded-xl border bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-green-500 transition-colors"
+            title="Setup-Wizard & Anleitungen"
+          >
+            <BookOpen className="w-5 h-5" />
           </button>
           <button
             type="button"
