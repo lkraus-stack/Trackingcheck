@@ -6,6 +6,13 @@ import { analyzeTrackingTags } from './trackingTagsAnalyzer';
 import { analyzeDataLayer } from './dataLayerAnalyzer';
 import { analyzeThirdPartyDomains } from './thirdPartyAnalyzer';
 import { analyzeGDPRCompliance, analyzeDMACompliance } from './complianceAnalyzer';
+import {
+  analyzeEventQuality,
+  analyzeFunnelValidation,
+  analyzeCookieLifetime,
+  analyzeUnusedPotential,
+  analyzeROASQuality,
+} from './performanceMarketingAnalyzer';
 import { 
   AnalysisResult, 
   Issue, 
@@ -138,6 +145,21 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
         ? `${dmaCheck.gatekeepersDetected.length} Gatekeeper erkannt`
         : 'Keine DMA-Gatekeeper erkannt'
     );
+
+    // NEU: Performance Marketing Analysen
+    addStep('analyze_performance', 'running', 'Performance Marketing Analyse läuft...');
+    
+    const eventQualityScore = analyzeEventQuality(crawlResult, trackingTags, dataLayerAnalysis);
+    const funnelValidation = analyzeFunnelValidation(crawlResult, dataLayerAnalysis);
+    const cookieLifetimeAudit = analyzeCookieLifetime(cookies, trackingTags);
+    const unusedPotential = analyzeUnusedPotential(crawlResult, trackingTags, dataLayerAnalysis);
+    const roasQuality = dataLayerAnalysis.ecommerce.detected 
+      ? analyzeROASQuality(dataLayerAnalysis)
+      : undefined;
+    
+    addStep('analyze_performance', 'completed', 
+      `Event Quality: ${eventQualityScore.overallScore}%${funnelValidation.isEcommerce ? ` | Funnel: ${funnelValidation.overallScore}%` : ''}`
+    );
     
     // Issues sammeln
     addStep('generate_issues', 'running', 'Probleme und Empfehlungen werden generiert...');
@@ -175,6 +197,12 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       score,
       issues,
       analysisSteps,
+      // NEU: Performance Marketing
+      eventQualityScore,
+      funnelValidation,
+      cookieLifetimeAudit,
+      unusedPotential,
+      roasQuality,
     };
   } catch (error) {
     console.error('Analysis error:', error);

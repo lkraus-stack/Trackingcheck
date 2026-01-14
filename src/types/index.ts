@@ -41,6 +41,13 @@ export interface AnalysisResult {
   
   // Analyse-Prozess Info (für UI)
   analysisSteps?: AnalysisStep[];
+
+  // NEU: Performance Marketing Features
+  eventQualityScore?: EventQualityScoreResult;
+  funnelValidation?: FunnelValidationResult;
+  cookieLifetimeAudit?: CookieLifetimeAuditResult;
+  unusedPotential?: UnusedPotentialResult;
+  roasQuality?: ROASQualityResult;
 }
 
 // Analyse-Schritte für KI-ähnliche Gedankengänge in der UI
@@ -500,4 +507,160 @@ export interface CachedAnalysis {
   result: AnalysisResult;
   timestamp: number;
   expiresAt: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Performance Marketing Features
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Event Quality Score - Wie gut ist das Event-Matching?
+export interface EventQualityScoreResult {
+  overallScore: number; // 0-100
+  platforms: {
+    meta?: PlatformEventQuality;
+    google?: PlatformEventQuality;
+    tiktok?: PlatformEventQuality;
+    linkedin?: PlatformEventQuality;
+  };
+  recommendations: EventQualityRecommendation[];
+}
+
+export interface PlatformEventQuality {
+  platform: string;
+  score: number;
+  parameters: EventQualityParameter[];
+  hasServerSide: boolean;
+  hasDedupe: boolean;
+  estimatedMatchRate: number; // Geschätzte Match-Rate in %
+}
+
+export interface EventQualityParameter {
+  name: string;
+  displayName: string;
+  status: 'present' | 'missing' | 'invalid' | 'hashed';
+  importance: 'critical' | 'high' | 'medium' | 'low';
+  impact: string; // z.B. "+15% Match Rate"
+}
+
+export interface EventQualityRecommendation {
+  platform: string;
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  estimatedImpact: string;
+}
+
+// Funnel-Tracking-Validator
+export interface FunnelValidationResult {
+  isEcommerce: boolean;
+  platform?: 'shopify' | 'woocommerce' | 'shopware' | 'magento' | 'custom' | 'unknown';
+  funnelSteps: FunnelStep[];
+  overallScore: number;
+  criticalGaps: string[];
+  recommendations: string[];
+}
+
+export interface FunnelStep {
+  name: string;
+  event: string;
+  detected: boolean;
+  hasRequiredParams: boolean;
+  missingParams: string[];
+  sampleData?: Record<string, unknown>;
+  issues: string[];
+}
+
+// Cookie-Lifetime-Audit
+export interface CookieLifetimeAuditResult {
+  totalCookies: number;
+  impactedCookies: CookieLifetimeImpact[];
+  safariUserPercentage: number; // Geschätzter Safari/iOS Anteil
+  estimatedDataLoss: number; // Prozent
+  recommendations: CookieLifetimeRecommendation[];
+  serverSideWouldHelp: boolean;
+}
+
+export interface CookieLifetimeImpact {
+  cookieName: string;
+  service: string;
+  originalLifetime: number; // in Tagen
+  itpLifetime: number; // Safari/Firefox Limit in Tagen
+  impact: 'high' | 'medium' | 'low';
+  affectsAttribution: boolean;
+  affectsRemarketing: boolean;
+}
+
+export interface CookieLifetimeRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  solution: string;
+}
+
+// Ungenutztes Potenzial Scanner
+export interface UnusedPotentialResult {
+  totalPotential: UnusedPotentialItem[];
+  estimatedMonthlyValue: number; // Geschätzter Wert in €
+  quickWins: UnusedPotentialItem[];
+  missingPlatforms: MissingPlatform[];
+}
+
+export interface UnusedPotentialItem {
+  type: 'incomplete_setup' | 'missing_events' | 'no_conversions' | 'missing_platform' | 'no_remarketing';
+  platform: string;
+  title: string;
+  description: string;
+  currentState: string;
+  recommendation: string;
+  estimatedImpact: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+}
+
+export interface MissingPlatform {
+  platform: string;
+  reason: string;
+  audienceReach: string; // z.B. "28% deiner Zielgruppe"
+  recommendedFor: string[];
+}
+
+// ROAS-Daten-Qualitäts-Check
+export interface ROASQualityResult {
+  overallScore: number;
+  valueTracking: ROASValueTracking;
+  dataCompleteness: ROASDataCompleteness;
+  estimatedDataLoss: number; // Prozent
+  recommendations: ROASRecommendation[];
+}
+
+export interface ROASValueTracking {
+  hasTransactionId: boolean;
+  transactionIdUnique: boolean;
+  hasValue: boolean;
+  valueIncludesTax: boolean | null; // null = nicht bestimmbar
+  hasCurrency: boolean;
+  currencyConsistent: boolean;
+  hasItems: boolean;
+  itemsComplete: boolean;
+}
+
+export interface ROASDataCompleteness {
+  parameters: ROASParameter[];
+  missingCritical: string[];
+  missingRecommended: string[];
+}
+
+export interface ROASParameter {
+  name: string;
+  displayName: string;
+  status: 'present' | 'missing' | 'incomplete';
+  importance: 'critical' | 'recommended' | 'optional';
+  affects: string[]; // z.B. ['ROAS', 'Dynamic Remarketing']
+}
+
+export interface ROASRecommendation {
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  impact: string;
+  implementation: string;
 }

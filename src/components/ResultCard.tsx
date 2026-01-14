@@ -31,6 +31,7 @@ import { exportAnalysisToPDF } from '@/lib/pdf/exportToPdf';
 import { SectionInfoPopup } from './SectionInfoPopup';
 import { QuickActions } from './QuickActions';
 import { AnalysisComparison } from './AnalysisComparison';
+import { PerformanceMarketingSection } from './PerformanceMarketing';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -738,6 +739,15 @@ export function ResultCard({ result }: ResultCardProps) {
 
       {/* Quick Actions */}
       <QuickActions result={result} />
+
+      {/* Performance Marketing Analyse */}
+      <PerformanceMarketingSection
+        eventQualityScore={result.eventQualityScore}
+        funnelValidation={result.funnelValidation}
+        cookieLifetimeAudit={result.cookieLifetimeAudit}
+        unusedPotential={result.unusedPotential}
+        roasQuality={result.roasQuality}
+      />
 
       {/* Analyse-Vergleich */}
       <AnalysisComparison currentResult={result} />
