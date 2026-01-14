@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Globe, Loader2, History, RefreshCw, Brain, CheckCircle2, XCircle, Clock, Sparkles } from 'lucide-react';
+import { Send, Globe, Loader2, History, RefreshCw, Brain, CheckCircle2, XCircle, Clock, Sparkles, LayoutDashboard, Save } from 'lucide-react';
 import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
+import { Dashboard } from './Dashboard';
 import { getAnalysisHistory, addToHistory, removeFromHistory, clearHistory } from '@/lib/cache/analysisCache';
+import { saveAnalysis } from '@/lib/storage/projectStorage';
 
 interface Message {
   id: string;
@@ -34,7 +36,9 @@ export function ChatInterface() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+  const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // History laden
@@ -161,6 +165,14 @@ export function ChatInterface() {
       if (data.status === 'success') {
         addToHistory(data);
         setHistory(getAnalysisHistory());
+        setCurrentAnalysis(data as AnalysisResult);
+        
+        // Automatisch in IndexedDB speichern für Vergleichsfunktion
+        try {
+          await saveAnalysis(data as AnalysisResult);
+        } catch (e) {
+          console.log('Konnte Analyse nicht in IndexedDB speichern:', e);
+        }
       }
 
       // Loading Message ersetzen mit Ergebnis
@@ -342,9 +354,29 @@ export function ChatInterface() {
         </div>
       )}
 
+      {/* Dashboard Modal */}
+      {showDashboard && (
+        <Dashboard
+          onSelectUrl={(url) => {
+            setInput(url);
+            setShowDashboard(false);
+          }}
+          onClose={() => setShowDashboard(false)}
+          currentAnalysis={currentAnalysis}
+        />
+      )}
+
       {/* Input Area */}
       <div className="border-t border-slate-800 p-4 bg-slate-900/50 backdrop-blur">
         <form onSubmit={handleSubmit} className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowDashboard(true)}
+            className="p-3 rounded-xl border bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-indigo-500 transition-colors"
+            title="Dashboard öffnen"
+          >
+            <LayoutDashboard className="w-5 h-5" />
+          </button>
           <button
             type="button"
             onClick={() => setShowHistory(!showHistory)}

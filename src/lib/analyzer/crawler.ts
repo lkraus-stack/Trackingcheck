@@ -129,6 +129,93 @@ export class WebCrawler {
     this.browser = await getBrowser();
   }
 
+  // Quick-Crawl für schnellere Analyse (ohne Consent-Test, kürzere Wartezeiten)
+  async crawlQuick(url: string): Promise<CrawlResult> {
+    if (!this.browser) {
+      await this.init();
+    }
+
+    const page = await this.browser!.newPage();
+    const urlObj = new URL(url);
+    const pageDomain = urlObj.hostname;
+    
+    const networkRequests: NetworkRequest[] = [];
+    const networkRequestsExtended: NetworkRequestExtended[] = [];
+    const responseHeaders: ResponseHeaderData[] = [];
+    const consoleMessages: string[] = [];
+
+    page.on('request', (request) => {
+      networkRequests.push({
+        url: request.url(),
+        method: request.method(),
+        resourceType: request.resourceType(),
+        timestamp: Date.now(),
+      });
+    });
+
+    page.on('console', (msg) => {
+      consoleMessages.push(`${msg.type()}: ${msg.text()}`);
+    });
+
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+
+    await page.setViewport({ width: 1920, height: 1080 });
+
+    try {
+      // Schnelleres Laden mit kürzerer Wartezeit
+      await page.goto(url, {
+        waitUntil: 'domcontentloaded', // Schneller als networkidle2
+        timeout: 15000, // Kürzerer Timeout
+      });
+
+      // Kürzere Wartezeit
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const html = await page.content();
+
+      const scripts = await page.evaluate(() => {
+        const scriptElements = document.querySelectorAll('script');
+        const scripts: string[] = [];
+        scriptElements.forEach((script) => {
+          if (script.src) scripts.push(script.src);
+          if (script.innerHTML) scripts.push(script.innerHTML);
+        });
+        return scripts;
+      });
+
+      const windowObjects = await this.checkWindowObjects(page);
+
+      const cookies = await page.cookies();
+      const cookieData: CookieData[] = cookies.map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path,
+        expires: cookie.expires,
+        httpOnly: cookie.httpOnly ?? false,
+        secure: cookie.secure,
+        sameSite: cookie.sameSite as string | undefined,
+      }));
+
+      return {
+        html,
+        scripts,
+        networkRequests,
+        networkRequestsExtended,
+        cookies: cookieData,
+        windowObjects,
+        consoleMessages,
+        responseHeaders,
+        pageUrl: url,
+        pageDomain,
+      };
+    } finally {
+      await page.close();
+    }
+  }
+
   async crawl(url: string): Promise<CrawlResult> {
     if (!this.browser) {
       await this.init();
@@ -422,6 +509,9 @@ export class WebCrawler {
       'button:has-text("Einverstanden")',
       'button:has-text("OK")',
       'button:has-text("Verstanden")',
+      'button:has-text("Annehmen")',
+      'button:has-text("Ich stimme zu")',
+      'button:has-text("Weiter")',
       
       // Englische Texte
       'button:has-text("Accept all")',
@@ -429,18 +519,83 @@ export class WebCrawler {
       'button:has-text("I agree")',
       'button:has-text("Allow all")',
       'button:has-text("Allow cookies")',
+      'button:has-text("Got it")',
+      'button:has-text("Agree")',
       
-      // Bekannte CMPs
-      '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll', // Cookiebot
-      '#onetrust-accept-btn-handler', // OneTrust
-      '.uc-btn-accept-banner', // Usercentrics
-      '#accept-choices', // Quantcast
-      '.cky-btn-accept', // CookieYes
-      '[data-testid="uc-accept-all-button"]', // Usercentrics v2
-      '.cc-accept-all', // Cookie Consent
-      '#gdpr-cookie-accept', // GDPR Cookie Consent
-      '.cmplz-accept', // Complianz
-      '#BorlabsCookieBoxButtonAccept', // Borlabs
+      // Bekannte CMPs - Cookiebot
+      '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+      '#CybotCookiebotDialogBodyButtonAccept',
+      '.CybotCookiebotDialogBodyButton[id*="Accept"]',
+      
+      // OneTrust
+      '#onetrust-accept-btn-handler',
+      '.onetrust-accept-btn-handler',
+      '#accept-recommended-btn-handler',
+      
+      // Usercentrics
+      '.uc-btn-accept-banner',
+      '[data-testid="uc-accept-all-button"]',
+      '#uc-btn-accept-banner',
+      '.sc-hKFxyN', // Usercentrics styled button
+      
+      // Quantcast
+      '#accept-choices',
+      '.qc-cmp2-summary-buttons button[mode="primary"]',
+      
+      // CookieYes
+      '.cky-btn-accept',
+      '#cky-btn-accept',
+      
+      // Cookie Consent (Osano)
+      '.cc-accept-all',
+      '.osano-cm-accept-all',
+      '.osano-cm-button--type_accept',
+      
+      // TrustArc
+      '#consent_prompt_submit',
+      '.pdynamicbutton .call',
+      '#truste-consent-button',
+      
+      // Didomi
+      '#didomi-notice-agree-button',
+      '.didomi-continue-without-agreeing',
+      
+      // Klaro
+      '#klaro .cm-btn-success',
+      '.klaro .cm-btn-accept-all',
+      
+      // Complianz
+      '.cmplz-accept',
+      '#cmplz-accept-all',
+      '.cmplz-btn.cmplz-accept',
+      
+      // Borlabs
+      '#BorlabsCookieBoxButtonAccept',
+      '.BorlabsCookie button[data-cookie-accept-all]',
+      
+      // GDPR Cookie Consent
+      '#gdpr-cookie-accept',
+      '.gdpr-cookie-accept',
+      
+      // Iubenda
+      '.iubenda-cs-accept-btn',
+      '#iubenda-cs-accept-btn',
+      
+      // Termly
+      '#termly-code-snippet-support button[aria-label*="accept"]',
+      '.t-acceptAllBtn',
+      
+      // Cookie Notice
+      '#cn-accept-cookie',
+      '.cn-button[data-cookie-action="accept"]',
+      
+      // WP GDPR
+      '.wpgdprc-button',
+      '#wpgdprc-consent-accept',
+      
+      // Shopify Cookie Banner
+      '.shopify-section .cookie-banner__button--accept',
+      '#shopify-pc__banner__btn-accept',
     ];
 
     // Selektoren für Ablehnen-Buttons
@@ -462,6 +617,10 @@ export class WebCrawler {
       'button:has-text("Nur essenzielle")',
       'button:has-text("Nur erforderliche")',
       'button:has-text("Nein, danke")',
+      'button:has-text("Nicht akzeptieren")',
+      'button:has-text("Nicht zustimmen")',
+      'button:has-text("Auswahl speichern")',
+      'button:has-text("Essenziell")',
       
       // Englische Texte
       'button:has-text("Reject all")',
@@ -469,23 +628,87 @@ export class WebCrawler {
       'button:has-text("Decline")',
       'button:has-text("Only necessary")',
       'button:has-text("Deny")',
+      'button:has-text("Refuse")',
+      'button:has-text("Essential only")',
+      'button:has-text("Necessary only")',
       
-      // Bekannte CMPs
-      '#CybotCookiebotDialogBodyButtonDecline', // Cookiebot
-      '#onetrust-reject-all-handler', // OneTrust
-      '.uc-btn-deny-banner', // Usercentrics
-      '#deny-consent', // Quantcast
-      '.cky-btn-reject', // CookieYes
-      '[data-testid="uc-deny-all-button"]', // Usercentrics v2
-      '.cc-deny', // Cookie Consent
-      '.cmplz-deny', // Complianz
-      '#BorlabsCookieBoxButtonDecline', // Borlabs
+      // Bekannte CMPs - Cookiebot
+      '#CybotCookiebotDialogBodyButtonDecline',
+      '.CybotCookiebotDialogBodyButton[id*="Decline"]',
+      '#CybotCookiebotDialogBodyLevelButtonLevelOptinDeclineAll',
+      
+      // OneTrust
+      '#onetrust-reject-all-handler',
+      '.onetrust-reject-all-handler',
+      '#onetrust-pc-btn-handler', // Settings/Preferences button
+      
+      // Usercentrics
+      '.uc-btn-deny-banner',
+      '[data-testid="uc-deny-all-button"]',
+      '#uc-btn-deny-banner',
+      
+      // Quantcast
+      '#deny-consent',
+      '.qc-cmp2-summary-buttons button[mode="secondary"]',
+      
+      // CookieYes
+      '.cky-btn-reject',
+      '#cky-btn-reject',
+      '.cky-btn-customize', // Often functions as reject
+      
+      // Cookie Consent (Osano)
+      '.cc-deny',
+      '.osano-cm-deny',
+      '.osano-cm-button--type_deny',
+      
+      // TrustArc
+      '#consent_prompt_decline',
+      '#truste-consent-required',
+      
+      // Didomi
+      '#didomi-notice-disagree-button',
+      '.didomi-dismiss-button',
+      
+      // Klaro
+      '#klaro .cm-btn-decline',
+      '.klaro .cm-btn-deny',
+      
+      // Complianz
+      '.cmplz-deny',
+      '#cmplz-deny-all',
+      '.cmplz-btn.cmplz-deny',
+      
+      // Borlabs
+      '#BorlabsCookieBoxButtonDecline',
+      '.BorlabsCookie button[data-cookie-refuse]',
+      
+      // GDPR Cookie Consent
+      '#gdpr-cookie-decline',
+      '.gdpr-cookie-decline',
+      
+      // Iubenda
+      '.iubenda-cs-reject-btn',
+      '#iubenda-cs-reject-btn',
+      
+      // Termly
+      '.t-declineAllBtn',
+      
+      // Cookie Notice
+      '#cn-refuse-cookie',
+      '.cn-button[data-cookie-action="refuse"]',
+      
+      // WP GDPR
+      '#wpgdprc-consent-deny',
+      
+      // Shopify Cookie Banner
+      '.shopify-section .cookie-banner__button--decline',
+      '#shopify-pc__banner__btn-decline',
     ];
 
     const selectors = type === 'accept' ? acceptSelectors : rejectSelectors;
     const textPatterns = type === 'accept' 
-      ? ['akzeptieren', 'accept', 'zustimmen', 'agree', 'allow', 'einverstanden', 'verstanden', 'ok']
-      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential'];
+      ? ['akzeptieren', 'accept', 'zustimmen', 'agree', 'allow', 'einverstanden', 'verstanden', 'ok', 'annehmen', 'weiter', 'got it', 'continue']
+      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential', 'refuse', 'nicht akzeptieren', 'essenziell', 'necessary only', 'auswahl speichern'];
 
     // Versuche verschiedene Selektoren
     for (const selector of selectors) {
@@ -573,13 +796,43 @@ export class WebCrawler {
     page: Page
   ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
     const saveSelectors = [
+      // Speichern-Buttons
       'button:has-text("Speichern")',
       'button:has-text("Save")',
+      'button:has-text("Auswahl speichern")',
+      'button:has-text("Einstellungen speichern")',
+      'button:has-text("Save selection")',
+      'button:has-text("Save preferences")',
+      // Nur Essenzielle-Buttons
+      'button:has-text("Nur essenzielle")',
+      'button:has-text("Nur essenziell")',
+      'button:has-text("Nur notwendige")',
+      'button:has-text("Nur erforderliche")',
+      'button:has-text("Only essential")',
+      'button:has-text("Only necessary")',
+      'button:has-text("Essential only")',
+      'button:has-text("Necessary only")',
+      // ID/Class-basierte Selektoren
       'button[id*="save"]',
       'button[class*="save"]',
+      'button[id*="essential"]',
+      'button[class*="essential"]',
+      'button[id*="necessary"]',
+      'button[class*="necessary"]',
     ];
 
-    const savePatterns = ['speichern', 'save'];
+    const savePatterns = [
+      'speichern',
+      'save',
+      'nur essenzielle',
+      'nur essenziell',
+      'nur notwendige',
+      'nur erforderliche',
+      'only essential',
+      'only necessary',
+      'essential only',
+      'necessary only',
+    ];
 
     // Versuche verschiedene Selektoren
     for (const selector of saveSelectors) {

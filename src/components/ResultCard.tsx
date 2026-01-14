@@ -29,6 +29,8 @@ import { AnalysisResult, Issue, CookieResult } from '@/types';
 import { AIAnalysis } from './AIAnalysis';
 import { exportAnalysisToPDF } from '@/lib/pdf/exportToPdf';
 import { SectionInfoPopup } from './SectionInfoPopup';
+import { QuickActions } from './QuickActions';
+import { AnalysisComparison } from './AnalysisComparison';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -733,6 +735,12 @@ export function ResultCard({ result }: ResultCardProps) {
           </div>
         </Section>
       )}
+
+      {/* Quick Actions */}
+      <QuickActions result={result} />
+
+      {/* Analyse-Vergleich */}
+      <AnalysisComparison currentResult={result} />
 
       {/* KI-Analyse */}
       <AIAnalysis result={result} />

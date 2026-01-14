@@ -807,6 +807,151 @@ function calculateScore(
   return Math.max(0, Math.min(100, score));
 }
 
+// Quick-Scan Funktion (schneller, weniger Details)
+export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> {
+  const crawler = new WebCrawler();
+  const analysisSteps: AnalysisStep[] = [];
+  
+  const addStep = (step: string, status: AnalysisStep['status'], message: string, details?: string) => {
+    analysisSteps.push({ step, status, message, details, timestamp: Date.now() });
+  };
+
+  try {
+    addStep('init', 'running', 'Quick-Scan wird gestartet...');
+    await crawler.init();
+    addStep('init', 'completed', 'Browser bereit');
+    
+    const normalizedUrl = normalizeUrl(url);
+    
+    // Quick-Crawl (kürzer, kein Consent-Test)
+    addStep('crawl', 'running', 'Seite wird schnell analysiert...');
+    const crawlResult = await crawler.crawlQuick(normalizedUrl);
+    addStep('crawl', 'completed', `${crawlResult.networkRequests.length} Requests erfasst`);
+    
+    // Basis-Analyzer (ohne Deep-Scan)
+    addStep('analyze', 'running', 'Basis-Analyse läuft...');
+    const cookieBanner = analyzeCookieBanner(crawlResult);
+    const tcf = analyzeTCF(crawlResult);
+    const googleConsentMode = analyzeGoogleConsentMode(crawlResult);
+    const trackingTags = analyzeTrackingTags(crawlResult);
+    const cookies = categorizeCookies(crawlResult.cookies);
+    addStep('analyze', 'completed', 'Basis-Analyse abgeschlossen');
+    
+    // Leere/minimale Ergebnisse für nicht durchgeführte Analysen
+    const dataLayerAnalysis: DataLayerAnalysisResult = {
+      hasDataLayer: crawlResult.windowObjects.hasDataLayer,
+      events: [],
+      ecommerce: {
+        detected: false,
+        events: [],
+        valueTracking: {
+          hasTransactionValue: false,
+          hasCurrency: false,
+          hasItemData: false,
+          hasUserData: false,
+          valueParameters: [],
+          missingRecommended: [],
+        },
+        issues: [],
+      },
+      customDimensions: [],
+      userProperties: [],
+    };
+
+    const thirdPartyDomains: ThirdPartyDomainsResult = {
+      totalCount: 0,
+      domains: [],
+      categories: {
+        advertising: 0,
+        analytics: 0,
+        social: 0,
+        cdn: 0,
+        functional: 0,
+        unknown: 0,
+      },
+      riskAssessment: {
+        highRiskDomains: [],
+        crossBorderTransfers: [],
+        unknownDomains: [],
+      },
+    };
+
+    const gdprChecklist: GDPRChecklistResult = {
+      score: 0,
+      checks: [],
+      summary: { passed: 0, failed: 0, warnings: 0, notApplicable: 0 },
+    };
+
+    const dmaCheck: DMACheckResult = {
+      applicable: false,
+      gatekeepersDetected: [],
+      checks: [],
+      summary: { compliant: 0, nonCompliant: 0, requiresReview: 0 },
+    };
+    
+    // Schnelle Issue-Generierung
+    const issues: Issue[] = [];
+    
+    if (!cookieBanner.detected && (trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected)) {
+      issues.push({
+        severity: 'error',
+        category: 'cookie-banner',
+        title: 'Kein Cookie-Banner erkannt',
+        description: 'Tracking erkannt, aber kein Cookie-Banner gefunden.',
+        recommendation: 'Implementieren Sie einen DSGVO-konformen Cookie-Banner.',
+      });
+    }
+    
+    if (!googleConsentMode.detected && trackingTags.googleAnalytics.detected) {
+      issues.push({
+        severity: 'error',
+        category: 'consent-mode',
+        title: 'Google Consent Mode nicht erkannt',
+        description: 'Google Tags ohne Consent Mode.',
+        recommendation: 'Implementieren Sie Google Consent Mode v2.',
+      });
+    } else if (googleConsentMode.version === 'v1') {
+      issues.push({
+        severity: 'error',
+        category: 'consent-mode',
+        title: 'Veraltete Consent Mode Version',
+        description: 'Google Consent Mode v1 erkannt. v2 ist seit März 2024 erforderlich.',
+        recommendation: 'Aktualisieren Sie auf Consent Mode v2.',
+      });
+    }
+    
+    // Schneller Score
+    let score = 100;
+    if (!cookieBanner.detected && (trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected)) score -= 20;
+    if (!googleConsentMode.detected && trackingTags.googleAnalytics.detected) score -= 20;
+    if (googleConsentMode.version === 'v1') score -= 15;
+    if (cookieBanner.detected && !cookieBanner.hasRejectButton && !cookieBanner.hasEssentialSaveButton) score -= 10;
+    
+    return {
+      url: normalizedUrl,
+      timestamp: new Date().toISOString(),
+      status: 'success',
+      cookieBanner,
+      tcf,
+      googleConsentMode,
+      trackingTags,
+      cookies,
+      dataLayerAnalysis,
+      thirdPartyDomains,
+      gdprChecklist,
+      dmaCheck,
+      score: Math.max(0, Math.min(100, score)),
+      issues,
+      analysisSteps,
+    };
+  } catch (error) {
+    console.error('Quick analysis error:', error);
+    throw error;
+  } finally {
+    await crawler.close();
+  }
+}
+
 export { WebCrawler } from './crawler';
 export { analyzeCookieBanner } from './cookieBannerAnalyzer';
 export { analyzeTCF } from './tcfAnalyzer';
