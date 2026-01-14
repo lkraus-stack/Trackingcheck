@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X,
   ChevronRight,
@@ -25,7 +25,6 @@ import {
   SetupGuide,
   allGuides,
   getGuideById,
-  getGuidesByCategory,
 } from '@/lib/templates/setupGuides';
 import {
   generateGTMContainer,
@@ -51,6 +50,28 @@ export function SetupWizard({ onClose, analysis }: SetupWizardProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  
+  // GTM Generator States
+  const [includeGA4, setIncludeGA4] = useState(true);
+  const [includeMeta, setIncludeMeta] = useState(false);
+  const [includeAds, setIncludeAds] = useState(false);
+  
+  // DataLayer Generator States
+  const [selectedEvent, setSelectedEvent] = useState('purchase');
+  const [generatedCode, setGeneratedCode] = useState('');
+
+  // Initialize states based on analysis
+  useEffect(() => {
+    if (analysis) {
+      setIncludeMeta(analysis.trackingTags.metaPixel.detected || false);
+      setIncludeAds(analysis.trackingTags.googleAdsConversion?.detected || false);
+    }
+  }, [analysis]);
+
+  // Update generated code when event changes
+  useEffect(() => {
+    setGeneratedCode(generateExampleCode(selectedEvent));
+  }, [selectedEvent]);
 
   const copyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -58,12 +79,39 @@ export function SetupWizard({ onClose, analysis }: SetupWizardProps) {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const filteredGuides = allGuides.filter(guide => {
-    const matchesSearch = guide.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      guide.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || guide.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredGuides = useMemo(() => {
+    return allGuides.filter(guide => {
+      const matchesSearch = guide.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        guide.description.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || guide.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchTerm, selectedCategory]);
+
+  const eventCategories = useMemo(() => ({
+    ecommerce: standardEvents.filter(e => e.category === 'ecommerce'),
+    engagement: standardEvents.filter(e => e.category === 'engagement'),
+    conversion: standardEvents.filter(e => e.category === 'conversion'),
+  }), []);
+
+  const downloadContainer = () => {
+    if (!analysis) return;
+    
+    const container = generateGTMContainer(analysis, {
+      includeGA4,
+      includeMeta,
+      includeConversionTags: includeAds,
+    });
+    
+    const json = exportGTMContainerAsJSON(container);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gtm-container-consent-mode-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderHome = () => (
     <div className="space-y-6">
@@ -367,29 +415,6 @@ export function SetupWizard({ onClose, analysis }: SetupWizardProps) {
   };
 
   const renderGTMGenerator = () => {
-    const [includeGA4, setIncludeGA4] = useState(true);
-    const [includeMeta, setIncludeMeta] = useState(analysis?.trackingTags.metaPixel.detected || false);
-    const [includeAds, setIncludeAds] = useState(analysis?.trackingTags.googleAdsConversion?.detected || false);
-
-    const downloadContainer = () => {
-      if (!analysis) return;
-      
-      const container = generateGTMContainer(analysis, {
-        includeGA4,
-        includeMeta,
-        includeConversionTags: includeAds,
-      });
-      
-      const json = exportGTMContainerAsJSON(container);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gtm-container-consent-mode-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
-
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -493,19 +518,6 @@ export function SetupWizard({ onClose, analysis }: SetupWizardProps) {
   };
 
   const renderDataLayerGenerator = () => {
-    const [selectedEvent, setSelectedEvent] = useState('purchase');
-    const [generatedCode, setGeneratedCode] = useState(generateExampleCode('purchase'));
-
-    useEffect(() => {
-      setGeneratedCode(generateExampleCode(selectedEvent));
-    }, [selectedEvent]);
-
-    const eventCategories = {
-      ecommerce: standardEvents.filter(e => e.category === 'ecommerce'),
-      engagement: standardEvents.filter(e => e.category === 'engagement'),
-      conversion: standardEvents.filter(e => e.category === 'conversion'),
-    };
-
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
