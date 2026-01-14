@@ -454,6 +454,7 @@ export interface AnalysisRequest {
   options?: {
     skipCache?: boolean;
     deepScan?: boolean;
+    quickScan?: boolean;
   };
 }
 

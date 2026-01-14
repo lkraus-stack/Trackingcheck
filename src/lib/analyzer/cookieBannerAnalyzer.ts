@@ -182,9 +182,10 @@ function detectRejectButton(htmlLower: string): boolean {
 }
 
 function detectEssentialSaveButton(htmlLower: string): boolean {
-  // Prüfe auf "Speichern"-Button oder "Auswahl speichern"-Button
-  // Diese werden oft verwendet, um nur essentielle Cookies zu speichern (wenn nichts ausgewählt ist)
+  // Prüfe auf "Speichern"-Button, "Nur essenzielle"-Button oder ähnliche Buttons
+  // Diese werden verwendet, um nur essentielle/notwendige Cookies zu speichern
   const savePatterns = [
+    // Speichern-Varianten
     'speichern',
     'save',
     'auswahl speichern',
@@ -194,6 +195,20 @@ function detectEssentialSaveButton(htmlLower: string): boolean {
     'save settings',
     'auswahl bestätigen',
     'confirm selection',
+    // Nur Essenzielle-Varianten
+    'nur essenzielle',
+    'nur essenziell',
+    'nur notwendige',
+    'nur erforderliche',
+    'only essential',
+    'only necessary',
+    'essential only',
+    'necessary only',
+    'essenziell',
+    'essential',
+    'necessary cookies only',
+    'erforderliche cookies',
+    'notwendige cookies',
   ];
 
   for (const pattern of savePatterns) {

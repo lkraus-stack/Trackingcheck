@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeWebsite } from '@/lib/analyzer';
+import { analyzeWebsite, analyzeWebsiteQuick } from '@/lib/analyzer';
 import { AnalysisRequest } from '@/types';
 import { getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
 
@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
 
     // Cache prüfen (wenn nicht explizit übersprungen)
     const skipCache = body.options?.skipCache === true;
+    const quickScan = body.options?.quickScan === true;
     
     if (!skipCache) {
       const cachedResult = getCachedAnalysis(url);
@@ -50,15 +51,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Analyse durchführen
-    const result = await analyzeWebsite(url);
+    // Analyse durchführen (Quick oder Full)
+    const result = quickScan 
+      ? await analyzeWebsiteQuick(url)
+      : await analyzeWebsite(url);
 
-    // Ergebnis cachen
-    setCachedAnalysis(url, result);
+    // Ergebnis cachen (nur bei Full-Scan)
+    if (!quickScan) {
+      setCachedAnalysis(url, result);
+    }
 
     return NextResponse.json({
       ...result,
       fromCache: false,
+      scanMode: quickScan ? 'quick' : 'full',
     });
   } catch (error) {
     console.error('Analyse-Fehler:', error);
