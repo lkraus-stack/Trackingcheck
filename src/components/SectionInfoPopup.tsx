@@ -15,9 +15,46 @@ interface SectionInfoPopupProps {
 export function SectionInfoPopup({ sectionName, sectionData, fullAnalysis, trigger }: SectionInfoPopupProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+
+  // Erklärung direkt beim Mount laden
+  useEffect(() => {
+    const fetchExplanation = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/ai/explain-section', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sectionName,
+            sectionData,
+            fullAnalysis,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (data.configured === false) {
+            throw new Error('KI-API ist nicht konfiguriert.');
+          }
+          throw new Error(data.details || data.error || 'Erklärung fehlgeschlagen');
+        }
+
+        setExplanation(data.explanation);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchExplanation();
+  }, [sectionName, sectionData, fullAnalysis]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -32,47 +69,8 @@ export function SectionInfoPopup({ sectionName, sectionData, fullAnalysis, trigg
     }
   }, [isOpen]);
 
-  const fetchExplanation = async () => {
-    if (explanation) return; // Bereits geladen
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/ai/explain-section', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sectionName,
-          sectionData,
-          fullAnalysis,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.configured === false) {
-          throw new Error('KI-API ist nicht konfiguriert.');
-        }
-        throw new Error(data.details || data.error || 'Erklärung fehlgeschlagen');
-      }
-
-      setExplanation(data.explanation);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unbekannter Fehler');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleToggle = () => {
-    if (!isOpen) {
-      setIsOpen(true);
-      fetchExplanation();
-    } else {
-      setIsOpen(false);
-    }
+    setIsOpen(!isOpen);
   };
 
   return (
@@ -82,10 +80,13 @@ export function SectionInfoPopup({ sectionName, sectionData, fullAnalysis, trigg
           e.stopPropagation();
           handleToggle();
         }}
-        className="text-slate-400 hover:text-slate-300 transition-colors"
+        className="text-slate-400 hover:text-slate-300 transition-colors relative"
         title="Informationen zu dieser Sektion"
       >
         {trigger}
+        {isLoading && (
+          <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+        )}
       </button>
 
       {isOpen && (

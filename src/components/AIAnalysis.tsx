@@ -124,22 +124,81 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
       {aiAnalysis && (
         <>
           <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-500/30 overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 bg-purple-500/10 border-b border-purple-500/30">
-              <Bot className="w-5 h-5 text-purple-400" />
-              <span className="font-medium text-purple-300">KI-Auswertung</span>
+            <div className="flex items-center justify-between px-4 py-3 bg-purple-500/10 border-b border-purple-500/30">
+              <div className="flex items-center gap-2">
+                <Bot className="w-5 h-5 text-purple-400" />
+                <span className="font-medium text-purple-300">Ausführlicher KI-Analyse-Bericht</span>
+              </div>
+              <span className="text-xs text-purple-400/70 bg-purple-500/20 px-2 py-1 rounded">
+                Detaillierte Auswertung
+              </span>
             </div>
-            <div className="p-4 prose prose-invert prose-sm max-w-none">
+            <div className="p-6 prose prose-invert prose-sm max-w-none overflow-y-auto max-h-[800px] scrollbar-thin scrollbar-thumb-purple-500/30 scrollbar-track-transparent">
               <ReactMarkdown
                 components={{
-                  h1: ({ children }) => <h1 className="text-lg font-bold text-slate-200 mt-4 mb-2">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-base font-semibold text-slate-200 mt-3 mb-2">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-300 mt-2 mb-1">{children}</h3>,
-                  p: ({ children }) => <p className="text-slate-300 text-sm mb-2">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ol>,
-                  li: ({ children }) => <li className="text-slate-300">{children}</li>,
-                  strong: ({ children }) => <strong className="text-slate-200 font-semibold">{children}</strong>,
-                  code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-purple-300">{children}</code>,
+                  h1: ({ children }) => (
+                    <h1 className="text-xl font-bold text-white mt-6 mb-3 pb-2 border-b border-purple-500/30 first:mt-0">
+                      {children}
+                    </h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="text-lg font-semibold text-purple-200 mt-6 mb-3 flex items-center gap-2">
+                      {children}
+                    </h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="text-base font-semibold text-slate-200 mt-4 mb-2 ml-1">
+                      {children}
+                    </h3>
+                  ),
+                  h4: ({ children }) => (
+                    <h4 className="text-sm font-semibold text-slate-300 mt-3 mb-1 ml-2">
+                      {children}
+                    </h4>
+                  ),
+                  p: ({ children }) => (
+                    <p className="text-slate-300 text-sm mb-3 leading-relaxed">
+                      {children}
+                    </p>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="list-disc list-outside ml-5 text-slate-300 text-sm mb-3 space-y-2">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal list-outside ml-5 text-slate-300 text-sm mb-3 space-y-2">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="text-slate-300 leading-relaxed pl-1">
+                      {children}
+                    </li>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="text-slate-100 font-semibold">
+                      {children}
+                    </strong>
+                  ),
+                  em: ({ children }) => (
+                    <em className="text-purple-300 italic">
+                      {children}
+                    </em>
+                  ),
+                  code: ({ children }) => (
+                    <code className="bg-slate-700/80 px-1.5 py-0.5 rounded text-xs text-purple-300 font-mono">
+                      {children}
+                    </code>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-purple-500/50 pl-4 py-1 my-3 bg-purple-500/5 rounded-r text-slate-400 italic">
+                      {children}
+                    </blockquote>
+                  ),
+                  hr: () => (
+                    <hr className="my-6 border-purple-500/30" />
+                  ),
                 }}
               >
                 {aiAnalysis}
@@ -147,13 +206,13 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
             </div>
 
             {/* Chat Toggle */}
-            <div className="px-4 py-3 border-t border-purple-500/30">
+            <div className="px-4 py-3 border-t border-purple-500/30 bg-purple-500/5">
               <button
                 onClick={() => setShowChat(!showChat)}
                 className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
               >
                 <MessageSquare className="w-4 h-4" />
-                {showChat ? 'Chat ausblenden' : 'Rückfragen stellen'}
+                {showChat ? 'Chat ausblenden' : 'Rückfragen zum Bericht stellen'}
               </button>
             </div>
           </div>
@@ -161,22 +220,73 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
           {/* Validierungs-Ergebnisse */}
           {validation && (
             <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-xl border border-amber-500/30 overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-3 bg-amber-500/10 border-b border-amber-500/30">
-                <AlertTriangle className="w-5 h-5 text-amber-400" />
-                <span className="font-medium text-amber-300">KI-Validierung & Überprüfung</span>
+              <div className="flex items-center justify-between px-4 py-3 bg-amber-500/10 border-b border-amber-500/30">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                  <span className="font-medium text-amber-300">Qualitätssicherung & Checkliste</span>
+                </div>
+                <span className="text-xs text-amber-400/70 bg-amber-500/20 px-2 py-1 rounded">
+                  Zusätzliche Hinweise
+                </span>
               </div>
-              <div className="p-4 prose prose-invert prose-sm max-w-none">
+              <div className="p-6 prose prose-invert prose-sm max-w-none overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-amber-500/30 scrollbar-track-transparent">
                 <ReactMarkdown
                   components={{
-                    h1: ({ children }) => <h1 className="text-lg font-bold text-slate-200 mt-4 mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-base font-semibold text-slate-200 mt-3 mb-2">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-sm font-semibold text-slate-300 mt-2 mb-1">{children}</h3>,
-                    p: ({ children }) => <p className="text-slate-300 text-sm mb-2">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 text-sm mb-2 space-y-1">{children}</ol>,
-                    li: ({ children }) => <li className="text-slate-300">{children}</li>,
-                    strong: ({ children }) => <strong className="text-slate-200 font-semibold">{children}</strong>,
-                    code: ({ children }) => <code className="bg-slate-700 px-1 py-0.5 rounded text-xs text-amber-300">{children}</code>,
+                    h1: ({ children }) => (
+                      <h1 className="text-xl font-bold text-white mt-6 mb-3 pb-2 border-b border-amber-500/30 first:mt-0">
+                        {children}
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-lg font-semibold text-amber-200 mt-6 mb-3 flex items-center gap-2">
+                        {children}
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-base font-semibold text-slate-200 mt-4 mb-2 ml-1">
+                        {children}
+                      </h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-slate-300 text-sm mb-3 leading-relaxed">
+                        {children}
+                      </p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-disc list-outside ml-5 text-slate-300 text-sm mb-3 space-y-2">
+                        {children}
+                      </ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-outside ml-5 text-slate-300 text-sm mb-3 space-y-2">
+                        {children}
+                      </ol>
+                    ),
+                    li: ({ children }) => (
+                      <li className="text-slate-300 leading-relaxed pl-1">
+                        {children}
+                      </li>
+                    ),
+                    strong: ({ children }) => (
+                      <strong className="text-slate-100 font-semibold">
+                        {children}
+                      </strong>
+                    ),
+                    em: ({ children }) => (
+                      <em className="text-amber-300 italic">
+                        {children}
+                      </em>
+                    ),
+                    code: ({ children }) => (
+                      <code className="bg-slate-700/80 px-1.5 py-0.5 rounded text-xs text-amber-300 font-mono">
+                        {children}
+                      </code>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-4 border-amber-500/50 pl-4 py-1 my-3 bg-amber-500/5 rounded-r text-slate-400 italic">
+                        {children}
+                      </blockquote>
+                    ),
                   }}
                 >
                   {validation}
