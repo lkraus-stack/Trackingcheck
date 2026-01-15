@@ -10,6 +10,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-jetbrains-mono);
+  /* Custom breakpoint for extra small screens */
+  --breakpoint-xs: 480px;
 }
 
 body {

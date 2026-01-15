@@ -228,18 +228,18 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-w-5xl mx-auto">
+    <div className="flex flex-col h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)] w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[90%] rounded-2xl px-4 py-3 ${
+              className={`w-full sm:max-w-[90%] lg:max-w-[85%] rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
                 message.role === 'user'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ml-auto max-w-[85%] sm:max-w-[70%]'
                   : message.role === 'system'
                   ? 'bg-slate-800/50 text-slate-200 border border-slate-700'
                   : 'bg-slate-800 text-slate-200'
@@ -317,7 +317,7 @@ export function ChatInterface() {
 
       {/* History Panel */}
       {showHistory && history.length > 0 && (
-        <div className="absolute bottom-24 left-4 right-4 max-w-5xl mx-auto bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-80 overflow-y-auto z-50">
+        <div className="absolute bottom-20 sm:bottom-24 left-2 right-2 sm:left-4 sm:right-4 max-w-[1400px] mx-auto bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-60 sm:max-h-80 overflow-y-auto z-50">
           <div className="sticky top-0 bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between">
             <span className="font-medium text-slate-200">Letzte Analysen</span>
             <button
@@ -377,56 +377,63 @@ export function ChatInterface() {
       )}
 
       {/* Input Area */}
-      <div className="border-t border-slate-800 p-4 bg-slate-900/50 backdrop-blur">
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => setShowDashboard(true)}
-            className="p-3 rounded-xl border bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-indigo-500 transition-colors"
-            title="Dashboard öffnen"
-          >
-            <LayoutDashboard className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowSetupWizard(true)}
-            className="p-3 rounded-xl border bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-green-500 transition-colors"
-            title="Setup-Wizard & Anleitungen"
-          >
-            <BookOpen className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowHistory(!showHistory)}
-            className={`p-3 rounded-xl border transition-colors ${
-              showHistory 
-                ? 'bg-indigo-600 border-indigo-500 text-white' 
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-            title="Historie anzeigen"
-          >
-            <History className="w-5 h-5" />
-          </button>
-          <div className="relative flex-1">
-            <Globe className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-500" />
+      <div className="border-t border-slate-800 py-3 sm:py-4 bg-slate-900/50 backdrop-blur shrink-0">
+        <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3">
+          {/* Action Buttons */}
+          <div className="hidden min-[480px]:flex gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setShowDashboard(true)}
+              className="p-2.5 sm:p-3 rounded-lg sm:rounded-xl border bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-indigo-500 transition-colors"
+              title="Dashboard öffnen"
+            >
+              <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSetupWizard(true)}
+              className="hidden sm:block p-2.5 sm:p-3 rounded-lg sm:rounded-xl border bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-green-500 transition-colors"
+              title="Setup-Wizard & Anleitungen"
+            >
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-2.5 sm:p-3 rounded-lg sm:rounded-xl border transition-colors ${
+                showHistory 
+                  ? 'bg-indigo-600 border-indigo-500 text-white' 
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+              title="Historie anzeigen"
+            >
+              <History className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
+          
+          {/* Input Field */}
+          <div className="relative flex-1 min-w-0">
+            <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Website-URL eingeben (z.B. www.example.com)"
-              className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-slate-800 border border-slate-700 rounded-lg sm:rounded-xl text-sm sm:text-base text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               disabled={isLoading}
             />
           </div>
+          
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+            className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg sm:rounded-xl font-medium hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shrink-0"
           >
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
             ) : (
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
             <span className="hidden sm:inline">Analysieren</span>
           </button>

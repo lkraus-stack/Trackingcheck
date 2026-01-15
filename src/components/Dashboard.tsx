@@ -124,58 +124,59 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
   const recentAnalyses = analyses.slice(0, 5);
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl max-h-[90vh] bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-slate-800/50">
-          <div className="flex items-center gap-3">
-            <LayoutDashboard className="w-6 h-6 text-indigo-400" />
-            <h2 className="text-xl font-bold text-slate-200">Dashboard</h2>
+        <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-700 bg-slate-800/50 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LayoutDashboard className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
+            <h2 className="text-lg sm:text-xl font-bold text-slate-200">Dashboard</h2>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {currentAnalysis && (
               <button
                 onClick={() => setShowAssignToProject(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors"
+                className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm rounded-lg transition-colors"
               >
-                <Plus className="w-4 h-4" />
-                Analyse speichern
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Analyse speichern</span>
+                <span className="sm:hidden">Speichern</span>
               </button>
             )}
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-200 transition-colors"
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-700 bg-slate-800/30">
+        <div className="flex border-b border-slate-700 bg-slate-800/30 overflow-x-auto shrink-0">
           <TabButton
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
-            icon={<BarChart3 className="w-4 h-4" />}
+            icon={<BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             label="Übersicht"
           />
           <TabButton
             active={activeTab === 'projects'}
             onClick={() => setActiveTab('projects')}
-            icon={<FolderOpen className="w-4 h-4" />}
+            icon={<FolderOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             label={`Projekte (${projects.length})`}
           />
           <TabButton
             active={activeTab === 'history'}
             onClick={() => setActiveTab('history')}
-            icon={<History className="w-4 h-4" />}
+            icon={<History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             label={`Historie (${analyses.length})`}
           />
         </div>
 
         {/* Search Bar */}
         {(activeTab === 'projects' || activeTab === 'history') && (
-          <div className="px-6 py-3 border-b border-slate-800">
+          <div className="px-3 sm:px-6 py-2 sm:py-3 border-b border-slate-800 shrink-0">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
@@ -190,7 +191,7 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-3 sm:p-6 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full" />
@@ -199,9 +200,9 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
             <>
               {/* Overview Tab */}
               {activeTab === 'overview' && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Stats Cards */}
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                     <StatCard
                       label="Analysen"
                       value={stats?.totalAnalyses || 0}
@@ -229,9 +230,9 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                     {/* Favorite Projects */}
-                    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                    <div className="bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700 p-3 sm:p-4">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-medium text-slate-200 flex items-center gap-2">
                           <Star className="w-4 h-4 text-yellow-400" />
@@ -268,7 +269,7 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
                     </div>
 
                     {/* Recent Analyses */}
-                    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                    <div className="bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700 p-3 sm:p-4">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="font-medium text-slate-200 flex items-center gap-2">
                           <Clock className="w-4 h-4 text-slate-400" />
@@ -305,7 +306,7 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
 
                   {/* Top Issues */}
                   {stats?.topIssues && stats.topIssues.length > 0 && (
-                    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+                    <div className="bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700 p-3 sm:p-4">
                       <h3 className="font-medium text-slate-200 flex items-center gap-2 mb-4">
                         <AlertTriangle className="w-4 h-4 text-yellow-400" />
                         Häufigste Probleme
@@ -342,15 +343,15 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
                   </div>
 
                   {filteredProjects.length === 0 ? (
-                    <div className="text-center py-12">
-                      <FolderOpen className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-400">Keine Projekte gefunden</p>
-                      <p className="text-sm text-slate-500 mt-1">
+                    <div className="text-center py-8 sm:py-12">
+                      <FolderOpen className="w-10 h-10 sm:w-12 sm:h-12 text-slate-600 mx-auto mb-3" />
+                      <p className="text-slate-400 text-sm sm:text-base">Keine Projekte gefunden</p>
+                      <p className="text-xs sm:text-sm text-slate-500 mt-1">
                         Erstelle ein Projekt, um deine Analysen zu organisieren.
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       {filteredProjects.map((project) => (
                         <ProjectCard
                           key={project.id}
@@ -451,7 +452,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+      className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
         active
           ? 'text-indigo-400 border-indigo-400'
           : 'text-slate-400 border-transparent hover:text-slate-200'
@@ -486,12 +487,12 @@ function StatCard({
   };
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>{icon}</div>
-        <span className="text-sm text-slate-400">{label}</span>
+    <div className="bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700 p-3 sm:p-4">
+      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+        <div className={`p-1.5 sm:p-2 rounded-lg ${colorClasses[color]}`}>{icon}</div>
+        <span className="text-xs sm:text-sm text-slate-400">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-slate-200">
+      <p className="text-xl sm:text-2xl font-bold text-slate-200">
         {value}{suffix}
       </p>
     </div>
