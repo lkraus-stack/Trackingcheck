@@ -35,6 +35,7 @@ import {
   CampaignAttributionResult,
   GTMAuditResult,
   PrivacySandboxResult,
+  PrivacySandboxSignal,
   EcommerceDeepDiveResult,
 } from '@/types';
 
@@ -1165,16 +1166,16 @@ export function PrivacySandboxCard({ data }: PrivacySandboxCardProps) {
 
       {expanded && (
         <div className="px-4 pb-4 space-y-3">
-          {[
+          {([
             ['Topics API', data.topicsApi],
             ['Protected Audience', data.protectedAudience],
             ['Attribution Reporting', data.attributionReporting],
             ['Private Aggregation', data.privateAggregation],
             ['CHIPS', data.chips],
             ['First-Party Sets', data.firstPartySets],
-          ].map(([label, signal]) => (
-            <div key={label as string} className="flex items-center justify-between p-2 bg-slate-700/30 rounded-lg">
-              <span className="text-sm text-slate-200">{label as string}</span>
+          ] as [string, PrivacySandboxSignal][]).map(([label, signal]) => (
+            <div key={label} className="flex items-center justify-between p-2 bg-slate-700/30 rounded-lg">
+              <span className="text-sm text-slate-200">{label}</span>
               <span className={`text-xs ${signal.detected ? 'text-green-400' : 'text-slate-500'}`}>
                 {signal.detected ? 'Erkannt' : 'Nicht erkannt'}
               </span>
