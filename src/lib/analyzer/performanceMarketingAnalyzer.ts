@@ -1424,7 +1424,10 @@ export function analyzeEcommerceDeepDive(
   };
 
   const sampleEvent = ecommerce.events.find(e => e.sampleData?.items) || ecommerce.events.find(e => e.sampleData);
-  const itemSample = sampleEvent?.sampleData?.items?.[0] as Record<string, unknown> | undefined;
+  const items = sampleEvent?.sampleData?.items;
+  const itemSample = Array.isArray(items) && items.length > 0 
+    ? (items[0] as Record<string, unknown>)
+    : undefined;
   const requiredItemFields = ['item_id', 'item_name', 'price', 'quantity'];
   const missingFields = itemSample
     ? requiredItemFields.filter(f => itemSample[f] === undefined)
