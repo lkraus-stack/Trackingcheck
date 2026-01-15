@@ -747,6 +747,11 @@ export function ResultCard({ result }: ResultCardProps) {
         cookieLifetimeAudit={result.cookieLifetimeAudit}
         unusedPotential={result.unusedPotential}
         roasQuality={result.roasQuality}
+        conversionTrackingAudit={result.conversionTrackingAudit}
+        campaignAttribution={result.campaignAttribution}
+        gtmAudit={result.gtmAudit}
+        privacySandbox={result.privacySandbox}
+        ecommerceDeepDive={result.ecommerceDeepDive}
       />
 
       {/* Analyse-Vergleich */}

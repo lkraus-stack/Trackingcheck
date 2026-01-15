@@ -20,6 +20,10 @@ import {
   PieChart,
   ArrowRight,
   Info,
+  Link2,
+  Tag,
+  ShieldCheck,
+  Layers,
 } from 'lucide-react';
 import {
   EventQualityScoreResult,
@@ -27,6 +31,11 @@ import {
   CookieLifetimeAuditResult,
   UnusedPotentialResult,
   ROASQualityResult,
+  ConversionTrackingAuditResult,
+  CampaignAttributionResult,
+  GTMAuditResult,
+  PrivacySandboxResult,
+  EcommerceDeepDiveResult,
 } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -340,6 +349,33 @@ export function FunnelValidationCard({ data }: FunnelValidationCardProps) {
                   <ArrowRight className="w-3 h-3 text-indigo-400 flex-shrink-0 mt-0.5" />
                   {rec}
                 </p>
+              ))}
+            </div>
+          )}
+
+          {data.conversionRateKillers && data.conversionRateKillers.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Conversion Rate Killer</h4>
+              {data.conversionRateKillers.map((issue, i) => (
+                <div key={i} className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p className="text-sm text-red-300 font-medium">{issue.title}</p>
+                  <p className="text-xs text-slate-300">{issue.description}</p>
+                  <p className="text-xs text-slate-400 mt-1">Impact: {issue.impact}</p>
+                  <p className="text-xs text-green-400 mt-1">Fix: {issue.fix}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {data.optimizations && data.optimizations.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Funnel-Optimierungen</h4>
+              {data.optimizations.map((opt, i) => (
+                <div key={i} className="p-3 bg-slate-700/30 rounded-lg">
+                  <p className="text-sm text-slate-200">{opt.title}</p>
+                  <p className="text-xs text-slate-400">{opt.description}</p>
+                  <p className="text-xs text-green-400 mt-1">{opt.estimatedImpact}</p>
+                </div>
               ))}
             </div>
           )}
@@ -798,6 +834,456 @@ export function ROASQualityCard({ data }: ROASQualityCardProps) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Conversion Tracking Audit Card
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ConversionTrackingAuditCardProps {
+  data: ConversionTrackingAuditResult;
+}
+
+export function ConversionTrackingAuditCard({ data }: ConversionTrackingAuditCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${
+            data.overallScore >= 80 ? 'bg-green-500/20' :
+            data.overallScore >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+          }`}>
+            <Target className={`w-5 h-5 ${getScoreColor(data.overallScore)}`} />
+          </div>
+          <div className="text-left">
+            <h3 className="font-medium text-slate-200">Conversion Tracking Audit</h3>
+            <p className="text-xs text-slate-500">Plattform-Setup & Datenqualität</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`text-2xl font-bold ${getScoreColor(data.overallScore)}`}>
+            {data.overallScore}%
+          </div>
+          {expanded ? (
+            <ChevronUp className="w-5 h-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {data.platforms.map((platform) => (
+              <div key={platform.platform} className="p-3 bg-slate-700/30 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-200">{platform.platform.toUpperCase()}</span>
+                  <span className={`text-sm font-bold ${getScoreColor(platform.coverageScore)}`}>
+                    {platform.coverageScore}%
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className={platform.hasServerSide ? 'text-green-400' : 'text-slate-500'}>
+                    {platform.hasServerSide ? '✓' : '○'} Server-Side
+                  </span>
+                  <span className={platform.hasDedupe ? 'text-green-400' : 'text-slate-500'}>
+                    {platform.hasDedupe ? '✓' : '○'} Dedupe
+                  </span>
+                  <span className={platform.hasValue ? 'text-green-400' : 'text-slate-500'}>
+                    {platform.hasValue ? '✓' : '○'} Value
+                  </span>
+                  <span className={platform.hasCurrency ? 'text-green-400' : 'text-slate-500'}>
+                    {platform.hasCurrency ? '✓' : '○'} Currency
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {data.issues.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Probleme</h4>
+              {data.issues.map((issue, i) => (
+                <div key={i} className="p-3 bg-slate-700/30 rounded-lg">
+                  <p className="text-sm text-slate-200">{issue.title}</p>
+                  <p className="text-xs text-slate-400">{issue.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {data.recommendations.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Empfehlungen</h4>
+              {data.recommendations.map((rec, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <Lightbulb className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
+                    rec.priority === 'high' ? 'text-red-400' : 'text-yellow-400'
+                  }`} />
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">{rec.title}</p>
+                    <p className="text-xs text-slate-400">{rec.description}</p>
+                    <p className="text-xs text-green-400 mt-1">{rec.estimatedImpact}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Campaign Attribution Card
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface CampaignAttributionCardProps {
+  data: CampaignAttributionResult;
+}
+
+export function CampaignAttributionCard({ data }: CampaignAttributionCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${
+            data.overallScore >= 80 ? 'bg-green-500/20' :
+            data.overallScore >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+          }`}>
+            <Link2 className={`w-5 h-5 ${getScoreColor(data.overallScore)}`} />
+          </div>
+          <div className="text-left">
+            <h3 className="font-medium text-slate-200">Campaign & Attribution</h3>
+            <p className="text-xs text-slate-500">UTM, Click-IDs, Cross-Domain</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`text-2xl font-bold ${getScoreColor(data.overallScore)}`}>
+            {data.overallScore}%
+          </div>
+          {expanded ? (
+            <ChevronUp className="w-5 h-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-medium text-slate-300 mb-2">Click IDs</h4>
+            <div className="flex flex-wrap gap-2">
+              {data.clickIdStatus.map((signal) => (
+                <span
+                  key={signal.signal}
+                  className={`text-xs px-2 py-1 rounded ${
+                    signal.detected ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'
+                  }`}
+                >
+                  {signal.signal}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium text-slate-300 mb-2">UTM Parameter</h4>
+            <div className="flex flex-wrap gap-2">
+              {data.utmStatus.map((signal) => (
+                <span
+                  key={signal.signal}
+                  className={`text-xs px-2 py-1 rounded ${
+                    signal.detected ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'
+                  }`}
+                >
+                  {signal.signal}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-700/30 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-slate-400" />
+              <span className="text-sm text-slate-200">Cross-Domain Tracking</span>
+            </div>
+            <span className={`text-xs ${data.crossDomain.detected ? 'text-green-400' : 'text-yellow-400'}`}>
+              {data.crossDomain.detected ? 'Erkannt' : 'Nicht erkannt'}
+            </span>
+          </div>
+
+          {data.recommendations.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Empfehlungen</h4>
+              {data.recommendations.map((rec, i) => (
+                <p key={i} className="text-xs text-slate-400 flex items-start gap-2">
+                  <ArrowRight className="w-3 h-3 text-indigo-400 flex-shrink-0 mt-0.5" />
+                  {rec.title}: {rec.description}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GTM Audit Card
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface GTMAuditCardProps {
+  data: GTMAuditResult;
+}
+
+export function GTMAuditCard({ data }: GTMAuditCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${
+            data.score >= 80 ? 'bg-green-500/20' :
+            data.score >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+          }`}>
+            <Layers className={`w-5 h-5 ${getScoreColor(data.score)}`} />
+          </div>
+          <div className="text-left">
+            <h3 className="font-medium text-slate-200">GTM Container Audit</h3>
+            <p className="text-xs text-slate-500">
+              {data.detected ? `${data.containerIds.join(', ')}` : 'Kein GTM erkannt'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`text-2xl font-bold ${getScoreColor(data.score)}`}>
+            {data.score}%
+          </div>
+          {expanded ? (
+            <ChevronUp className="w-5 h-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <StatusItem label="Noscript Tag" status={data.hasNoScriptTag} />
+            <StatusItem label="Snippet im Head" status={data.snippetInHead} />
+            <StatusItem label="Consent vor GTM" status={data.consentDefaultBeforeGtm} />
+            <StatusItem label="Single Container" status={!data.hasMultipleContainers} />
+          </div>
+
+          {data.issues.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Auffälligkeiten</h4>
+              {data.issues.map((issue, i) => (
+                <div key={i} className="p-3 bg-slate-700/30 rounded-lg">
+                  <p className="text-sm text-slate-200">{issue.title}</p>
+                  <p className="text-xs text-slate-400">{issue.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Privacy Sandbox Card
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface PrivacySandboxCardProps {
+  data: PrivacySandboxResult;
+}
+
+export function PrivacySandboxCard({ data }: PrivacySandboxCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-slate-700/50">
+            <ShieldCheck className="w-5 h-5 text-slate-300" />
+          </div>
+          <div className="text-left">
+            <h3 className="font-medium text-slate-200">Privacy Sandbox</h3>
+            <p className="text-xs text-slate-500">
+              {data.summary.detectedSignals} Signale erkannt
+            </p>
+          </div>
+        </div>
+        {expanded ? (
+          <ChevronUp className="w-5 h-5 text-slate-400" />
+        ) : (
+          <ChevronDown className="w-5 h-5 text-slate-400" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3">
+          {[
+            ['Topics API', data.topicsApi],
+            ['Protected Audience', data.protectedAudience],
+            ['Attribution Reporting', data.attributionReporting],
+            ['Private Aggregation', data.privateAggregation],
+            ['CHIPS', data.chips],
+            ['First-Party Sets', data.firstPartySets],
+          ].map(([label, signal]) => (
+            <div key={label as string} className="flex items-center justify-between p-2 bg-slate-700/30 rounded-lg">
+              <span className="text-sm text-slate-200">{label as string}</span>
+              <span className={`text-xs ${signal.detected ? 'text-green-400' : 'text-slate-500'}`}>
+                {signal.detected ? 'Erkannt' : 'Nicht erkannt'}
+              </span>
+            </div>
+          ))}
+          {data.summary.warnings.length > 0 && (
+            <div className="text-xs text-yellow-400">
+              {data.summary.warnings.join(' ')}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E-Commerce Deep Dive Card
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface EcommerceDeepDiveCardProps {
+  data: EcommerceDeepDiveResult;
+}
+
+export function EcommerceDeepDiveCard({ data }: EcommerceDeepDiveCardProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  return (
+    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-700/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${
+            data.overallScore >= 80 ? 'bg-green-500/20' :
+            data.overallScore >= 60 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+          }`}>
+            <ShoppingCart className={`w-5 h-5 ${getScoreColor(data.overallScore)}`} />
+          </div>
+          <div className="text-left">
+            <h3 className="font-medium text-slate-200">E-Commerce Deep Dive</h3>
+            <p className="text-xs text-slate-500">
+              Coverage & Item-Qualität
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`text-2xl font-bold ${getScoreColor(data.overallScore)}`}>
+            {data.overallScore}%
+          </div>
+          {expanded ? (
+            <ChevronUp className="w-5 h-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <StatusItem label="Event Coverage" status={data.coverage.coverageScore >= 80} />
+            <StatusItem label="Item-Qualität" status={data.itemDataQuality.completenessScore >= 80} />
+            <StatusItem label="Revenue Daten" status={data.revenueQuality.issues.length === 0} />
+            <StatusItem label="Dynamic Remarketing" status={data.dynamicRemarketingReady} />
+          </div>
+
+          {data.coverage.missingEvents.length > 0 && (
+            <div className="text-xs text-yellow-400">
+              Fehlende Events: {data.coverage.missingEvents.join(', ')}
+            </div>
+          )}
+
+          {data.itemDataQuality.missingFields.length > 0 && (
+            <div className="text-xs text-yellow-400">
+              Fehlende Item-Felder: {data.itemDataQuality.missingFields.join(', ')}
+            </div>
+          )}
+
+          {data.recommendations.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-slate-300">Empfehlungen</h4>
+              {data.recommendations.map((rec, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <Lightbulb className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
+                    rec.priority === 'high' ? 'text-red-400' : 'text-yellow-400'
+                  }`} />
+                  <div>
+                    <p className="text-sm font-medium text-slate-200">{rec.title}</p>
+                    <p className="text-xs text-slate-400">{rec.description}</p>
+                    <p className="text-xs text-green-400 mt-1">{rec.estimatedImpact}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Helper Component
 function StatusItem({ label, status, critical = false }: { 
   label: string; 
@@ -830,6 +1316,11 @@ interface PerformanceMarketingSectionProps {
   cookieLifetimeAudit?: CookieLifetimeAuditResult;
   unusedPotential?: UnusedPotentialResult;
   roasQuality?: ROASQualityResult;
+  conversionTrackingAudit?: ConversionTrackingAuditResult;
+  campaignAttribution?: CampaignAttributionResult;
+  gtmAudit?: GTMAuditResult;
+  privacySandbox?: PrivacySandboxResult;
+  ecommerceDeepDive?: EcommerceDeepDiveResult;
 }
 
 export function PerformanceMarketingSection({
@@ -838,11 +1329,17 @@ export function PerformanceMarketingSection({
   cookieLifetimeAudit,
   unusedPotential,
   roasQuality,
+  conversionTrackingAudit,
+  campaignAttribution,
+  gtmAudit,
+  privacySandbox,
+  ecommerceDeepDive,
 }: PerformanceMarketingSectionProps) {
   const [expanded, setExpanded] = useState(true);
 
   // Check if any data exists
-  const hasData = eventQualityScore || funnelValidation || cookieLifetimeAudit || unusedPotential || roasQuality;
+  const hasData = eventQualityScore || funnelValidation || cookieLifetimeAudit || unusedPotential || roasQuality ||
+    conversionTrackingAudit || campaignAttribution || gtmAudit || privacySandbox || ecommerceDeepDive;
 
   if (!hasData) return null;
 
@@ -871,10 +1368,15 @@ export function PerformanceMarketingSection({
       {expanded && (
         <div className="space-y-3 pl-2">
           {eventQualityScore && <EventQualityCard data={eventQualityScore} />}
+          {conversionTrackingAudit && <ConversionTrackingAuditCard data={conversionTrackingAudit} />}
+          {campaignAttribution && <CampaignAttributionCard data={campaignAttribution} />}
+          {gtmAudit && <GTMAuditCard data={gtmAudit} />}
           {roasQuality && <ROASQualityCard data={roasQuality} />}
           {funnelValidation && <FunnelValidationCard data={funnelValidation} />}
+          {ecommerceDeepDive && <EcommerceDeepDiveCard data={ecommerceDeepDive} />}
           {cookieLifetimeAudit && <CookieLifetimeCard data={cookieLifetimeAudit} />}
           {unusedPotential && <UnusedPotentialCard data={unusedPotential} />}
+          {privacySandbox && <PrivacySandboxCard data={privacySandbox} />}
         </div>
       )}
     </div>

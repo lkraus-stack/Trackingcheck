@@ -7,3 +7,7 @@ export { AnalysisComparison } from './AnalysisComparison';
 export { Dashboard } from './Dashboard';
 export { SetupWizard } from './SetupWizard';
 export { PerformanceMarketingSection } from './PerformanceMarketing';
+export { HeroSection } from './HeroSection';
+export { ProblemSection } from './ProblemSection';
+export { AgencySection } from './AgencySection';
+export { ExpertRecommendation } from './ExpertRecommendation';

@@ -1,7 +1,18 @@
 import jsPDF from 'jspdf';
 import { AnalysisResult } from '@/types';
 
-export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void> {
+export interface PDFReportOptions {
+  brandName?: string;
+  clientName?: string;
+  reportTitle?: string;
+  contactInfo?: string;
+  showTrackingCheckerBranding?: boolean;
+}
+
+export async function exportAnalysisToPDF(
+  result: AnalysisResult,
+  options: PDFReportOptions = {}
+): Promise<void> {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -16,19 +27,39 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     }
   };
 
+  const showBranding = options.showTrackingCheckerBranding !== false;
+  const title = options.reportTitle ||
+    (showBranding ? 'Tracking & Compliance Report' : `${options.brandName || 'Tracking'} Report`);
+
   // Title
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('Tracking & Compliance Report', margin, yPos);
+  doc.text(title, margin, yPos);
   yPos += 10;
 
   // URL and Date
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
+  if (options.clientName) {
+    doc.text(`Client: ${options.clientName}`, margin, yPos);
+    yPos += 5;
+  }
   doc.text(`URL: ${result.url}`, margin, yPos);
   yPos += 5;
   doc.text(`Analysiert am: ${new Date(result.timestamp).toLocaleString('de-DE')}`, margin, yPos);
   yPos += 10;
+
+  if (!showBranding && options.brandName) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Erstellt von: ${options.brandName}`, margin, yPos);
+    yPos += 6;
+    if (options.contactInfo) {
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Kontakt: ${options.contactInfo}`, margin, yPos);
+      yPos += 8;
+    }
+  }
 
   // Score
   checkPageBreak(30);
@@ -239,6 +270,101 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     yPos += 5;
   }
 
+  // Conversion Tracking Audit (Performance Marketing)
+  if (result.conversionTrackingAudit) {
+    checkPageBreak(35);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Conversion Tracking Audit', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Score: ${result.conversionTrackingAudit.overallScore}%`, margin, yPos);
+    yPos += 5;
+    if (result.conversionTrackingAudit.platforms.length > 0) {
+      result.conversionTrackingAudit.platforms.forEach((platform) => {
+        checkPageBreak(5);
+        doc.text(
+          `${platform.platform.toUpperCase()}: ${platform.coverageScore}% (Server-Side: ${platform.hasServerSide ? 'Ja' : 'Nein'})`,
+          margin,
+          yPos
+        );
+        yPos += 5;
+      });
+    }
+    yPos += 5;
+  }
+
+  // Campaign Attribution
+  if (result.campaignAttribution) {
+    checkPageBreak(30);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Campaign & Attribution', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Score: ${result.campaignAttribution.overallScore}%`, margin, yPos);
+    yPos += 5;
+    const missingClickIds = result.campaignAttribution.clickIdStatus
+      .filter(s => !s.detected)
+      .map(s => s.signal)
+      .join(', ');
+    if (missingClickIds) {
+      doc.text(`Fehlende Click-IDs: ${missingClickIds}`, margin, yPos);
+      yPos += 5;
+    }
+    yPos += 5;
+  }
+
+  // GTM Audit
+  if (result.gtmAudit) {
+    checkPageBreak(25);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GTM Audit', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Score: ${result.gtmAudit.score}%`, margin, yPos);
+    yPos += 5;
+    doc.text(`Container: ${result.gtmAudit.containerIds.join(', ') || 'Nicht erkannt'}`, margin, yPos);
+    yPos += 5;
+    yPos += 5;
+  }
+
+  // Privacy Sandbox
+  if (result.privacySandbox) {
+    checkPageBreak(25);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Privacy Sandbox', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Readiness: ${result.privacySandbox.summary.readinessScore}%`, margin, yPos);
+    yPos += 5;
+    yPos += 5;
+  }
+
+  // E-Commerce Deep Dive
+  if (result.ecommerceDeepDive) {
+    checkPageBreak(25);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('E-Commerce Deep Dive', margin, yPos);
+    yPos += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Score: ${result.ecommerceDeepDive.overallScore}%`, margin, yPos);
+    yPos += 5;
+    if (result.ecommerceDeepDive.coverage.missingEvents.length > 0) {
+      doc.text(`Fehlende Events: ${result.ecommerceDeepDive.coverage.missingEvents.join(', ')}`, margin, yPos);
+      yPos += 5;
+    }
+    yPos += 5;
+  }
+
   // Cookies Summary
   checkPageBreak(35);
   doc.setFontSize(14);
@@ -378,7 +504,7 @@ export async function exportAnalysisToPDF(result: AnalysisResult): Promise<void>
     doc.setFontSize(8);
     doc.setTextColor(128, 128, 128);
     doc.text(
-      `Seite ${i} von ${totalPages} | Tracking Checker Report`,
+      `Seite ${i} von ${totalPages} | ${showBranding ? 'Tracking Checker Report' : (options.brandName || 'Tracking Report')}`,
       pageWidth / 2,
       pageHeight - 10,
       { align: 'center' }
