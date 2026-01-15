@@ -86,17 +86,17 @@ export function ResultCard({ result }: ResultCardProps) {
     });
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
       {/* Score Card */}
-      <div className={`bg-gradient-to-r ${getScoreBackground(result.score)} rounded-xl p-4 border border-slate-700`}>
+      <div className={`bg-gradient-to-r ${getScoreBackground(result.score)} rounded-lg sm:rounded-xl p-3 sm:p-4 border border-slate-700`}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-slate-400 text-sm">Compliance Score</p>
-            <p className={`text-4xl font-bold ${getScoreColor(result.score)}`}>{result.score}/100</p>
+            <p className="text-slate-400 text-xs sm:text-sm">Compliance Score</p>
+            <p className={`text-3xl sm:text-4xl font-bold ${getScoreColor(result.score)}`}>{result.score}/100</p>
           </div>
           <div className="text-right">
-            <p className="text-slate-400 text-xs">Analysiert am</p>
-            <p className="text-slate-300 text-sm">
+            <p className="text-slate-400 text-[10px] sm:text-xs">Analysiert am</p>
+            <p className="text-slate-300 text-xs sm:text-sm">
               {new Date(result.timestamp).toLocaleDateString('de-DE', {
                 day: '2-digit',
                 month: '2-digit',
@@ -106,7 +106,7 @@ export function ResultCard({ result }: ResultCardProps) {
               })}
             </p>
             {result.gdprChecklist && (
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
                 DSGVO: {result.gdprChecklist.score}%
               </p>
             )}
@@ -118,7 +118,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {result.cookieConsentTest && (
         <Section
           title="Cookie-Consent Test"
-          icon={<Shield className="w-5 h-5" />}
+          icon={<Shield className="w-4 h-4 sm:w-5 sm:h-5" />}
           status={
             result.cookieConsentTest.analysis.consentWorksProperly &&
             result.cookieConsentTest.analysis.rejectWorksProperly
@@ -137,8 +137,8 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.cookieConsentTest}
           fullAnalysis={result}
         >
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <ConsentTestPhase
                 phase="Vor Consent"
                 cookieCount={result.cookieConsentTest.beforeConsent.cookieCount}
@@ -198,7 +198,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Cookie Banner Section */}
       <Section
         title="Cookie Banner"
-        icon={<Cookie className="w-5 h-5" />}
+        icon={<Cookie className="w-4 h-4 sm:w-5 sm:h-5" />}
         status={result.cookieBanner.detected}
         expanded={expandedSections.cookieBanner}
         onToggle={() => toggleSection('cookieBanner')}
@@ -206,7 +206,7 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.cookieBanner}
         fullAnalysis={result}
       >
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           <StatusItem
             label="Banner erkannt"
             value={result.cookieBanner.detected}
@@ -243,7 +243,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Google Consent Mode Section */}
       <Section
         title="Google Consent Mode"
-        icon={<Shield className="w-5 h-5" />}
+        icon={<Shield className="w-4 h-4 sm:w-5 sm:h-5" />}
         status={result.googleConsentMode.detected}
         expanded={expandedSections.googleConsentMode}
         onToggle={() => toggleSection('googleConsentMode')}
@@ -251,8 +251,8 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.googleConsentMode}
         fullAnalysis={result}
       >
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2 sm:space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
             <StatusItem
               label="Consent Mode erkannt"
               value={result.googleConsentMode.detected}
@@ -281,9 +281,9 @@ export function ResultCard({ result }: ResultCardProps) {
             </div>
           )}
 
-          <div className="border-t border-slate-700 pt-3">
-            <p className="text-xs text-slate-400 mb-2">Parameter Status:</p>
-            <div className="grid grid-cols-2 gap-2">
+          <div className="border-t border-slate-700 pt-2 sm:pt-3">
+            <p className="text-[10px] sm:text-xs text-slate-400 mb-2">Parameter Status:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2">
               {Object.entries(result.googleConsentMode.parameters).map(([key, value]) => (
                 <div key={key} className="flex items-center gap-2">
                   {value ? (
@@ -305,7 +305,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {result.dataLayerAnalysis?.ecommerce?.detected && (
         <Section
           title="E-Commerce Tracking"
-          icon={<ShoppingCart className="w-5 h-5" />}
+          icon={<ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />}
           status={result.dataLayerAnalysis.ecommerce.valueTracking.hasTransactionValue}
           expanded={expandedSections.ecommerce}
           onToggle={() => toggleSection('ecommerce')}
@@ -318,8 +318,8 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.dataLayerAnalysis.ecommerce}
           fullAnalysis={result}
         >
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               <StatusItem
                 label="Plattform"
                 value={result.dataLayerAnalysis.ecommerce.platform?.toUpperCase() || 'Unbekannt'}
@@ -375,7 +375,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Tracking Tags Section */}
       <Section
         title="Tracking Tags"
-        icon={<Tag className="w-5 h-5" />}
+        icon={<Tag className="w-4 h-4 sm:w-5 sm:h-5" />}
         status={
           result.trackingTags.googleAnalytics.detected ||
           result.trackingTags.googleTagManager.detected ||
@@ -387,7 +387,7 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.trackingTags}
         fullAnalysis={result}
       >
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           <TrackingItem
             name="Google Analytics"
             detected={result.trackingTags.googleAnalytics.detected}
@@ -482,7 +482,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {result.thirdPartyDomains && (
         <Section
           title={`Third-Party Domains (${result.thirdPartyDomains.totalCount})`}
-          icon={<Globe2 className="w-5 h-5" />}
+          icon={<Globe2 className="w-4 h-4 sm:w-5 sm:h-5" />}
           status={result.thirdPartyDomains.totalCount > 0}
           expanded={expandedSections.thirdParty}
           onToggle={() => toggleSection('thirdParty')}
@@ -490,8 +490,8 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.thirdPartyDomains}
           fullAnalysis={result}
         >
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <div className="p-2 bg-slate-800 rounded text-center">
                 <p className="text-xs text-slate-400">Advertising</p>
                 <p className="text-lg font-bold text-red-400">{result.thirdPartyDomains.categories.advertising}</p>
@@ -544,7 +544,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Cookies Section - Erweitert */}
       <Section
         title={`Cookies (${result.cookies.length})`}
-        icon={<BarChart3 className="w-5 h-5" />}
+        icon={<BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />}
         status={result.cookies.length > 0}
         expanded={expandedSections.cookies}
         onToggle={() => toggleSection('cookies')}
@@ -552,9 +552,9 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={{ cookies: result.cookies, count: result.cookies.length }}
         fullAnalysis={result}
       >
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {/* Filter und Suche */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[150px]">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
               <input
@@ -589,7 +589,7 @@ export function ResultCard({ result }: ResultCardProps) {
           </div>
 
           {/* Cookie Categories Summary */}
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
             <CookieCategorySummary
               category="Notwendig"
               count={result.cookies.filter((c) => c.category === 'necessary').length}
@@ -628,7 +628,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {result.gdprChecklist && (
         <Section
           title={`DSGVO-Checkliste (${result.gdprChecklist.score}%)`}
-          icon={<Scale className="w-5 h-5" />}
+          icon={<Scale className="w-4 h-4 sm:w-5 sm:h-5" />}
           status={result.gdprChecklist.score >= 70}
           expanded={expandedSections.gdpr}
           onToggle={() => toggleSection('gdpr')}
@@ -641,8 +641,8 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.gdprChecklist}
           fullAnalysis={result}
         >
-          <div className="space-y-3">
-            <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="space-y-2 sm:space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-center">
               <div className="p-2 bg-green-500/10 rounded">
                 <p className="text-lg font-bold text-green-400">{result.gdprChecklist.summary.passed}</p>
                 <p className="text-[10px] text-slate-400">Bestanden</p>
@@ -684,7 +684,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {result.dmaCheck?.applicable && (
         <Section
           title="DMA-Compliance"
-          icon={<FileCheck className="w-5 h-5" />}
+          icon={<FileCheck className="w-4 h-4 sm:w-5 sm:h-5" />}
           status={result.dmaCheck.summary.nonCompliant === 0}
           expanded={expandedSections.dma}
           onToggle={() => toggleSection('dma')}
@@ -692,7 +692,7 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.dmaCheck}
           fullAnalysis={result}
         >
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             <div className="flex flex-wrap gap-2">
               {result.dmaCheck.gatekeepersDetected.map((gk) => (
                 <span key={gk} className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">
@@ -720,7 +720,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {result.issues.length > 0 && (
         <Section
           title={`Probleme & Hinweise (${result.issues.length})`}
-          icon={<AlertTriangle className="w-5 h-5" />}
+          icon={<AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />}
           status={false}
           expanded={expandedSections.issues}
           onToggle={() => toggleSection('issues')}
@@ -729,7 +729,7 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={{ issues: result.issues, count: result.issues.length }}
           fullAnalysis={result}
         >
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-2 sm:space-y-3 max-h-72 sm:max-h-96 overflow-y-auto">
             {result.issues.map((issue, index) => (
               <IssueItem key={index} issue={issue} />
             ))}
@@ -756,10 +756,10 @@ export function ResultCard({ result }: ResultCardProps) {
       <AIAnalysis result={result} />
 
       {/* Actions */}
-      <div className="flex gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
         <button
           onClick={() => exportAnalysisToPDF(result)}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-medium transition-all"
+          className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg sm:rounded-xl font-medium text-sm sm:text-base transition-all"
         >
           <Download className="w-4 h-4" />
           PDF Export
@@ -768,7 +768,7 @@ export function ResultCard({ result }: ResultCardProps) {
           href={result.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-medium transition-colors"
+          className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg sm:rounded-xl font-medium text-sm sm:text-base transition-colors"
         >
           <ExternalLink className="w-4 h-4" />
           Website öffnen
@@ -803,41 +803,41 @@ function Section({
   fullAnalysis?: AnalysisResult;
 }) {
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700 overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors"
+        className="w-full flex items-center justify-between p-2.5 sm:p-3 hover:bg-slate-700/30 transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <span className={statusColor || (status ? 'text-green-400' : 'text-slate-500')}>
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <span className={`shrink-0 ${statusColor || (status ? 'text-green-400' : 'text-slate-500')}`}>
             {icon}
           </span>
-          <span className="font-medium text-slate-200">{title}</span>
+          <span className="font-medium text-slate-200 text-sm sm:text-base truncate">{title}</span>
           {sectionName && sectionData !== undefined && sectionData !== null && fullAnalysis && (
             <SectionInfoPopup
               sectionName={sectionName}
               sectionData={sectionData}
               fullAnalysis={fullAnalysis}
-              trigger={<HelpCircle className="w-4 h-4" />}
+              trigger={<HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             />
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {!statusColor && (
             status ? (
-              <CheckCircle2 className="w-4 h-4 text-green-400" />
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-400" />
             ) : (
-              <XCircle className="w-4 h-4 text-slate-500" />
+              <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />
             )
           )}
           {expanded ? (
-            <ChevronUp className="w-4 h-4 text-slate-400" />
+            <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
           )}
         </div>
       </button>
-      {expanded && <div className="px-3 pb-3">{children}</div>}
+      {expanded && <div className="px-2.5 sm:px-3 pb-2.5 sm:pb-3">{children}</div>}
     </div>
   );
 }

@@ -104,24 +104,24 @@ export function QuickActions({ result }: QuickActionsProps) {
   const gtmPreviewUrl = getGTMPreviewUrl();
 
   return (
-    <div className="mt-4">
+    <div className="mt-3 sm:mt-4">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 transition-colors"
+        className="w-full flex items-center justify-between p-2.5 sm:p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg sm:rounded-xl border border-slate-700 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Zap className="w-5 h-5 text-yellow-400" />
-          <span className="font-medium text-slate-200">Quick Actions</span>
+          <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400" />
+          <span className="font-medium text-slate-200 text-sm sm:text-base">Quick Actions</span>
         </div>
         {expanded ? (
-          <ChevronUp className="w-5 h-5 text-slate-400" />
+          <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
         ) : (
-          <ChevronDown className="w-5 h-5 text-slate-400" />
+          <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
         )}
       </button>
 
       {expanded && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-2 sm:mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* Code Generator */}
           <button
             onClick={() => setShowCodeModal(true)}
@@ -668,13 +668,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-3xl max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+      <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90vw] sm:max-w-3xl sm:max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-700/50 border-b border-slate-600">
           <div className="flex items-center gap-2">
-            <FileCode className="w-5 h-5 text-indigo-400" />
-            <h3 className="font-medium text-slate-200">Consent Mode v2 Code Generator</h3>
+            <FileCode className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
+            <h3 className="font-medium text-slate-200 text-sm sm:text-base">Consent Mode v2 Code Generator</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1">
             ✕
           </button>
         </div>
@@ -887,13 +887,13 @@ function ChecklistModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-2xl max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+      <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90vw] sm:max-w-2xl sm:max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-700/50 border-b border-slate-600">
           <div className="flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-green-400" />
-            <h3 className="font-medium text-slate-200">Setup Checkliste</h3>
+            <ClipboardList className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+            <h3 className="font-medium text-slate-200 text-sm sm:text-base">Setup Checkliste</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1">
             ✕
           </button>
         </div>
@@ -998,19 +998,19 @@ function DataLayerGeneratorModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+      <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90vw] sm:max-w-4xl sm:max-h-[85vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-700/50 border-b border-slate-600">
           <div className="flex items-center gap-2">
-            <Layers className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-medium text-slate-200">DataLayer Generator</h3>
+            <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+            <h3 className="font-medium text-slate-200 text-sm sm:text-base">DataLayer Generator</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1">
             ✕
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
-          <div className="grid grid-cols-3 gap-4">
+        <div className="flex-1 overflow-auto p-3 sm:p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
             {/* Event Auswahl */}
             <div className="bg-slate-700/30 rounded-xl p-4 border border-slate-600">
               <h4 className="font-medium text-slate-200 mb-3">Event auswählen</h4>
@@ -1309,15 +1309,15 @@ function DataLayerViewerModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-5xl max-h-[90vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
+      <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[95vw] sm:max-w-5xl sm:max-h-[90vh] bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-700/50 border-b border-slate-600">
           <div className="flex items-center gap-2">
-            <Eye className="w-5 h-5 text-sky-400" />
-            <h3 className="font-medium text-slate-200">DataLayer Viewer</h3>
-            <span className="text-xs text-slate-500">({entries.length} Einträge)</span>
+            <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400" />
+            <h3 className="font-medium text-slate-200 text-sm sm:text-base">DataLayer Viewer</h3>
+            <span className="text-[10px] sm:text-xs text-slate-500">({entries.length} Einträge)</span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1">
             ✕
           </button>
         </div>

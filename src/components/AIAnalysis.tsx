@@ -83,14 +83,14 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
   };
 
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
       {/* KI-Analyse Button */}
       {!aiAnalysis && !isLoading && (
         <button
           onClick={generateAnalysis}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-medium transition-all"
+          className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg sm:rounded-xl font-medium text-sm sm:text-base transition-all"
         >
-          <Sparkles className="w-5 h-5" />
+          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
           KI-Analyse starten
         </button>
       )}
