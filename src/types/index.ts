@@ -48,6 +48,11 @@ export interface AnalysisResult {
   cookieLifetimeAudit?: CookieLifetimeAuditResult;
   unusedPotential?: UnusedPotentialResult;
   roasQuality?: ROASQualityResult;
+  conversionTrackingAudit?: ConversionTrackingAuditResult;
+  campaignAttribution?: CampaignAttributionResult;
+  gtmAudit?: GTMAuditResult;
+  privacySandbox?: PrivacySandboxResult;
+  ecommerceDeepDive?: EcommerceDeepDiveResult;
 }
 
 // Analyse-Schritte für KI-ähnliche Gedankengänge in der UI
@@ -463,7 +468,7 @@ export interface CookieConsentIssue {
 
 export interface Issue {
   severity: 'error' | 'warning' | 'info';
-  category: 'cookie-banner' | 'tcf' | 'consent-mode' | 'tracking' | 'cookies' | 'general' | 'gdpr' | 'dma' | 'ecommerce';
+  category: 'cookie-banner' | 'tcf' | 'consent-mode' | 'tracking' | 'cookies' | 'general' | 'gdpr' | 'dma' | 'ecommerce' | 'conversion' | 'attribution' | 'gtm' | 'privacy';
   title: string;
   description: string;
   recommendation?: string;
@@ -558,6 +563,8 @@ export interface FunnelValidationResult {
   overallScore: number;
   criticalGaps: string[];
   recommendations: string[];
+  conversionRateKillers?: FunnelIssue[];
+  optimizations?: FunnelOptimization[];
 }
 
 export interface FunnelStep {
@@ -568,6 +575,21 @@ export interface FunnelStep {
   missingParams: string[];
   sampleData?: Record<string, unknown>;
   issues: string[];
+}
+
+export interface FunnelIssue {
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  impact: string;
+  fix: string;
+}
+
+export interface FunnelOptimization {
+  title: string;
+  description: string;
+  estimatedImpact: string;
+  effort: 'low' | 'medium' | 'high';
 }
 
 // Cookie-Lifetime-Audit
@@ -663,4 +685,159 @@ export interface ROASRecommendation {
   description: string;
   impact: string;
   implementation: string;
+}
+
+// Conversion Tracking Audit
+export interface ConversionTrackingAuditResult {
+  overallScore: number;
+  platforms: ConversionPlatformAudit[];
+  issues: ConversionAuditIssue[];
+  recommendations: ConversionAuditRecommendation[];
+}
+
+export interface ConversionPlatformAudit {
+  platform: 'google' | 'meta' | 'tiktok' | 'linkedin' | 'other';
+  detected: boolean;
+  hasServerSide: boolean;
+  hasDedupe: boolean;
+  hasValue: boolean;
+  hasCurrency: boolean;
+  hasEventId: boolean;
+  coverageScore: number;
+  notes: string[];
+}
+
+export interface ConversionAuditIssue {
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  impact: string;
+}
+
+export interface ConversionAuditRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  estimatedImpact: string;
+}
+
+// Campaign Tracking & Attribution
+export interface CampaignAttributionResult {
+  overallScore: number;
+  clickIdStatus: CampaignSignalStatus[];
+  utmStatus: CampaignSignalStatus[];
+  crossDomain: CrossDomainTrackingStatus;
+  issues: CampaignAttributionIssue[];
+  recommendations: CampaignAttributionRecommendation[];
+}
+
+export interface CampaignSignalStatus {
+  signal: string;
+  detected: boolean;
+  source: 'url' | 'cookie' | 'script' | 'network' | 'unknown';
+  notes?: string;
+}
+
+export interface CrossDomainTrackingStatus {
+  detected: boolean;
+  methods: string[];
+  warnings: string[];
+}
+
+export interface CampaignAttributionIssue {
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  impact: string;
+}
+
+export interface CampaignAttributionRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  estimatedImpact: string;
+}
+
+// GTM Audit
+export interface GTMAuditResult {
+  detected: boolean;
+  containerIds: string[];
+  hasMultipleContainers: boolean;
+  hasNoScriptTag: boolean;
+  snippetInHead: boolean;
+  consentDefaultBeforeGtm: boolean;
+  issues: GTMAuditIssue[];
+  recommendations: GTMAuditRecommendation[];
+  score: number;
+}
+
+export interface GTMAuditIssue {
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  impact: string;
+}
+
+export interface GTMAuditRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  estimatedImpact: string;
+}
+
+// Privacy Sandbox / Cookie-less Tracking
+export interface PrivacySandboxResult {
+  topicsApi: PrivacySandboxSignal;
+  protectedAudience: PrivacySandboxSignal;
+  attributionReporting: PrivacySandboxSignal;
+  privateAggregation: PrivacySandboxSignal;
+  chips: PrivacySandboxSignal;
+  firstPartySets: PrivacySandboxSignal;
+  summary: {
+    detectedSignals: number;
+    readinessScore: number;
+    warnings: string[];
+  };
+}
+
+export interface PrivacySandboxSignal {
+  detected: boolean;
+  evidence: string[];
+  notes?: string;
+}
+
+// E-Commerce Deep Dive
+export interface EcommerceDeepDiveResult {
+  overallScore: number;
+  coverage: EcommerceCoverage;
+  itemDataQuality: EcommerceItemQuality;
+  revenueQuality: EcommerceRevenueQuality;
+  dynamicRemarketingReady: boolean;
+  recommendations: EcommerceDeepDiveRecommendation[];
+}
+
+export interface EcommerceCoverage {
+  detectedEvents: string[];
+  missingEvents: string[];
+  coverageScore: number;
+}
+
+export interface EcommerceItemQuality {
+  requiredFieldsPresent: string[];
+  missingFields: string[];
+  completenessScore: number;
+}
+
+export interface EcommerceRevenueQuality {
+  hasValue: boolean;
+  hasCurrency: boolean;
+  hasTransactionId: boolean;
+  issues: string[];
+}
+
+export interface EcommerceDeepDiveRecommendation {
+  priority: 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  estimatedImpact: string;
 }

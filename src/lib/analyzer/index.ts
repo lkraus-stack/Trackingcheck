@@ -12,6 +12,11 @@ import {
   analyzeCookieLifetime,
   analyzeUnusedPotential,
   analyzeROASQuality,
+  analyzeConversionTrackingAudit,
+  analyzeCampaignAttribution,
+  analyzeGTMAudit,
+  analyzePrivacySandbox,
+  analyzeEcommerceDeepDive,
 } from './performanceMarketingAnalyzer';
 import { 
   AnalysisResult, 
@@ -156,9 +161,16 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     const roasQuality = dataLayerAnalysis.ecommerce.detected 
       ? analyzeROASQuality(dataLayerAnalysis)
       : undefined;
+    const conversionTrackingAudit = analyzeConversionTrackingAudit(crawlResult, trackingTags, dataLayerAnalysis);
+    const campaignAttribution = analyzeCampaignAttribution(crawlResult, trackingTags);
+    const gtmAudit = analyzeGTMAudit(crawlResult, trackingTags);
+    const privacySandbox = analyzePrivacySandbox(crawlResult);
+    const ecommerceDeepDive = dataLayerAnalysis.ecommerce.detected
+      ? analyzeEcommerceDeepDive(dataLayerAnalysis)
+      : undefined;
     
     addStep('analyze_performance', 'completed', 
-      `Event Quality: ${eventQualityScore.overallScore}%${funnelValidation.isEcommerce ? ` | Funnel: ${funnelValidation.overallScore}%` : ''}`
+      `Event Quality: ${eventQualityScore.overallScore}%${funnelValidation.isEcommerce ? ` | Funnel: ${funnelValidation.overallScore}%` : ''} | Conversion Audit: ${conversionTrackingAudit.overallScore}%`
     );
     
     // Issues sammeln
@@ -173,7 +185,12 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       dataLayerAnalysis,
       thirdPartyDomains,
       gdprChecklist,
-      dmaCheck
+      dmaCheck,
+      conversionTrackingAudit,
+      campaignAttribution,
+      gtmAudit,
+      privacySandbox,
+      ecommerceDeepDive
     );
     addStep('generate_issues', 'completed', `${issues.length} Hinweise generiert`);
     
@@ -203,6 +220,11 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       cookieLifetimeAudit,
       unusedPotential,
       roasQuality,
+      conversionTrackingAudit,
+      campaignAttribution,
+      gtmAudit,
+      privacySandbox,
+      ecommerceDeepDive,
     };
   } catch (error) {
     console.error('Analysis error:', error);
@@ -506,7 +528,12 @@ function generateIssues(
   dataLayerAnalysis: DataLayerAnalysisResult,
   thirdPartyDomains: ThirdPartyDomainsResult,
   gdprChecklist: GDPRChecklistResult,
-  dmaCheck: DMACheckResult
+  dmaCheck: DMACheckResult,
+  conversionTrackingAudit: AnalysisResult['conversionTrackingAudit'],
+  campaignAttribution: AnalysisResult['campaignAttribution'],
+  gtmAudit: AnalysisResult['gtmAudit'],
+  privacySandbox: AnalysisResult['privacySandbox'],
+  ecommerceDeepDive: AnalysisResult['ecommerceDeepDive']
 ): Issue[] {
   const issues: Issue[] = [];
 
@@ -695,6 +722,76 @@ function generateIssues(
       title: 'Viele unbekannte Drittanbieter',
       description: `${thirdPartyDomains.riskAssessment.unknownDomains.length} unbekannte Drittanbieter-Domains erkannt.`,
       recommendation: 'Dokumentieren Sie alle Drittanbieter in Ihrer Datenschutzerklärung.',
+    });
+  }
+
+  // Conversion Tracking Audit Issues
+  if (conversionTrackingAudit) {
+    for (const issue of conversionTrackingAudit.issues) {
+      issues.push({
+        severity: issue.severity === 'high' ? 'error' : issue.severity === 'medium' ? 'warning' : 'info',
+        category: 'conversion',
+        title: issue.title,
+        description: issue.description,
+        recommendation: issue.impact,
+      });
+    }
+    if (conversionTrackingAudit.overallScore < 50) {
+      issues.push({
+        severity: 'warning',
+        category: 'conversion',
+        title: 'Conversion Tracking Qualität niedrig',
+        description: `Audit Score nur ${conversionTrackingAudit.overallScore}%.`,
+        recommendation: 'Conversion-Tracking Setup prüfen und ergänzen.',
+      });
+    }
+  }
+
+  // Campaign Attribution Issues
+  if (campaignAttribution) {
+    for (const issue of campaignAttribution.issues) {
+      issues.push({
+        severity: issue.severity === 'high' ? 'warning' : issue.severity === 'medium' ? 'info' : 'info',
+        category: 'attribution',
+        title: issue.title,
+        description: issue.description,
+        recommendation: issue.impact,
+      });
+    }
+  }
+
+  // GTM Audit Issues
+  if (gtmAudit) {
+    for (const issue of gtmAudit.issues) {
+      issues.push({
+        severity: issue.severity === 'high' ? 'error' : issue.severity === 'medium' ? 'warning' : 'info',
+        category: 'gtm',
+        title: issue.title,
+        description: issue.description,
+        recommendation: issue.impact,
+      });
+    }
+  }
+
+  // Privacy Sandbox Hinweise
+  if (privacySandbox && privacySandbox.summary.detectedSignals === 0) {
+    issues.push({
+      severity: 'info',
+      category: 'privacy',
+      title: 'Keine Privacy Sandbox Signale erkannt',
+      description: 'Es wurden keine Topics/Attribution/Protected Audience Signale erkannt.',
+      recommendation: 'Cookie-less Tracking Roadmap prüfen.',
+    });
+  }
+
+  // E-Commerce Deep Dive
+  if (ecommerceDeepDive && ecommerceDeepDive.coverage.missingEvents.length > 0) {
+    issues.push({
+      severity: 'warning',
+      category: 'ecommerce',
+      title: 'E-Commerce Events unvollständig',
+      description: `Fehlende Events: ${ecommerceDeepDive.coverage.missingEvents.join(', ')}`,
+      recommendation: 'Funnel-Events ergänzen, um Optimierung zu verbessern.',
     });
   }
 

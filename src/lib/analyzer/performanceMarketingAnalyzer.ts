@@ -17,6 +17,27 @@ import {
   ROASDataCompleteness,
   ROASParameter,
   ROASRecommendation,
+  ConversionTrackingAuditResult,
+  ConversionPlatformAudit,
+  ConversionAuditIssue,
+  ConversionAuditRecommendation,
+  CampaignAttributionResult,
+  CampaignSignalStatus,
+  CrossDomainTrackingStatus,
+  CampaignAttributionIssue,
+  CampaignAttributionRecommendation,
+  GTMAuditResult,
+  GTMAuditIssue,
+  GTMAuditRecommendation,
+  PrivacySandboxResult,
+  PrivacySandboxSignal,
+  EcommerceDeepDiveResult,
+  EcommerceDeepDiveRecommendation,
+  EcommerceCoverage,
+  EcommerceItemQuality,
+  EcommerceRevenueQuality,
+  FunnelIssue,
+  FunnelOptimization,
   TrackingTagsResult,
   DataLayerAnalysisResult,
   CookieResult,
@@ -487,6 +508,78 @@ export function analyzeFunnelValidation(
     recommendations.push('View-Item Event für Dynamic Remarketing aktivieren.');
   }
 
+  const conversionRateKillers: FunnelIssue[] = [];
+  const optimizations: FunnelOptimization[] = [];
+
+  if (criticalGaps.includes('purchase')) {
+    conversionRateKillers.push({
+      severity: 'high',
+      title: 'Purchase-Event fehlt',
+      description: 'Ohne Purchase-Event können Conversions nicht gemessen werden.',
+      impact: 'Kein ROAS/Conversion-Tracking',
+      fix: 'Purchase-Event mit value, currency und transaction_id implementieren.',
+    });
+  }
+
+  if (criticalGaps.includes('add_to_cart')) {
+    conversionRateKillers.push({
+      severity: 'high',
+      title: 'Add-to-Cart fehlt',
+      description: 'Warenkorb-Hinzugefügt Event fehlt im Funnel.',
+      impact: 'Optimierung auf Warenkorb-Events nicht möglich',
+      fix: 'add_to_cart Event mit items, value und currency implementieren.',
+    });
+  }
+
+  if (!funnelSteps.find(s => s.event === 'begin_checkout')?.detected) {
+    conversionRateKillers.push({
+      severity: 'medium',
+      title: 'Checkout-Start fehlt',
+      description: 'Kein begin_checkout Event erkannt.',
+      impact: 'Checkout-Abbruch nicht messbar',
+      fix: 'begin_checkout Event im Checkout-Start auslösen.',
+    });
+  }
+
+  for (const step of funnelSteps) {
+    if (step.detected && !step.hasRequiredParams) {
+      conversionRateKillers.push({
+        severity: step.event === 'purchase' ? 'high' : 'medium',
+        title: `${step.name}: Parameter fehlen`,
+        description: `Fehlende Parameter: ${step.missingParams.join(', ')}`,
+        impact: 'Wertbasierte Optimierung ungenau',
+        fix: 'Parameter im DataLayer ergänzen.',
+      });
+    }
+  }
+
+  if (!funnelSteps.find(s => s.event === 'view_cart')?.detected) {
+    optimizations.push({
+      title: 'Warenkorb-Event ergänzen',
+      description: 'view_cart erleichtert Abbruchanalysen und Remarketing.',
+      estimatedImpact: '+5-10% bessere Funnel-Insights',
+      effort: 'low',
+    });
+  }
+
+  if (!funnelSteps.find(s => s.event === 'add_shipping_info')?.detected) {
+    optimizations.push({
+      title: 'Versand-Info tracken',
+      description: 'add_shipping_info identifiziert Reibung im Checkout.',
+      estimatedImpact: 'Höhere Checkout-Conversion',
+      effort: 'medium',
+    });
+  }
+
+  if (!funnelSteps.find(s => s.event === 'add_payment_info')?.detected) {
+    optimizations.push({
+      title: 'Zahlungs-Info tracken',
+      description: 'add_payment_info hilft Payment-Methoden zu optimieren.',
+      estimatedImpact: 'Bessere Payment-Optimierung',
+      effort: 'medium',
+    });
+  }
+
   return {
     isEcommerce,
     platform,
@@ -494,6 +587,8 @@ export function analyzeFunnelValidation(
     overallScore,
     criticalGaps,
     recommendations,
+    conversionRateKillers,
+    optimizations,
   };
 }
 
@@ -881,5 +976,541 @@ export function analyzeROASQuality(
     dataCompleteness,
     estimatedDataLoss: Math.min(50, estimatedDataLoss),
     recommendations,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Conversion Tracking Audit
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function analyzeConversionTrackingAudit(
+  crawlResult: CrawlResult,
+  trackingTags: TrackingTagsResult,
+  dataLayerAnalysis: DataLayerAnalysisResult
+): ConversionTrackingAuditResult {
+  const platforms: ConversionPlatformAudit[] = [];
+  const issues: ConversionAuditIssue[] = [];
+  const recommendations: ConversionAuditRecommendation[] = [];
+
+  const hasEventId = /event_id/i.test(crawlResult.scripts.join(' ') + JSON.stringify(crawlResult.windowObjects.dataLayerContent || []));
+  const hasValue = dataLayerAnalysis.ecommerce.valueTracking.hasTransactionValue;
+  const hasCurrency = dataLayerAnalysis.ecommerce.valueTracking.hasCurrency;
+
+  const addPlatform = (platform: ConversionPlatformAudit) => {
+    platforms.push(platform);
+    if (platform.detected && !platform.hasServerSide) {
+      issues.push({
+        severity: 'medium',
+        title: `${platform.platform.toUpperCase()}: Server-Side fehlt`,
+        description: 'Nur Client-Side Tracking erkannt.',
+        impact: 'Geringere Datenqualität & Attribution',
+      });
+      recommendations.push({
+        priority: 'medium',
+        title: `${platform.platform.toUpperCase()} Server-Side Tracking`,
+        description: 'Server-Side Implementierung erhöht Stabilität und Match-Rate.',
+        estimatedImpact: '+15-25% mehr gemessene Conversions',
+      });
+    }
+    if (platform.detected && !platform.hasValue && dataLayerAnalysis.ecommerce.detected) {
+      issues.push({
+        severity: 'high',
+        title: `${platform.platform.toUpperCase()}: Conversion-Wert fehlt`,
+        description: 'Conversion-Events ohne value/currency erkannt.',
+        impact: 'Kein ROAS / wertbasiertes Bidding',
+      });
+      recommendations.push({
+        priority: 'high',
+        title: 'Conversion-Wert übergeben',
+        description: 'value + currency im Purchase-Event ergänzen.',
+        estimatedImpact: 'Wertbasiertes Bidding möglich',
+      });
+    }
+    if (platform.detected && !platform.hasDedupe && platform.hasServerSide) {
+      issues.push({
+        severity: 'medium',
+        title: `${platform.platform.toUpperCase()}: Deduplizierung fehlt`,
+        description: 'Server-Side aktiv, aber event_id nicht erkennbar.',
+        impact: 'Doppelte Conversions möglich',
+      });
+      recommendations.push({
+        priority: 'medium',
+        title: 'Event-Deduplizierung einrichten',
+        description: 'event_id client- und serverseitig übergeben.',
+        estimatedImpact: 'Genauere Conversion-Zahlen',
+      });
+    }
+  };
+
+  if (trackingTags.googleAdsConversion.detected || trackingTags.googleAnalytics.detected) {
+    const hasServerSide = trackingTags.serverSideTracking.summary.hasServerSideGTM;
+    const notes = [];
+    if (trackingTags.googleAdsConversion.detected) notes.push('Google Ads Conversion Tag erkannt');
+    if (trackingTags.googleAnalytics.detected) notes.push('GA4 erkannt');
+
+    addPlatform({
+      platform: 'google',
+      detected: true,
+      hasServerSide,
+      hasDedupe: true,
+      hasValue,
+      hasCurrency,
+      hasEventId,
+      coverageScore: calculateCoverageScore([hasServerSide, hasValue, hasCurrency, hasEventId], 40),
+      notes,
+    });
+  }
+
+  if (trackingTags.metaPixel.detected) {
+    const hasServerSide = trackingTags.metaPixel.serverSide?.detected || false;
+    const hasDedupe = trackingTags.metaPixel.serverSide?.hasDedupe || hasEventId;
+    addPlatform({
+      platform: 'meta',
+      detected: true,
+      hasServerSide,
+      hasDedupe,
+      hasValue,
+      hasCurrency,
+      hasEventId,
+      coverageScore: calculateCoverageScore([hasServerSide, hasDedupe, hasValue, hasCurrency, hasEventId], 35),
+      notes: ['Meta Pixel erkannt'],
+    });
+  }
+
+  if (trackingTags.tiktokPixel.detected) {
+    const hasServerSide = trackingTags.serverSideTracking.summary.hasTikTokEventsAPI;
+    addPlatform({
+      platform: 'tiktok',
+      detected: true,
+      hasServerSide,
+      hasDedupe: hasServerSide,
+      hasValue,
+      hasCurrency,
+      hasEventId,
+      coverageScore: calculateCoverageScore([hasServerSide, hasValue, hasCurrency], 40),
+      notes: ['TikTok Pixel erkannt'],
+    });
+  }
+
+  if (trackingTags.linkedInInsight.detected) {
+    const hasServerSide = trackingTags.serverSideTracking.summary.hasLinkedInCAPI;
+    addPlatform({
+      platform: 'linkedin',
+      detected: true,
+      hasServerSide,
+      hasDedupe: hasServerSide,
+      hasValue,
+      hasCurrency,
+      hasEventId,
+      coverageScore: calculateCoverageScore([hasServerSide, hasValue, hasCurrency], 40),
+      notes: ['LinkedIn Insight erkannt'],
+    });
+  }
+
+  const overallScore = platforms.length > 0
+    ? Math.round(platforms.reduce((sum, p) => sum + p.coverageScore, 0) / platforms.length)
+    : 0;
+
+  if (platforms.length === 0) {
+    issues.push({
+      severity: 'high',
+      title: 'Kein Conversion Tracking erkannt',
+      description: 'Keine Conversion-Tags gefunden.',
+      impact: 'Keine messbaren Conversions',
+    });
+    recommendations.push({
+      priority: 'high',
+      title: 'Conversion Tracking aktivieren',
+      description: 'Mindestens Google Ads oder Meta Conversion Tracking einrichten.',
+      estimatedImpact: 'Grundlage für Performance-Optimierung',
+    });
+  }
+
+  return {
+    overallScore,
+    platforms,
+    issues,
+    recommendations,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Campaign Tracking & Attribution
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function analyzeCampaignAttribution(
+  crawlResult: CrawlResult,
+  trackingTags: TrackingTagsResult
+): CampaignAttributionResult {
+  const url = safeParseUrl(crawlResult.pageUrl);
+  const query = url?.searchParams;
+
+  const clickIdSignals: Array<{ key: string; label: string }> = [
+    { key: 'gclid', label: 'gclid' },
+    { key: 'dclid', label: 'dclid' },
+    { key: 'wbraid', label: 'wbraid' },
+    { key: 'pbraid', label: 'pbraid' },
+    { key: 'fbclid', label: 'fbclid' },
+    { key: 'msclkid', label: 'msclkid' },
+    { key: 'ttclid', label: 'ttclid' },
+    { key: 'li_fat_id', label: 'li_fat_id' },
+  ];
+
+  const utmSignals = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+
+  const clickIdStatus: CampaignSignalStatus[] = clickIdSignals.map(({ key, label }) => {
+    const detectedInUrl = query?.has(key) || false;
+    const detectedInCookie = crawlResult.cookies.some(c => c.name.toLowerCase().includes(key));
+    const detectedInScript = /gclid|fbclid|msclkid|ttclid|li_fat_id/i.test(crawlResult.scripts.join(' '));
+    const detected =
+      detectedInUrl ||
+      detectedInCookie ||
+      (trackingTags.marketingParameters as Record<string, boolean>)[key] ||
+      detectedInScript;
+    return {
+      signal: label,
+      detected,
+      source: detectedInUrl ? 'url' : detectedInCookie ? 'cookie' : detectedInScript ? 'script' : 'unknown',
+      notes: detected ? undefined : 'Nicht nachweisbar',
+    };
+  });
+
+  const utmStatus: CampaignSignalStatus[] = utmSignals.map((key) => ({
+    signal: key,
+    detected: Boolean(query?.has(key)) || trackingTags.marketingParameters.utm,
+    source: query?.has(key) ? 'url' : trackingTags.marketingParameters.utm ? 'network' : 'unknown',
+    notes: query?.has(key) ? undefined : 'UTM im URL nicht sichtbar',
+  }));
+
+  const scriptsStr = crawlResult.scripts.join(' ');
+  const crossDomainDetected = /linker|allowLinker|decorate|autoLink|cross[_-]?domain/i.test(scriptsStr);
+  const crossDomain: CrossDomainTrackingStatus = {
+    detected: crossDomainDetected,
+    methods: crossDomainDetected ? ['GA Linker / Decorate'] : [],
+    warnings: crossDomainDetected ? [] : ['Keine Cross-Domain Konfiguration erkannt'],
+  };
+
+  let score = 100;
+  const issues: CampaignAttributionIssue[] = [];
+  const recommendations: CampaignAttributionRecommendation[] = [];
+
+  const hasGoogleSignals = clickIdStatus.some(s => ['gclid', 'wbraid', 'pbraid'].includes(s.signal) && s.detected);
+  if (trackingTags.googleAdsConversion.detected && !hasGoogleSignals) {
+    score -= 20;
+    issues.push({
+      severity: 'high',
+      title: 'Google Click IDs fehlen',
+      description: 'gclid/wbraid/pbraid nicht erkannt.',
+      impact: 'Schwache Google Ads Attribution',
+    });
+    recommendations.push({
+      priority: 'high',
+      title: 'Click-ID Weitergabe sicherstellen',
+      description: 'gclid/wbraid/pbraid in URLs und Cookies erhalten.',
+      estimatedImpact: '+10-20% bessere Ads Attribution',
+    });
+  }
+
+  const hasMetaSignals = clickIdStatus.some(s => s.signal === 'fbclid' && s.detected) ||
+    crawlResult.cookies.some(c => c.name === '_fbc');
+  if (trackingTags.metaPixel.detected && !hasMetaSignals) {
+    score -= 15;
+    issues.push({
+      severity: 'medium',
+      title: 'Meta Click ID fehlt',
+      description: 'fbclid/_fbc nicht erkannt.',
+      impact: 'Schwächere Meta Attribution',
+    });
+  }
+
+  const utmDetected = utmStatus.some(s => s.detected);
+  if (!utmDetected) {
+    score -= 10;
+    issues.push({
+      severity: 'low',
+      title: 'UTM Parameter nicht sichtbar',
+      description: 'UTM Parameter konnten nicht gefunden werden.',
+      impact: 'Kampagnen-Reporting unvollständig',
+    });
+    recommendations.push({
+      priority: 'medium',
+      title: 'UTM Standards definieren',
+      description: 'UTM Parameter auf allen Kampagnen-URLs verwenden.',
+      estimatedImpact: 'Besseres Kampagnen-Reporting',
+    });
+  }
+
+  if (!crossDomainDetected && trackingTags.googleAnalytics.detected) {
+    score -= 5;
+    recommendations.push({
+      priority: 'low',
+      title: 'Cross-Domain Tracking prüfen',
+      description: 'Linker-Konfiguration für Checkout/Payment Domains prüfen.',
+      estimatedImpact: 'Stabilere Session-Zuordnung',
+    });
+  }
+
+  score = Math.max(0, Math.min(100, score));
+
+  return {
+    overallScore: score,
+    clickIdStatus,
+    utmStatus,
+    crossDomain,
+    issues,
+    recommendations,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GTM Audit
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function analyzeGTMAudit(
+  crawlResult: CrawlResult,
+  trackingTags: TrackingTagsResult
+): GTMAuditResult {
+  const html = crawlResult.html.toLowerCase();
+  const containerIds = trackingTags.googleTagManager.containerIds || [];
+  const detected = trackingTags.googleTagManager.detected;
+  const hasMultipleContainers = trackingTags.googleTagManager.hasMultipleContainers;
+  const hasNoScriptTag = /<noscript>[\s\S]*?googletagmanager\.com\/ns\.html/i.test(crawlResult.html);
+  const gtmIndex = html.indexOf('googletagmanager.com/gtm.js');
+  const headCloseIndex = html.indexOf('</head>');
+  const snippetInHead = gtmIndex !== -1 && headCloseIndex !== -1 && gtmIndex < headCloseIndex;
+
+  const consentDefaultIndex = html.indexOf("gtag('consent");
+  const consentDefaultBeforeGtm = consentDefaultIndex !== -1 && gtmIndex !== -1 && consentDefaultIndex < gtmIndex;
+
+  const issues: GTMAuditIssue[] = [];
+  const recommendations: GTMAuditRecommendation[] = [];
+
+  let score = detected ? 100 : 0;
+  if (!detected) {
+    issues.push({
+      severity: 'high',
+      title: 'Kein GTM erkannt',
+      description: 'Google Tag Manager wurde nicht gefunden.',
+      impact: 'Kein zentrales Tag-Management',
+    });
+    recommendations.push({
+      priority: 'high',
+      title: 'GTM installieren',
+      description: 'GTM ermöglicht konsistentes Tracking und Consent-Management.',
+      estimatedImpact: 'Schnellere Tracking-Iterationen',
+    });
+  }
+
+  if (detected && hasMultipleContainers) {
+    score -= 15;
+    issues.push({
+      severity: 'medium',
+      title: 'Mehrere GTM Container',
+      description: `Mehrere Container erkannt (${containerIds.join(', ')})`,
+      impact: 'Erhöhtes Risiko für doppelte Tags',
+    });
+    recommendations.push({
+      priority: 'medium',
+      title: 'Container konsolidieren',
+      description: 'Mehrere Container vermeiden, um Duplicates zu reduzieren.',
+      estimatedImpact: 'Weniger doppelte Events',
+    });
+  }
+
+  if (detected && !hasNoScriptTag) {
+    score -= 5;
+    issues.push({
+      severity: 'low',
+      title: 'GTM noscript fehlt',
+      description: 'Noscript-Tag für GTM wurde nicht gefunden.',
+      impact: 'GTM fallback fehlt',
+    });
+  }
+
+  if (detected && !snippetInHead) {
+    score -= 10;
+    issues.push({
+      severity: 'medium',
+      title: 'GTM nicht im Head',
+      description: 'GTM-Snippet sollte im <head> platziert werden.',
+      impact: 'Später Tag-Load',
+    });
+  }
+
+  if (detected && !consentDefaultBeforeGtm) {
+    score -= 10;
+    issues.push({
+      severity: 'medium',
+      title: 'Consent Default nach GTM',
+      description: 'Consent Default sollte vor GTM gesetzt werden.',
+      impact: 'Tags können vor Consent feuern',
+    });
+    recommendations.push({
+      priority: 'medium',
+      title: 'Consent Default vorziehen',
+      description: 'gtag("consent", "default") vor GTM ausführen.',
+      estimatedImpact: 'Saubere Consent-Steuerung',
+    });
+  }
+
+  return {
+    detected,
+    containerIds,
+    hasMultipleContainers,
+    hasNoScriptTag,
+    snippetInHead,
+    consentDefaultBeforeGtm,
+    issues,
+    recommendations,
+    score: Math.max(0, Math.min(100, score)),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Privacy Sandbox / Cookie-less Tracking
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function analyzePrivacySandbox(crawlResult: CrawlResult): PrivacySandboxResult {
+  const scriptsStr = crawlResult.scripts.join(' ');
+  const headersStr = crawlResult.responseHeaders.map(h => JSON.stringify(h.headers)).join(' ');
+
+  const topicsApi = buildPrivacySignal(/browsingTopics|topics\(\)/i, scriptsStr, 'Topics API Nutzung erkannt');
+  const protectedAudience = buildPrivacySignal(/runAdAuction|protected\s*audience|fledge/i, scriptsStr, 'Protected Audience erkannt');
+  const attributionReporting = buildPrivacySignal(/attributionreporting|attribution_reporting/i, scriptsStr + headersStr, 'Attribution Reporting erkannt');
+  const privateAggregation = buildPrivacySignal(/privateAggregation/i, scriptsStr, 'Private Aggregation erkannt');
+  const chips = buildPrivacySignal(/Partitioned/i, headersStr, 'CHIPS (Partitioned Cookies) erkannt');
+  const firstPartySets = buildPrivacySignal(/first-party-set|First-Party-Set/i, headersStr, 'First-Party Sets Header erkannt');
+
+  const signals = [topicsApi, protectedAudience, attributionReporting, privateAggregation, chips, firstPartySets];
+  const detectedSignals = signals.filter(s => s.detected).length;
+  const readinessScore = Math.min(100, detectedSignals * 20);
+
+  const warnings: string[] = [];
+  if (detectedSignals === 0) {
+    warnings.push('Keine Privacy Sandbox Signale erkannt.');
+  }
+
+  return {
+    topicsApi,
+    protectedAudience,
+    attributionReporting,
+    privateAggregation,
+    chips,
+    firstPartySets,
+    summary: {
+      detectedSignals,
+      readinessScore,
+      warnings,
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E-Commerce Deep Dive
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function analyzeEcommerceDeepDive(
+  dataLayerAnalysis: DataLayerAnalysisResult
+): EcommerceDeepDiveResult {
+  const ecommerce = dataLayerAnalysis.ecommerce;
+  const requiredEvents = ['view_item', 'add_to_cart', 'begin_checkout', 'add_payment_info', 'purchase'];
+  const detectedEvents = ecommerce.events.filter(e => e.detected).map(e => e.name);
+  const missingEvents = requiredEvents.filter(e => !detectedEvents.includes(e));
+
+  const coverage: EcommerceCoverage = {
+    detectedEvents,
+    missingEvents,
+    coverageScore: Math.round(((requiredEvents.length - missingEvents.length) / requiredEvents.length) * 100),
+  };
+
+  const sampleEvent = ecommerce.events.find(e => e.sampleData?.items) || ecommerce.events.find(e => e.sampleData);
+  const itemSample = sampleEvent?.sampleData?.items?.[0] as Record<string, unknown> | undefined;
+  const requiredItemFields = ['item_id', 'item_name', 'price', 'quantity'];
+  const missingFields = itemSample
+    ? requiredItemFields.filter(f => itemSample[f] === undefined)
+    : requiredItemFields;
+  const requiredFieldsPresent = requiredItemFields.filter(f => !missingFields.includes(f));
+
+  const itemDataQuality: EcommerceItemQuality = {
+    requiredFieldsPresent,
+    missingFields,
+    completenessScore: Math.round((requiredFieldsPresent.length / requiredItemFields.length) * 100),
+  };
+
+  const revenueQuality: EcommerceRevenueQuality = {
+    hasValue: ecommerce.valueTracking.hasTransactionValue,
+    hasCurrency: ecommerce.valueTracking.hasCurrency,
+    hasTransactionId: ecommerce.valueTracking.valueParameters.includes('transaction_id'),
+    issues: [],
+  };
+
+  if (!revenueQuality.hasValue) revenueQuality.issues.push('Bestellwert fehlt');
+  if (!revenueQuality.hasCurrency) revenueQuality.issues.push('Währung fehlt');
+  if (!revenueQuality.hasTransactionId) revenueQuality.issues.push('Transaction ID fehlt');
+
+  const dynamicRemarketingReady =
+    ecommerce.valueTracking.hasItemData && missingFields.length === 0;
+
+  const recommendations: EcommerceDeepDiveRecommendation[] = [];
+  if (missingEvents.length > 0) {
+    recommendations.push({
+      priority: 'high',
+      title: 'Funnel-Events ergänzen',
+      description: `Fehlende Events: ${missingEvents.join(', ')}`,
+      estimatedImpact: 'Bessere Funnel-Optimierung',
+    });
+  }
+  if (missingFields.length > 0) {
+    recommendations.push({
+      priority: 'medium',
+      title: 'Item-Daten vervollständigen',
+      description: `Fehlende Felder: ${missingFields.join(', ')}`,
+      estimatedImpact: 'Bessere Produkt-Attribution',
+    });
+  }
+  if (revenueQuality.issues.length > 0) {
+    recommendations.push({
+      priority: 'high',
+      title: 'Revenue-Daten korrigieren',
+      description: revenueQuality.issues.join(', '),
+      estimatedImpact: 'Korrektes ROAS-Tracking',
+    });
+  }
+
+  const overallScore = Math.round(
+    coverage.coverageScore * 0.4 +
+    itemDataQuality.completenessScore * 0.3 +
+    (revenueQuality.issues.length === 0 ? 100 : 60) * 0.3
+  );
+
+  return {
+    overallScore,
+    coverage,
+    itemDataQuality,
+    revenueQuality,
+    dynamicRemarketingReady,
+    recommendations,
+  };
+}
+
+function calculateCoverageScore(flags: boolean[], baseScore: number): number {
+  const trueCount = flags.filter(Boolean).length;
+  const bonus = Math.round((trueCount / flags.length) * (100 - baseScore));
+  return Math.min(100, baseScore + bonus);
+}
+
+function safeParseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+function buildPrivacySignal(pattern: RegExp, content: string, note: string): PrivacySandboxSignal {
+  const detected = pattern.test(content);
+  return {
+    detected,
+    evidence: detected ? [note] : [],
   };
 }

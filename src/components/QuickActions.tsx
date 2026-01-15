@@ -29,6 +29,7 @@ import {
   generateExampleCode,
   generateConsentUpdateCode,
 } from '@/lib/templates/dataLayerGenerator';
+import { exportAnalysisToPDF } from '@/lib/pdf/exportToPdf';
 
 interface QuickActionsProps {
   result: AnalysisResult;
@@ -41,6 +42,7 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [showDataLayerModal, setShowDataLayerModal] = useState(false);
   const [showDataLayerViewerModal, setShowDataLayerViewerModal] = useState(false);
+  const [showWhiteLabelModal, setShowWhiteLabelModal] = useState(false);
 
   const copyToClipboard = async (text: string, actionId: string) => {
     await navigator.clipboard.writeText(text);
@@ -246,6 +248,18 @@ export function QuickActions({ result }: QuickActionsProps) {
               <p className="text-xs text-slate-500">In Zwischenablage</p>
             </div>
           </button>
+
+          {/* White-Label Report */}
+          <button
+            onClick={() => setShowWhiteLabelModal(true)}
+            className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
+          >
+            <FileText className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-slate-200">Client Report</p>
+              <p className="text-xs text-slate-500">White-Label PDF</p>
+            </div>
+          </button>
         </div>
       )}
 
@@ -285,7 +299,108 @@ export function QuickActions({ result }: QuickActionsProps) {
           copiedAction={copiedAction}
         />
       )}
+
+      {/* White-Label Report Modal */}
+      {showWhiteLabelModal && (
+        <WhiteLabelReportModal
+          result={result}
+          onClose={() => setShowWhiteLabelModal(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function WhiteLabelReportModal({
+  result,
+  onClose,
+}: {
+  result: AnalysisResult;
+  onClose: () => void;
+}) {
+  const [brandName, setBrandName] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [contactInfo, setContactInfo] = useState('');
+  const [reportTitle, setReportTitle] = useState('Tracking Report');
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
+      <div className="fixed inset-2 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:transform sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90vw] sm:max-w-lg bg-slate-800 rounded-xl border border-slate-700 shadow-2xl z-50 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-700/50 border-b border-slate-600">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-emerald-400" />
+            <h3 className="font-medium text-slate-200">White-Label Report</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Report Titel</label>
+            <input
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm"
+              placeholder="Tracking Report"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Agentur / Brand</label>
+            <input
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm"
+              placeholder="Agenturname"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Client Name</label>
+            <input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm"
+              placeholder="Kundenname"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Kontakt</label>
+            <input
+              value={contactInfo}
+              onChange={(e) => setContactInfo(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-200 text-sm"
+              placeholder="E-Mail / Telefon"
+            />
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-700 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 text-slate-300 border border-slate-600 rounded-lg hover:bg-slate-700 transition-colors"
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={() => {
+              exportAnalysisToPDF(result, {
+                brandName: brandName.trim() || undefined,
+                clientName: clientName.trim() || undefined,
+                contactInfo: contactInfo.trim() || undefined,
+                reportTitle: reportTitle.trim() || undefined,
+                showTrackingCheckerBranding: false,
+              });
+              onClose();
+            }}
+            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+          >
+            PDF erstellen
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 

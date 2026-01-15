@@ -6,6 +6,7 @@ import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
 import { SetupWizard } from './SetupWizard';
+import { ExpertRecommendation } from './ExpertRecommendation';
 import { getAnalysisHistory, addToHistory, removeFromHistory, clearHistory } from '@/lib/cache/analysisCache';
 import { saveAnalysis } from '@/lib/storage/projectStorage';
 
@@ -25,7 +26,12 @@ interface Message {
   fromCache?: boolean;
 }
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  embedded?: boolean;
+  autoFocus?: boolean;
+}
+
+export function ChatInterface({ embedded = false, autoFocus = false }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -228,7 +234,11 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)] w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6">
+    <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 ${
+      embedded 
+        ? 'min-h-[500px] max-h-[800px]' 
+        : 'h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)]'
+    }`}>
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0">
         {messages.map((message) => (
@@ -299,6 +309,8 @@ export function ChatInterface() {
                         </button>
                       )}
                       <ResultCard result={message.analysisResult} />
+                      {/* Expert Recommendation CTA */}
+                      <ExpertRecommendation result={message.analysisResult} />
                     </div>
                   )}
                 </>
