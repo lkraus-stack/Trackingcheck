@@ -1,4 +1,4 @@
-import type { Browser, Page } from 'puppeteer-core';
+import type { Browser, Page, Frame, BrowserContext } from 'puppeteer-core';
 
 export interface CrawlResult {
   html: string;
@@ -11,11 +11,14 @@ export interface CrawlResult {
   responseHeaders: ResponseHeaderData[];
   pageUrl: string;
   pageDomain: string;
+  // Set-Cookie Headers aus Responses (für HttpOnly Cookies)
+  setCookieHeaders?: Array<{ url: string; cookies: string[] }>;
   // Neue Cookie-Consent-Test-Daten
   cookieConsentTest?: CookieConsentTestData;
 }
 
 export interface CookieConsentTestData {
+  pageDomain?: string;
   beforeConsent: {
     cookies: CookieData[];
   };
@@ -117,6 +120,7 @@ async function getBrowser(): Promise<Browser> {
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
+        '--disable-blink-features=AutomationControlled',
       ],
     }) as Promise<Browser>;
   }
@@ -252,11 +256,23 @@ export class WebCrawler {
       networkRequestsExtended.push(extendedData);
     });
 
-    // Response Listener für Header-Analyse (wichtig für Server-Side Tracking)
+    // Set-Cookie Header aus Responses sammeln (für HttpOnly Cookies)
+    const setCookieHeaders: Array<{ url: string; cookies: string[] }> = [];
+    
+    // Response Listener für Header-Analyse (wichtig für Server-Side Tracking + Cookies)
     page.on('response', async (response) => {
       try {
         const headers = response.headers();
         const responseUrl = response.url();
+        
+        // Set-Cookie Headers erfassen (wichtig für HttpOnly Cookies die sonst nicht sichtbar sind)
+        const setCookie = headers['set-cookie'];
+        if (setCookie) {
+          setCookieHeaders.push({
+            url: responseUrl,
+            cookies: Array.isArray(setCookie) ? setCookie : [setCookie],
+          });
+        }
         
         // Sammle wichtige Response-Headers für Tracking-Analyse
         if (this.isTrackingRelatedUrl(responseUrl)) {
@@ -357,6 +373,7 @@ export class WebCrawler {
         windowObjects,
         consoleMessages,
         responseHeaders,
+        setCookieHeaders,
         pageUrl: url,
         pageDomain,
       };
@@ -487,6 +504,810 @@ export class WebCrawler {
     });
   }
 
+  private async createIsolatedContext(): Promise<BrowserContext | null> {
+    if (!this.browser) return null;
+    const browserAny = this.browser as unknown as {
+      createBrowserContext?: () => Promise<BrowserContext>;
+      createIncognitoBrowserContext?: () => Promise<BrowserContext>;
+    };
+    if (typeof browserAny.createBrowserContext === 'function') {
+      return await browserAny.createBrowserContext();
+    }
+    if (typeof browserAny.createIncognitoBrowserContext === 'function') {
+      return await browserAny.createIncognitoBrowserContext();
+    }
+    return null;
+  }
+
+  private getSearchContexts(page: Page): Array<Page | Frame> {
+    const mainFrame = page.mainFrame();
+    const frames = page.frames().filter(frame => frame !== mainFrame);
+    return [page, ...frames];
+  }
+
+  private async waitForConsentBanner(page: Page): Promise<void> {
+    const bannerSelectors = [
+      // Usercentrics - erweitert
+      '#usercentrics-root',
+      '#uc-center-container',
+      '#uc-ui-container',
+      '.uc-root',
+      '.uc-banner',
+      '.uc-overlay',
+      '[data-testid="uc-banner"]',
+      '[data-testid="uc-first-layer"]',
+      '[data-testid="uc-banner-content"]',
+      '.sc-eCApnc', // Usercentrics styled-components
+      '.sc-furwcr', // Weitere Usercentrics Klassen
+      'div[class*="uc-"][class*="banner"]',
+
+      // OneTrust
+      '#onetrust-banner-sdk',
+      '#onetrust-consent-sdk',
+      '#onetrust-pc-sdk',
+      '.ot-sdk-container',
+
+      // Cookiebot
+      '#CybotCookiebotDialog',
+      '#CybotCookiebotDialogBody',
+      '.CybotCookiebotDialog',
+
+      // Didomi
+      '#didomi-notice',
+      '#didomi-popup',
+
+      // Klaro
+      '#klaro',
+      '.klaro',
+
+      // Real Cookie Banner - erweitert
+      '#real-cookie-banner',
+      '.real-cookie-banner',
+      '#rcb-consent',
+      '.rcb-consent',
+      '.rcb-banner',
+      '[data-rcb-root]',
+      '[data-rcb-consent]',
+      '.rcb-content',
+      '.rcb-modal',
+      'div[class*="rcb-"]',
+      // Real Cookie Banner WordPress: iframe oder Shadow DOM
+      'div[id*="real-cookie-banner"]',
+
+      // Borlabs
+      '#BorlabsCookieBox',
+      '.borlabs-cookie',
+
+      // Complianz
+      '#cmplz-cookiebanner-container',
+      '.cmplz-cookiebanner',
+
+      // Generic
+      '[id*="cookie-consent"]',
+      '[class*="cookie-consent"]',
+      '[id*="cookie-banner"]',
+      '[class*="cookie-banner"]',
+      '[id*="cookie-notice"]',
+      '[class*="cookie-notice"]',
+      '[aria-modal="true"]',
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+    ];
+
+    const waits = bannerSelectors.map(selector =>
+      page.waitForSelector(selector, { timeout: 3500, visible: true }).catch(() => null)
+    );
+    
+    // Warten auf CMP JavaScript APIs
+    waits.push(
+      page.waitForFunction(() => {
+        const win = window as unknown as Record<string, unknown>;
+        const uc = (win as any).UC_UI;
+        const ucReady = uc && typeof uc.isInitialized === 'function' ? uc.isInitialized() : Boolean(uc);
+        return Boolean(
+          ucReady ||
+          (win as any).__ucCmp ||
+          (win as any).CookieConsent ||
+          (win as any).Cookiebot ||
+          (win as any).OnetrustActiveGroups ||
+          (win as any).consentApi ||
+          (win as any).rcbConsentManager ||
+          (win as any).realCookieBanner ||
+          (win as any).BorlabsCookie ||
+          (win as any).cmplz_banner
+        );
+      }, { timeout: 4000 }).catch(() => null)
+    );
+
+    // Zusätzlich: Warten auf sichtbare Banner-Elemente im Shadow DOM
+    waits.push(
+      page.waitForFunction(() => {
+        // Suche nach Shadow DOM Elementen
+        const shadowHosts = document.querySelectorAll('[id*="usercentrics"], [id*="cookie"], [id*="consent"]');
+        for (const host of shadowHosts) {
+          const shadow = (host as HTMLElement).shadowRoot;
+          if (shadow) {
+            const buttons = shadow.querySelectorAll('button');
+            if (buttons.length > 0) return true;
+          }
+        }
+        return false;
+      }, { timeout: 3000 }).catch(() => null)
+    );
+
+    await Promise.allSettled(waits);
+    await new Promise(resolve => setTimeout(resolve, 800));
+  }
+
+  private async waitForCmpApi(page: Page): Promise<void> {
+    await page.waitForFunction(() => {
+      const win = window as unknown as Record<string, any>;
+      const uc = win.UC_UI;
+      if (uc && typeof uc.isInitialized === 'function') {
+        if (uc.isInitialized()) return true;
+      }
+      if (win.__ucCmp) return true;
+      if (win.consentApi) return true;
+      if (win.rcbConsentManager && typeof win.rcbConsentManager.getOptions === 'function') {
+        const groups = win.rcbConsentManager.getOptions?.()?.groups;
+        if (Array.isArray(groups) && groups.length > 0) return true;
+      }
+      return false;
+    }, { timeout: 6000 }).catch(() => null);
+  }
+
+  private async tryClickSelectors(
+    context: Page | Frame,
+    selectors: string[],
+    textPatterns: string[]
+  ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
+    for (const selector of selectors) {
+      try {
+        if (selector.includes(':has-text')) {
+          const textMatch = selector.match(/:has-text\("([^"]+)"\)/);
+          if (textMatch) {
+            const searchText = textMatch[1].toLowerCase();
+            const tagType = selector.split(':')[0];
+
+            const result = await context.evaluate((tag, text) => {
+              const elements = document.querySelectorAll(tag);
+              for (const el of elements) {
+                const textContent = el.textContent?.toLowerCase() || '';
+                const ariaLabel = el.getAttribute('aria-label')?.toLowerCase() || '';
+                const title = el.getAttribute('title')?.toLowerCase() || '';
+                const value = (el as HTMLInputElement).value?.toLowerCase() || '';
+                const combinedText = `${textContent} ${ariaLabel} ${title} ${value}`;
+
+                if (combinedText.includes(text.toLowerCase())) {
+                  (el as HTMLElement).scrollIntoView({ block: 'center', inline: 'center' });
+                  (el as HTMLElement).click();
+                  const label = el.textContent?.trim() || el.getAttribute('aria-label') || el.getAttribute('title') || (el as HTMLInputElement).value;
+                  return { found: true, text: label?.trim() };
+                }
+              }
+              return { found: false };
+            }, tagType, searchText);
+
+            if (result.found) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              return { found: true, clicked: true, buttonText: result.text };
+            }
+          }
+        } else {
+          const element = await context.$(selector);
+          if (element) {
+            const box = await element.boundingBox();
+            if (box && box.width > 0 && box.height > 0) {
+              await element.evaluate(el => (el as HTMLElement).scrollIntoView({ block: 'center', inline: 'center' }));
+              const buttonText = await element.evaluate(el =>
+                (el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || (el as HTMLInputElement).value || '').trim()
+              );
+              await element.click();
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              return { found: true, clicked: true, buttonText: buttonText || undefined };
+            }
+          }
+        }
+      } catch {
+        // Selector fehlgeschlagen, nächsten versuchen
+      }
+    }
+
+    return this.deepSearchAndClick(context, textPatterns);
+  }
+
+  private async tryClickWithRetries(
+    page: Page,
+    selectors: string[],
+    textPatterns: string[],
+    attempts = 3,
+    delayMs = 800
+  ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const contexts = this.getSearchContexts(page);
+      for (const context of contexts) {
+        const result = await this.tryClickSelectors(context, selectors, textPatterns);
+        if (result.found) {
+          return result;
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
+    return { found: false, clicked: false };
+  }
+
+  private async deepSearchAndClick(
+    context: Page | Frame,
+    patterns: string[]
+  ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
+    try {
+      const result = await context.evaluate((patternsLower: string[]) => {
+        const selectors = 'button, a, div, span, a[role="button"], [role="button"], input[type="button"], input[type="submit"], label';
+        const lowered = patternsLower.map(p => p.toLowerCase());
+
+        // Rekursive Shadow DOM Suche mit maximaler Tiefe
+        const collectElements = (root: Document | ShadowRoot, depth = 0, maxDepth = 5): Element[] => {
+          if (depth > maxDepth) return [];
+          
+          const elements = Array.from(root.querySelectorAll(selectors));
+          const all = Array.from(root.querySelectorAll('*'));
+
+          for (const el of all) {
+            const shadow = (el as HTMLElement).shadowRoot;
+            if (shadow) {
+              elements.push(...collectElements(shadow, depth + 1, maxDepth));
+            }
+            // Auch in iframes suchen (wenn same-origin)
+            if (el.tagName === 'IFRAME') {
+              try {
+                const iframeDoc = (el as HTMLIFrameElement).contentDocument;
+                if (iframeDoc) {
+                  elements.push(...collectElements(iframeDoc, depth + 1, maxDepth));
+                }
+              } catch {
+                // Cross-origin iframe ignorieren
+              }
+            }
+          }
+
+          return elements;
+        };
+
+        const candidates = collectElements(document);
+
+        // Sortiere Kandidaten: Buttons zuerst, dann nach Größe
+        const sortedCandidates = candidates.sort((a, b) => {
+          const aIsButton = a.tagName === 'BUTTON' || a.getAttribute('role') === 'button';
+          const bIsButton = b.tagName === 'BUTTON' || b.getAttribute('role') === 'button';
+          if (aIsButton && !bIsButton) return -1;
+          if (!aIsButton && bIsButton) return 1;
+          
+          const aRect = (a as HTMLElement).getBoundingClientRect();
+          const bRect = (b as HTMLElement).getBoundingClientRect();
+          return (bRect.width * bRect.height) - (aRect.width * aRect.height);
+        });
+
+        for (const el of sortedCandidates) {
+          const text = el.textContent?.toLowerCase().trim() || '';
+          const ariaLabel = el.getAttribute('aria-label')?.toLowerCase() || '';
+          const title = el.getAttribute('title')?.toLowerCase() || '';
+          const value = (el as HTMLInputElement).value?.toLowerCase() || '';
+          const dataTestId = el.getAttribute('data-testid')?.toLowerCase() || '';
+          const dataQa = el.getAttribute('data-qa')?.toLowerCase() || '';
+          const dataAction = el.getAttribute('data-action')?.toLowerCase() || '';
+          const dataConsent = el.getAttribute('data-consent')?.toLowerCase() || '';
+          const id = el.id?.toLowerCase() || '';
+          const className = el.className?.toString?.()?.toLowerCase() || '';
+
+          const combinedText = `${text} ${ariaLabel} ${title} ${value} ${dataTestId} ${dataQa} ${dataAction} ${dataConsent} ${id} ${className}`;
+
+          for (const pattern of lowered) {
+            if (combinedText.includes(pattern)) {
+              const rect = (el as HTMLElement).getBoundingClientRect();
+              const style = window.getComputedStyle(el as HTMLElement);
+              
+              // Verbesserte Sichtbarkeitsprüfung
+              const isVisible = rect.width > 0 && 
+                               rect.height > 0 && 
+                               style.display !== 'none' && 
+                               style.visibility !== 'hidden' &&
+                               style.opacity !== '0' &&
+                               rect.top < window.innerHeight &&
+                               rect.bottom > 0;
+              
+              if (isVisible) {
+                (el as HTMLElement).scrollIntoView({ block: 'center', inline: 'center' });
+                
+                // Mehrfache Click-Methoden versuchen
+                try {
+                  (el as HTMLElement).focus();
+                (el as HTMLElement).click();
+                  
+                  // Fallback: MouseEvent dispatchen
+                  const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                  });
+                  el.dispatchEvent(clickEvent);
+                } catch {
+                  (el as HTMLElement).click();
+                }
+                
+                const label = el.textContent?.trim() || el.getAttribute('aria-label') || el.getAttribute('title') || (el as HTMLInputElement).value;
+                return { found: true, text: label?.trim()?.substring(0, 100) };
+              }
+            }
+          }
+        }
+
+        return { found: false };
+      }, patterns);
+
+      if (result.found) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        return { found: true, clicked: true, buttonText: result.text };
+      }
+    } catch {
+      // Fallback fehlgeschlagen
+    }
+
+    return { found: false, clicked: false };
+  }
+
+  private async applyCmpConsentViaApi(
+    page: Page,
+    action: 'accept' | 'reject' | 'essential'
+  ): Promise<{ applied: boolean; method?: string }> {
+    try {
+      const result = await page.evaluate((action) => {
+        const win = window as unknown as Record<string, any>;
+        
+        const callFirst = (obj: any, methods: string[], args?: any[]) => {
+          for (const method of methods) {
+            const fn = obj?.[method];
+            if (typeof fn === 'function') {
+              try {
+                if (Array.isArray(args) && args.length > 0) {
+                  fn.call(obj, ...args);
+                } else {
+                  fn.call(obj);
+                }
+                return method;
+              } catch {
+                // ignore
+              }
+            }
+          }
+          return undefined;
+        };
+        
+        const callWithSource = (obj: any, methods: string[], source: string, args?: any[]) => {
+          const method = callFirst(obj, methods, args);
+          return method ? `${source}.${method}` : undefined;
+        };
+
+        let method: string | undefined;
+
+        // =========================================
+        // USERCENTRICS API - verbessert
+        // =========================================
+        if (win.UC_UI) {
+          // Warten bis initialisiert
+          const isReady = typeof win.UC_UI.isInitialized === 'function' 
+            ? win.UC_UI.isInitialized() 
+            : true;
+          
+          if (!isReady && typeof win.UC_UI.showFirstLayer === 'function') {
+            try {
+                win.UC_UI.showFirstLayer();
+            } catch {
+              // ignore
+            }
+          }
+          
+          if (action === 'accept') {
+            // Versuche verschiedene Methoden
+            if (typeof win.UC_UI.acceptAllConsents === 'function') {
+              win.UC_UI.acceptAllConsents();
+              method = 'UC_UI.acceptAllConsents';
+            } else if (typeof win.UC_UI.acceptAll === 'function') {
+              win.UC_UI.acceptAll();
+              method = 'UC_UI.acceptAll';
+            }
+          } else {
+            // Reject/Essential
+            if (typeof win.UC_UI.denyAllConsents === 'function') {
+              win.UC_UI.denyAllConsents();
+              method = 'UC_UI.denyAllConsents';
+            } else if (typeof win.UC_UI.rejectAll === 'function') {
+              win.UC_UI.rejectAll();
+              method = 'UC_UI.rejectAll';
+            } else if (typeof win.UC_UI.denyAll === 'function') {
+              win.UC_UI.denyAll();
+              method = 'UC_UI.denyAll';
+            }
+          }
+          
+          // Consent speichern wenn verfügbar
+          if (method) {
+            try {
+              if (typeof win.UC_UI.saveConsents === 'function') {
+              win.UC_UI.saveConsents();
+              }
+              if (typeof win.UC_UI.closeCMP === 'function') {
+                win.UC_UI.closeCMP();
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        // Usercentrics alternative API (__ucCmp)
+        if (!method && win.__ucCmp) {
+          if (action === 'accept') {
+            method = callWithSource(win.__ucCmp, ['acceptAllConsents', 'acceptAll'], '__ucCmp');
+          } else {
+            method = callWithSource(win.__ucCmp, ['denyAllConsents', 'denyAll', 'rejectAllConsents', 'rejectAll'], '__ucCmp');
+          }
+        }
+
+        // =========================================
+        // REAL COOKIE BANNER API - komplett überarbeitet
+        // =========================================
+        if (!method && win.consentApi) {
+          const rcbManager = win.rcbConsentManager;
+          
+          if (action === 'accept' && typeof win.consentApi.consentAll === 'function') {
+            try {
+              // Hole alle Gruppen und Items für consentAll
+              const options = rcbManager?.getOptions?.();
+              const groups = Array.isArray(options?.groups) ? options.groups : [];
+              
+              // consentAll erwartet: ...args wobei jedes arg [groupId, [itemIds]] ist
+              const consentArgs = groups
+                .filter((g: any) => g && g.id !== undefined && Array.isArray(g.items))
+                .map((g: any) => [g.id, g.items.map((i: any) => i.id).filter(Boolean)]);
+              
+              if (consentArgs.length > 0) {
+                win.consentApi.consentAll(...consentArgs);
+                method = 'consentApi.consentAll';
+              } else {
+                // Fallback ohne Argumente
+                win.consentApi.consentAll();
+                method = 'consentApi.consentAll';
+              }
+            } catch {
+              // Versuche ohne Argumente
+              try {
+                win.consentApi.consentAll();
+                method = 'consentApi.consentAll';
+              } catch {
+                // ignore
+              }
+            }
+          } else if (action !== 'accept' && typeof win.consentApi.consent === 'function') {
+            try {
+              // Nur essentielle Gruppen akzeptieren
+              const options = rcbManager?.getOptions?.();
+              const groups = Array.isArray(options?.groups) ? options.groups : [];
+              
+              const essentialArgs = groups
+                .filter((g: any) => g && g.id !== undefined && Array.isArray(g.items) && g.isEssential)
+                .map((g: any) => [g.id, g.items.map((i: any) => i.id).filter(Boolean)]);
+              
+              if (essentialArgs.length > 0) {
+                win.consentApi.consent(...essentialArgs);
+                method = 'consentApi.consent (essential only)';
+              }
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        // Real Cookie Banner persistConsent als Fallback
+        if (!method && win.rcbConsentManager && typeof win.rcbConsentManager.persistConsent === 'function') {
+          try {
+            const options = win.rcbConsentManager.getOptions?.();
+            const groups = Array.isArray(options?.groups) ? options.groups : [];
+            const decision: Record<string, number[]> = {};
+            
+            for (const group of groups) {
+              if (!group || typeof group.id === 'undefined' || !Array.isArray(group.items)) continue;
+              const isEssential = Boolean(group.isEssential);
+              
+              if (action === 'accept') {
+                // Alle Gruppen akzeptieren
+                decision[group.id] = group.items.map((item: any) => item.id).filter(Boolean);
+              } else if (isEssential) {
+                // Nur essentielle Gruppen
+                decision[group.id] = group.items.map((item: any) => item.id).filter(Boolean);
+              }
+              // Bei nicht-essentiellen Gruppen und reject: nichts hinzufügen
+            }
+            
+            if (Object.keys(decision).length > 0) {
+              win.rcbConsentManager.persistConsent(decision);
+              method = 'rcbConsentManager.persistConsent';
+              
+              // Cookies anwenden
+              if (typeof win.rcbConsentManager.applyCookies === 'function') {
+                win.rcbConsentManager.applyCookies();
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // =========================================
+        // COOKIEBOT API
+        // =========================================
+        if (!method && win.Cookiebot) {
+          if (action === 'accept') {
+            if (typeof win.Cookiebot.submitCustomConsent === 'function') {
+              win.Cookiebot.submitCustomConsent(true, true, true);
+              method = 'Cookiebot.submitCustomConsent';
+          } else {
+              method = callWithSource(win.Cookiebot, ['acceptAll', 'accept'], 'Cookiebot');
+            }
+          } else {
+            if (typeof win.Cookiebot.submitCustomConsent === 'function') {
+              win.Cookiebot.submitCustomConsent(false, false, false);
+              method = 'Cookiebot.submitCustomConsent (deny)';
+            } else {
+              method = callWithSource(win.Cookiebot, ['decline', 'reject', 'denyAll'], 'Cookiebot');
+            }
+          }
+        }
+
+        // =========================================
+        // ONETRUST API
+        // =========================================
+        if (!method && win.OneTrust) {
+          if (action === 'accept') {
+            method = callWithSource(win.OneTrust, ['AllowAll', 'acceptAll'], 'OneTrust');
+          } else {
+            method = callWithSource(win.OneTrust, ['RejectAll', 'rejectAll'], 'OneTrust');
+          }
+        }
+
+        // =========================================
+        // BORLABS COOKIE API
+        // =========================================
+        if (!method && win.BorlabsCookie) {
+          if (action === 'accept') {
+            method = callWithSource(win.BorlabsCookie, ['acceptAll', 'allowAll'], 'BorlabsCookie');
+          } else {
+            method = callWithSource(win.BorlabsCookie, ['denyAll', 'declineAll', 'rejectAll'], 'BorlabsCookie');
+          }
+        }
+
+        // =========================================
+        // GENERIC CookieConsent API
+        // =========================================
+        if (!method && win.CookieConsent) {
+          if (action === 'accept') {
+            method = callWithSource(win.CookieConsent, ['acceptAll', 'accept', 'allowAll'], 'CookieConsent');
+          } else {
+            method = callWithSource(win.CookieConsent, ['rejectAll', 'denyAll', 'reject', 'decline'], 'CookieConsent');
+          }
+        }
+
+        return { applied: Boolean(method), method };
+      }, action);
+
+      // Warten nach API-Aufruf
+      if (result.applied) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      return result;
+    } catch {
+      return { applied: false };
+    }
+  }
+
+  private async findAndClickSettingsButton(
+    page: Page
+  ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
+    const settingsSelectors = [
+      // Allgemeine Patterns
+      'button[id*="settings"]',
+      'button[class*="settings"]',
+      'button[id*="preferences"]',
+      'button[class*="preferences"]',
+      'button[id*="manage"]',
+      'button[class*="manage"]',
+      'a[id*="settings"]',
+      'a[class*="settings"]',
+      '[data-action*="settings"]',
+      '[data-consent*="settings"]',
+      '[data-action*="preferences"]',
+      '[data-consent*="preferences"]',
+      '[data-action*="manage"]',
+
+      // Texte
+      'button:has-text("Einstellungen")',
+      'button:has-text("Cookie-Einstellungen")',
+      'button:has-text("Datenschutzeinstellungen")',
+      'button:has-text("Datenschutz-Einstellungen")',
+      'button:has-text("Datenschutz-Einstellungen ändern")',
+      'button:has-text("Privatsphäre-Einstellungen")',
+      'button:has-text("Privatsphäre-Einstellungen ändern")',
+      'button:has-text("Präferenzen")',
+      'button:has-text("Anpassen")',
+      'button:has-text("Optionen")',
+      'button:has-text("Mehr Optionen")',
+      'button:has-text("Mehr Details")',
+      'button:has-text("Privacy Settings")',
+      'button:has-text("Privacy Center")',
+      'button:has-text("Customize")',
+      'button:has-text("Preferences")',
+      'button:has-text("Settings")',
+      'button:has-text("Manage")',
+
+      // OneTrust
+      '#onetrust-pc-btn-handler',
+      '.ot-sdk-show-settings',
+
+      // Usercentrics
+      '.uc-btn-settings',
+      '.uc-settings-button',
+      '.uc-btn-manage',
+      '.uc-manage-settings',
+      '.uc-btn-open-details',
+      '[data-testid="uc-open-details-button"]',
+      '[data-testid="uc-settings-button"]',
+
+      // Real Cookie Banner
+      '.rcb-btn-settings',
+      '.rcb-settings',
+      '.rcb-btn-customize',
+      '#rcb-consent-settings',
+      '[data-rcb-action="settings"]',
+      
+      // CookieYes
+      '.cky-btn-customize',
+      '#cky-btn-customize',
+      '.cky-preference-btn-wrapper button',
+      
+      // Osano
+      '.osano-cm-manage',
+      '.osano-cm-link--privacy-settings',
+    ];
+
+    const settingsPatterns = [
+      'einstellungen',
+      'cookie-einstellungen',
+      'datenschutzeinstellungen',
+      'datenschutz-einstellungen',
+      'privatsphäre-einstellungen',
+      'privatsphaere-einstellungen',
+      'präferenzen',
+      'anpassen',
+      'optionen',
+      'more options',
+      'more details',
+      'privacy settings',
+      'privacy center',
+      'customize',
+      'preferences',
+      'settings',
+      'manage',
+    ];
+
+    return this.tryClickWithRetries(page, settingsSelectors, settingsPatterns);
+  }
+
+  private async findAndClickEssentialOnlyButton(
+    page: Page
+  ): Promise<{ found: boolean; clicked: boolean; buttonText?: string }> {
+    const essentialSelectors = [
+      'button:has-text("Nur notwendige")',
+      'button:has-text("Nur essenzielle")',
+      'button:has-text("Nur essenziell")',
+      'button:has-text("Nur erforderliche")',
+      'button:has-text("Nur technisch")',
+      'button:has-text("Nur funktional")',
+      'button:has-text("Only essential")',
+      'button:has-text("Only necessary")',
+      'button:has-text("Essential only")',
+      'button:has-text("Necessary only")',
+      '.uc-btn-deny',
+      '.uc-deny-all',
+      '.rcb-btn-essential',
+      '.rcb-btn-necessary',
+      '[data-rcb-action="accept-essential"]',
+      '[data-rcb-action="accept-necessary"]',
+      '[data-rcb-action="essential"]',
+      '[data-rcb-action="necessary"]',
+    ];
+
+    const essentialPatterns = [
+      'nur notwendige',
+      'nur essenzielle',
+      'nur essenziell',
+      'nur erforderliche',
+      'nur technisch',
+      'nur funktional',
+      'only essential',
+      'only necessary',
+      'essential only',
+      'necessary only',
+      'technical only',
+    ];
+
+    return this.tryClickWithRetries(page, essentialSelectors, essentialPatterns);
+  }
+
+  private async toggleNonEssentialCategories(page: Page): Promise<boolean> {
+    try {
+      return await page.evaluate(() => {
+        const keywords = [
+          'marketing',
+          'advertising',
+          'ads',
+          'analytics',
+          'statistik',
+          'statistics',
+          'performance',
+          'tracking',
+          'personalisierung',
+          'personalization',
+          'targeting',
+        ];
+
+        const normalize = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').trim();
+        const candidates = Array.from(document.querySelectorAll('label, span, p, div'));
+        let toggled = false;
+
+        const findInput = (el: Element): HTMLInputElement | null => {
+          if (el instanceof HTMLLabelElement) {
+            const forId = el.getAttribute('for');
+            if (forId) {
+              const input = document.getElementById(forId);
+              if (input instanceof HTMLInputElement) return input;
+            }
+            const input = el.querySelector('input[type="checkbox"]');
+            return input instanceof HTMLInputElement ? input : null;
+          }
+
+          const input = el.querySelector('input[type="checkbox"]');
+          return input instanceof HTMLInputElement ? input : null;
+        };
+
+        for (const el of candidates) {
+          const text = normalize(el.textContent || '');
+          if (!text) continue;
+          if (!keywords.some(k => text.includes(k))) continue;
+
+          const input = findInput(el) || findInput(el.parentElement || el);
+          if (input) {
+            if (input.checked) {
+              input.click();
+              toggled = true;
+            }
+            continue;
+          }
+
+          const switchEl = el.querySelector('[role="switch"][aria-checked="true"]') as HTMLElement | null;
+          if (switchEl) {
+            switchEl.click();
+            toggled = true;
+          }
+        }
+
+        return toggled;
+      });
+    } catch {
+      return false;
+    }
+  }
+
   // Cookie-Banner-Buttons finden und klicken
   private async findAndClickConsentButton(
     page: Page,
@@ -503,6 +1324,7 @@ export class WebCrawler {
       '[data-consent="accept"]',
       
       // Deutsche Texte
+      'button:has-text("Alles akzeptieren")',
       'button:has-text("Alle akzeptieren")',
       'button:has-text("Akzeptieren")',
       'button:has-text("Alle Cookies akzeptieren")',
@@ -538,6 +1360,11 @@ export class WebCrawler {
       '[data-testid="uc-accept-all-button"]',
       '#uc-btn-accept-banner',
       '.sc-hKFxyN', // Usercentrics styled button
+      '.uc-btn-accept',
+      '.uc-btn-accept-all',
+      '.uc-accept-all',
+      '#uc-accept-all-button',
+      '[data-testid="uc-accept-button"]',
       
       // Quantcast
       '#accept-choices',
@@ -559,7 +1386,7 @@ export class WebCrawler {
       
       // Didomi
       '#didomi-notice-agree-button',
-      '.didomi-continue-without-agreeing',
+      // NICHT: .didomi-continue-without-agreeing - das ist Ablehnung, nicht Akzeptieren!
       
       // Klaro
       '#klaro .cm-btn-success',
@@ -597,6 +1424,14 @@ export class WebCrawler {
       // Shopify Cookie Banner
       '.shopify-section .cookie-banner__button--accept',
       '#shopify-pc__banner__btn-accept',
+
+      // Real Cookie Banner
+      '.rcb-btn-accept',
+      '.rcb-btn-accept-all',
+      '.rcb-accept-all',
+      '#rcb-consent-accept',
+      '[data-rcb-action="accept"]',
+      '[data-rcb-action="accept-all"]',
     ];
 
     // Selektoren für Ablehnen-Buttons
@@ -616,7 +1451,10 @@ export class WebCrawler {
       'button:has-text("Ablehnen")',
       'button:has-text("Nur notwendige")',
       'button:has-text("Nur essenzielle")',
+      'button:has-text("Nur essenziell")',
       'button:has-text("Nur erforderliche")',
+      'button:has-text("Nur technisch")',
+      'button:has-text("Nur funktional")',
       'button:has-text("Nein, danke")',
       'button:has-text("Nicht akzeptieren")',
       'button:has-text("Nicht zustimmen")',
@@ -641,12 +1479,16 @@ export class WebCrawler {
       // OneTrust
       '#onetrust-reject-all-handler',
       '.onetrust-reject-all-handler',
-      '#onetrust-pc-btn-handler', // Settings/Preferences button
       
       // Usercentrics
       '.uc-btn-deny-banner',
       '[data-testid="uc-deny-all-button"]',
       '#uc-btn-deny-banner',
+      '.uc-btn-deny',
+      '.uc-btn-reject',
+      '.uc-deny-all',
+      '.uc-reject-all',
+      '#uc-deny-all-button',
       
       // Quantcast
       '#deny-consent',
@@ -655,7 +1497,7 @@ export class WebCrawler {
       // CookieYes
       '.cky-btn-reject',
       '#cky-btn-reject',
-      '.cky-btn-customize', // Often functions as reject
+      // NICHT: .cky-btn-customize - das öffnet nur Einstellungen, ist kein Reject!
       
       // Cookie Consent (Osano)
       '.cc-deny',
@@ -669,6 +1511,8 @@ export class WebCrawler {
       // Didomi
       '#didomi-notice-disagree-button',
       '.didomi-dismiss-button',
+      '.didomi-continue-without-agreeing', // "Continue without agreeing" = Ablehnung
+      '.didomi-learn-more-button', // "Learn more" kann zu Ablehnung führen
       
       // Klaro
       '#klaro .cm-btn-decline',
@@ -704,92 +1548,25 @@ export class WebCrawler {
       // Shopify Cookie Banner
       '.shopify-section .cookie-banner__button--decline',
       '#shopify-pc__banner__btn-decline',
+
+      // Real Cookie Banner
+      '.rcb-btn-reject',
+      '.rcb-btn-deny',
+      '.rcb-reject',
+      '.rcb-deny',
+      '.rcb-btn-necessary',
+      '.rcb-btn-essential',
+      '#rcb-consent-decline',
+      '[data-rcb-action="reject"]',
+      '[data-rcb-action="deny"]',
     ];
 
     const selectors = type === 'accept' ? acceptSelectors : rejectSelectors;
     const textPatterns = type === 'accept' 
-      ? ['akzeptieren', 'accept', 'zustimmen', 'agree', 'allow', 'einverstanden', 'verstanden', 'ok', 'annehmen', 'weiter', 'got it', 'continue']
-      : ['ablehnen', 'reject', 'decline', 'deny', 'nur notwendig', 'nur erforderlich', 'only necessary', 'essential', 'refuse', 'nicht akzeptieren', 'essenziell', 'necessary only', 'auswahl speichern'];
+      ? ['alles akzeptieren', 'alle akzeptieren', 'akzeptieren', 'accept', 'zustimmen', 'agree', 'allow', 'einverstanden', 'verstanden', 'ok', 'annehmen', 'weiter', 'got it', 'continue', 'alle erlauben']
+      : ['ablehnen', 'reject', 'decline', 'deny', 'nur essenzielle', 'nur essenziell', 'nur notwendig', 'nur erforderliche', 'nur technisch', 'nur funktional', 'only necessary', 'essential', 'refuse', 'nicht akzeptieren', 'essenziell', 'necessary only', 'auswahl speichern'];
 
-    // Versuche verschiedene Selektoren
-    for (const selector of selectors) {
-      try {
-        // Für :has-text verwenden wir evaluate
-        if (selector.includes(':has-text')) {
-          const textMatch = selector.match(/:has-text\("([^"]+)"\)/);
-          if (textMatch) {
-            const searchText = textMatch[1].toLowerCase();
-            const tagType = selector.split(':')[0];
-            
-            const result = await page.evaluate((tag, text) => {
-              const elements = document.querySelectorAll(tag);
-              for (const el of elements) {
-                const elText = el.textContent?.toLowerCase() || '';
-                if (elText.includes(text.toLowerCase())) {
-                  (el as HTMLElement).click();
-                  return { found: true, text: el.textContent?.trim() };
-                }
-              }
-              return { found: false };
-            }, tagType, searchText);
-            
-            if (result.found) {
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              return { found: true, clicked: true, buttonText: result.text };
-            }
-          }
-        } else {
-          const element = await page.$(selector);
-          if (element) {
-            const isVisible = await element.isIntersectingViewport();
-            if (isVisible) {
-              const buttonText = await element.evaluate(el => el.textContent?.trim());
-              await element.click();
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              return { found: true, clicked: true, buttonText: buttonText || undefined };
-            }
-          }
-        }
-      } catch {
-        // Selector fehlgeschlagen, nächsten versuchen
-      }
-    }
-
-    // Fallback: Alle Buttons durchsuchen und nach Text filtern
-    try {
-      const result = await page.evaluate((patterns: string[]) => {
-        const allButtons = document.querySelectorAll('button, a[role="button"], [role="button"], input[type="button"], input[type="submit"]');
-        
-        for (const button of allButtons) {
-          const text = button.textContent?.toLowerCase() || '';
-          const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-          const title = button.getAttribute('title')?.toLowerCase() || '';
-          
-          const combinedText = `${text} ${ariaLabel} ${title}`;
-          
-          for (const pattern of patterns) {
-            if (combinedText.includes(pattern)) {
-              // Prüfen ob sichtbar
-              const rect = button.getBoundingClientRect();
-              if (rect.width > 0 && rect.height > 0) {
-                (button as HTMLElement).click();
-                return { found: true, text: button.textContent?.trim() };
-              }
-            }
-          }
-        }
-        return { found: false };
-      }, textPatterns);
-
-      if (result.found) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return { found: true, clicked: true, buttonText: result.text };
-      }
-    } catch {
-      // Fallback fehlgeschlagen
-    }
-
-    return { found: false, clicked: false };
+    return this.tryClickWithRetries(page, selectors, textPatterns);
   }
 
   // "Speichern"-Button finden (kann sowohl Akzeptieren als auch Ablehnen sein, je nach Auswahl)
@@ -809,6 +1586,8 @@ export class WebCrawler {
       'button:has-text("Nur essenziell")',
       'button:has-text("Nur notwendige")',
       'button:has-text("Nur erforderliche")',
+      'button:has-text("Nur technisch")',
+      'button:has-text("Nur funktional")',
       'button:has-text("Only essential")',
       'button:has-text("Only necessary")',
       'button:has-text("Essential only")',
@@ -820,6 +1599,18 @@ export class WebCrawler {
       'button[class*="essential"]',
       'button[id*="necessary"]',
       'button[class*="necessary"]',
+
+      // Usercentrics
+      '.uc-btn-save',
+      '.uc-save-button',
+      '#uc-save-button',
+      '[data-testid="uc-save-button"]',
+
+      // Real Cookie Banner
+      '.rcb-btn-save',
+      '.rcb-save',
+      '#rcb-consent-save',
+      '[data-rcb-action="save"]',
     ];
 
     const savePatterns = [
@@ -829,89 +1620,16 @@ export class WebCrawler {
       'nur essenziell',
       'nur notwendige',
       'nur erforderliche',
+      'nur technisch',
+      'nur funktional',
       'only essential',
       'only necessary',
       'essential only',
       'necessary only',
+      'technical only',
     ];
 
-    // Versuche verschiedene Selektoren
-    for (const selector of saveSelectors) {
-      try {
-        if (selector.includes(':has-text')) {
-          const textMatch = selector.match(/:has-text\("([^"]+)"\)/);
-          if (textMatch) {
-            const searchText = textMatch[1].toLowerCase();
-            const tagType = selector.split(':')[0];
-            
-            const result = await page.evaluate((tag, text) => {
-              const elements = document.querySelectorAll(tag);
-              for (const el of elements) {
-                const elText = el.textContent?.toLowerCase() || '';
-                if (elText.includes(text.toLowerCase())) {
-                  (el as HTMLElement).click();
-                  return { found: true, text: el.textContent?.trim() };
-                }
-              }
-              return { found: false };
-            }, tagType, searchText);
-            
-            if (result.found) {
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              return { found: true, clicked: true, buttonText: result.text };
-            }
-          }
-        } else {
-          const element = await page.$(selector);
-          if (element) {
-            const isVisible = await element.isIntersectingViewport();
-            if (isVisible) {
-              const buttonText = await element.evaluate(el => el.textContent?.trim());
-              await element.click();
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              return { found: true, clicked: true, buttonText: buttonText || undefined };
-            }
-          }
-        }
-      } catch {
-        // Selector fehlgeschlagen, nächsten versuchen
-      }
-    }
-
-    // Fallback: Alle Buttons durchsuchen
-    try {
-      const result = await page.evaluate((patterns: string[]) => {
-        const allButtons = document.querySelectorAll('button, a[role="button"], [role="button"], input[type="button"], input[type="submit"]');
-        
-        for (const button of allButtons) {
-          const text = button.textContent?.toLowerCase() || '';
-          const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-          const title = button.getAttribute('title')?.toLowerCase() || '';
-          
-          const combinedText = `${text} ${ariaLabel} ${title}`;
-          
-          for (const pattern of patterns) {
-            if (combinedText.includes(pattern)) {
-              const rect = button.getBoundingClientRect();
-              if (rect.width > 0 && rect.height > 0) {
-                (button as HTMLElement).click();
-                return { found: true, text: button.textContent?.trim() };
-              }
-            }
-          }
-        }
-        return { found: false };
-      }, savePatterns);
-
-      if (result.found) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return { found: true, clicked: true, buttonText: result.text };
-      }
-    } catch {
-      // Fallback fehlgeschlagen
-    }
-
-    return { found: false, clicked: false };
+    return this.tryClickWithRetries(page, saveSelectors, savePatterns);
   }
 
   // Cookie-Consent-Test durchführen
@@ -921,58 +1639,97 @@ export class WebCrawler {
     }
 
     const result: CookieConsentTestData = {
+      pageDomain: new URL(url).hostname,
       beforeConsent: { cookies: [] },
       afterAccept: { cookies: [], clickSuccessful: false, buttonFound: false },
       afterReject: { cookies: [], clickSuccessful: false, buttonFound: false },
     };
 
     // Test 1: Cookies vor Consent + Akzeptieren
-    const pageAccept = await this.browser!.newPage();
+    const acceptContext = await this.createIsolatedContext();
+    const pageAccept = acceptContext ? await acceptContext.newPage() : await this.browser!.newPage();
     await this.setupPage(pageAccept);
     
     try {
-      // Reduzierte Timeouts für Cookie-Consent-Test
+      await this.clearStorage(pageAccept, url);
       await pageAccept.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Cookies VOR jeder Interaktion sammeln
-      const cookiesBefore = await pageAccept.cookies();
-      result.beforeConsent.cookies = cookiesBefore.map(c => this.mapCookie(c));
+      result.beforeConsent.cookies = await this.collectCookies(pageAccept);
+
+      await this.waitForConsentBanner(pageAccept);
 
       // Akzeptieren-Button finden und klicken
-      const acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+      let acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+      if (!acceptResult.found) {
+        await this.waitForCmpApi(pageAccept);
+        const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
+        if (apiResult.applied) {
+          acceptResult = { found: true, clicked: true, buttonText: apiResult.method };
+        } else {
+          const settingsResult = await this.findAndClickSettingsButton(pageAccept);
+          if (settingsResult.clicked) {
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+          }
+        }
+      }
       result.afterAccept.buttonFound = acceptResult.found;
       result.afterAccept.clickSuccessful = acceptResult.clicked;
       result.afterAccept.buttonText = acceptResult.buttonText;
 
-      // Warten auf Cookie-Änderungen
+      // Warten auf Cookie-Änderungen + Reload für Consent-basierte Scripts
       if (acceptResult.clicked) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await this.waitAfterConsentClick(pageAccept);
       }
 
       // Cookies NACH Akzeptieren sammeln
-      const cookiesAfterAccept = await pageAccept.cookies();
-      result.afterAccept.cookies = cookiesAfterAccept.map(c => this.mapCookie(c));
+      result.afterAccept.cookies = await this.collectCookies(pageAccept);
 
     } finally {
       await pageAccept.close();
+      if (acceptContext) {
+        await acceptContext.close();
+      }
     }
 
     // Test 2: Ablehnen in neuem, sauberen Tab
-    const pageReject = await this.browser!.newPage();
+    const rejectContext = await this.createIsolatedContext();
+    const pageReject = rejectContext ? await rejectContext.newPage() : await this.browser!.newPage();
     await this.setupPage(pageReject);
     
-    // Cookies löschen für sauberen Test
-    const client = await pageReject.createCDPSession();
-    await client.send('Network.clearBrowserCookies');
-    
     try {
-      // Reduzierte Timeouts für Cookie-Consent-Test (Reject)
+      await this.clearStorage(pageReject, url);
       await pageReject.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Ablehnen-Button finden und klicken
-      const rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
+      await this.waitForConsentBanner(pageReject);
+
+      let rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
+      if (!rejectResult.found) {
+        await this.waitForCmpApi(pageReject);
+        const apiResult = await this.applyCmpConsentViaApi(pageReject, 'reject');
+        if (apiResult.applied) {
+          rejectResult = { found: true, clicked: true, buttonText: apiResult.method };
+        } else {
+          const settingsResult = await this.findAndClickSettingsButton(pageReject);
+          if (settingsResult.clicked) {
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            const essentialResult = await this.findAndClickEssentialOnlyButton(pageReject);
+            if (essentialResult.found) {
+              rejectResult = essentialResult;
+            } else {
+              const toggled = await this.toggleNonEssentialCategories(pageReject);
+              if (toggled) {
+                await new Promise(resolve => setTimeout(resolve, 600));
+              }
+              rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
+            }
+          }
+        }
+      }
       
       // Wenn kein expliziter Ablehnen-Button gefunden wurde, versuche "Speichern"-Button
       // WICHTIG: "Speichern" kann sowohl Akzeptieren als auch Ablehnen sein, je nach Auswahl
@@ -985,9 +1742,8 @@ export class WebCrawler {
           result.afterReject.buttonText = saveResult.buttonText;
           
           if (saveResult.clicked) {
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            const cookiesAfterSave = await pageReject.cookies();
-            result.afterReject.cookies = cookiesAfterSave.map(c => this.mapCookie(c));
+            await this.waitAfterConsentClick(pageReject);
+            result.afterReject.cookies = await this.collectCookies(pageReject);
           }
         } else {
           result.afterReject.buttonFound = rejectResult.found;
@@ -999,39 +1755,165 @@ export class WebCrawler {
         result.afterReject.clickSuccessful = rejectResult.clicked;
         result.afterReject.buttonText = rejectResult.buttonText;
 
-        // Warten auf Cookie-Änderungen
+        // Warten auf Cookie-Änderungen + Reload
         if (rejectResult.clicked) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await this.waitAfterConsentClick(pageReject);
         }
 
         // Cookies NACH Ablehnen sammeln
-        const cookiesAfterReject = await pageReject.cookies();
-        result.afterReject.cookies = cookiesAfterReject.map(c => this.mapCookie(c));
+        result.afterReject.cookies = await this.collectCookies(pageReject);
       }
 
     } finally {
       await pageReject.close();
+      if (rejectContext) {
+        await rejectContext.close();
+      }
     }
 
     return result;
   }
 
+  private async collectCookies(page: Page): Promise<CookieData[]> {
+    const allCookiesMap = new Map<string, CookieData>();
+    
+    // Methode 1: CDP Session für alle Cookies (inkl. HttpOnly, Secure, etc.)
+    try {
+      const client = await page.createCDPSession();
+      const cdpResult = await client.send('Network.getAllCookies');
+      if (Array.isArray(cdpResult?.cookies)) {
+        for (const cookie of cdpResult.cookies) {
+          const key = `${cookie.name}|${cookie.domain}|${cookie.path}`;
+          allCookiesMap.set(key, this.mapCookie(cookie));
+        }
+      }
+      await client.detach();
+    } catch {
+      // CDP nicht verfügbar
+    }
+
+    // Methode 2: Page.cookies() für aktuelle Seite
+    try {
+      const pageCookies = await page.cookies();
+      for (const cookie of pageCookies) {
+        const key = `${cookie.name}|${cookie.domain}|${cookie.path}`;
+        if (!allCookiesMap.has(key)) {
+          allCookiesMap.set(key, this.mapCookie(cookie));
+        }
+      }
+    } catch {
+      // Fallback fehlgeschlagen
+    }
+
+    // Methode 3: document.cookie als zusätzliche Quelle (erfasst nur nicht-HttpOnly Cookies)
+    try {
+      const docCookies = await page.evaluate(() => {
+        const cookies: Array<{ name: string; value: string; domain: string; path: string }> = [];
+        const cookieString = document.cookie;
+        if (cookieString) {
+          const pairs = cookieString.split(';');
+          for (const pair of pairs) {
+            const [name, ...valueParts] = pair.trim().split('=');
+            if (name) {
+              cookies.push({
+                name: name.trim(),
+                value: valueParts.join('=') || '',
+                domain: window.location.hostname,
+                path: '/',
+              });
+            }
+          }
+        }
+        return cookies;
+      });
+      
+      for (const cookie of docCookies) {
+        const key = `${cookie.name}|${cookie.domain}|${cookie.path}`;
+        if (!allCookiesMap.has(key)) {
+          allCookiesMap.set(key, {
+            name: cookie.name,
+            value: cookie.value,
+            domain: cookie.domain,
+            path: cookie.path,
+            expires: 0,
+            httpOnly: false,
+            secure: false,
+            sameSite: undefined,
+          });
+        }
+      }
+    } catch {
+      // document.cookie nicht verfügbar
+    }
+
+    return Array.from(allCookiesMap.values());
+  }
+
+  private async clearStorage(page: Page, url: string): Promise<void> {
+    try {
+      const client = await page.createCDPSession();
+      const origin = new URL(url).origin;
+      await client.send('Storage.clearDataForOrigin', {
+        origin,
+        storageTypes: 'all',
+      });
+      await client.send('Network.clearBrowserCookies');
+      await client.send('Network.clearBrowserCache');
+    } catch {
+      // Storage clearing fehlgeschlagen
+    }
+  }
+
+  private async waitAfterConsentClick(page: Page): Promise<void> {
+    // Warten auf initiale Cookie-Setzung nach Consent
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Warten auf möglicherweise verzögerte Script-Ausführung
+    try {
+      await page.waitForNetworkIdle({ timeout: 5000, idleTime: 1000 });
+    } catch {
+      // Timeout ist OK
+    }
+    
+    // Prüfen ob ein Reload nötig ist (manche CMPs setzen Cookies erst nach Reload)
+    
+    try {
+      await page.reload({ waitUntil: 'networkidle2', timeout: 20000 });
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      // Warten auf Tracking Scripts die nach Reload laden
+      await this.waitForTrackingObjects(page);
+      
+      // Zusätzliches Warten auf async Cookie-Setzung
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    } catch {
+      // Reload fehlgeschlagen - warte trotzdem
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
+
   private async setupPage(page: Page): Promise<void> {
+    // Basic anti-bot heuristics to avoid CMP suppression in headless mode
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined,
+      });
+    });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     );
     await page.setViewport({ width: 1920, height: 1080 });
   }
 
-  private mapCookie(cookie: { name: string; value: string; domain: string; path: string; expires: number; httpOnly?: boolean; secure: boolean; sameSite?: string }): CookieData {
+  private mapCookie(cookie: { name: string; value: string; domain: string; path: string; expires?: number; httpOnly?: boolean; secure?: boolean; sameSite?: string }): CookieData {
     return {
       name: cookie.name,
       value: cookie.value,
       domain: cookie.domain,
       path: cookie.path,
-      expires: cookie.expires,
+      expires: cookie.expires ?? 0,
       httpOnly: cookie.httpOnly ?? false,
-      secure: cookie.secure,
+      secure: cookie.secure ?? false,
       sameSite: cookie.sameSite as string | undefined,
     };
   }

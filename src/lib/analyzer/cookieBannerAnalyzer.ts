@@ -3,20 +3,44 @@ import { CookieBannerResult } from '@/types';
 
 // Bekannte CMP Provider und ihre Erkennungsmerkmale
 const CMP_PROVIDERS = [
-  { name: 'Cookiebot', patterns: ['cookiebot', 'Cookiebot', 'CookieConsent'] },
-  { name: 'OneTrust', patterns: ['onetrust', 'OneTrust', 'optanon'] },
-  { name: 'Usercentrics', patterns: ['usercentrics', 'Usercentrics', 'uc-'] },
-  { name: 'CookieYes', patterns: ['cookieyes', 'CookieYes', 'cky-'] },
-  { name: 'Quantcast', patterns: ['quantcast', 'Quantcast', 'qc-cmp'] },
-  { name: 'TrustArc', patterns: ['trustarc', 'TrustArc', 'truste'] },
-  { name: 'Didomi', patterns: ['didomi', 'Didomi'] },
-  { name: 'Sourcepoint', patterns: ['sourcepoint', 'Sourcepoint', 'sp_'] },
-  { name: 'Consentmanager', patterns: ['consentmanager', 'cmp.'] },
-  { name: 'Borlabs Cookie', patterns: ['borlabs', 'BorlabsCookie'] },
-  { name: 'Complianz', patterns: ['complianz', 'cmplz'] },
-  { name: 'GDPR Cookie Consent', patterns: ['gdpr-cookie-consent', 'cli_'] },
-  { name: 'Cookie Notice', patterns: ['cookie-notice', 'cn-'] },
-  { name: 'Cookie Law Info', patterns: ['cookie-law-info', 'wplc'] },
+  // Internationale CMPs
+  { name: 'Cookiebot', patterns: ['cookiebot', 'cookieconsent', 'cybotcookiebot', 'CybotCookiebot'] },
+  { name: 'OneTrust', patterns: ['onetrust', 'optanon', 'cookielaw.org', 'ot-sdk', 'OptanonConsent'] },
+  { name: 'Usercentrics', patterns: ['usercentrics', 'uc-', 'uc_ui', 'UC_UI', '__ucCmp', 'usercentrics-root'] },
+  { name: 'CookieYes', patterns: ['cookieyes', 'cky-', 'cky_consent'] },
+  { name: 'Quantcast', patterns: ['quantcast', 'qc-cmp', '__qcCmp'] },
+  { name: 'TrustArc', patterns: ['trustarc', 'truste', 'consent.trustarc'] },
+  { name: 'Didomi', patterns: ['didomi', 'didomi-notice', 'didomi_token'] },
+  { name: 'Sourcepoint', patterns: ['sourcepoint', 'sp_', 'sp-ccpa', 'sp-gdpr'] },
+  { name: 'Consentmanager', patterns: ['consentmanager', 'cmp.', 'consentmanager.net'] },
+  { name: 'Osano', patterns: ['osano', 'osano-cm', 'osano.com'] },
+  { name: 'Klaro', patterns: ['klaro', 'klaro-cookie'] },
+  { name: 'Iubenda', patterns: ['iubenda', 'iubenda-cs'] },
+  { name: 'Termly', patterns: ['termly', 'termly.io'] },
+  { name: 'Admiral', patterns: ['admiral', 'getadmiral'] },
+  { name: 'Securiti', patterns: ['securiti', 'securiti.ai'] },
+  { name: 'Transcend', patterns: ['transcend', 'transcend.io'] },
+  { name: 'LiveRamp', patterns: ['liveramp', 'ats.rlcdn.com'] },
+  
+  // WordPress/Shopify CMPs (Deutschland)
+  { name: 'Borlabs Cookie', patterns: ['borlabs', 'borlabscookie', 'BorlabsCookieBox', 'BorlabsCookie'] },
+  { name: 'Complianz', patterns: ['complianz', 'cmplz', 'cmplz_', 'cmplz-cookiebanner'] },
+  { name: 'GDPR Cookie Consent', patterns: ['gdpr-cookie-consent', 'cli_', 'webtoffee', 'wt-cli'] },
+  { name: 'Cookie Notice', patterns: ['cookie-notice', 'cn-', 'cookie-notice-js'] },
+  { name: 'Cookie Law Info', patterns: ['cookie-law-info', 'wplc', 'cookie-law-info-bar'] },
+  { name: 'Real Cookie Banner', patterns: ['real cookie banner', 'real-cookie-banner', 'rcb-', 'rcb_', 'devowl', 'rcbConsentManager', 'consentApi'] },
+  { name: 'CCM19', patterns: ['ccm19', 'ccm-', 'ccm_'] },
+  { name: 'Cookie Script', patterns: ['cookie-script', 'cookiescript'] },
+  { name: 'Cookie First', patterns: ['cookiefirst', 'cookie-first', 'cf-consent'] },
+  { name: 'Pandectes', patterns: ['pandectes', 'pandectes-gdpr'] },
+  { name: 'Orestbida', patterns: ['orestbida', 'cookie-consent-box'] },
+  
+  // Enterprise CMPs
+  { name: 'Axeptio', patterns: ['axeptio', 'axeptio_'] },
+  { name: 'Cookie Information', patterns: ['cookieinformation', 'cookie-information', 'coi-'] },
+  { name: 'CookiePro', patterns: ['cookiepro', 'cookie-pro'] },
+  { name: 'Crownpeak', patterns: ['crownpeak', 'evidon'] },
+  { name: 'Ensighten', patterns: ['ensighten', 'ensighten-'] },
 ];
 
 // Keywords für Banner-Erkennung
@@ -25,6 +49,8 @@ const BANNER_KEYWORDS = [
   'consent',
   'privacy',
   'datenschutz',
+  'privatsphäre',
+  'privatsphaere',
   'einwilligung',
   'akzeptieren',
   'accept',
@@ -32,21 +58,56 @@ const BANNER_KEYWORDS = [
   'reject',
   'decline',
   'alle akzeptieren',
+  'alles akzeptieren',
   'accept all',
   'alle ablehnen',
   'reject all',
   'einstellungen',
   'settings',
   'preferences',
+  'datenschutz-einstellungen',
+  'cookie-einstellungen',
+  'privacy settings',
+  'nur essenzielle',
+  'only essential',
 ];
 
 export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResult {
-  const { html, scripts } = crawlResult;
+  const { html, scripts, networkRequests } = crawlResult;
   const htmlLower = html.toLowerCase();
-  const combinedContent = html + scripts.join(' ');
+  const networkContent = networkRequests.map(req => req.url).join(' ');
+  const combinedContent = `${html} ${scripts.join(' ')} ${networkContent}`;
   const combinedLower = combinedContent.toLowerCase();
 
-  // CMP Provider erkennen
+  // CMP-Domains für Netzwerk-basierte Erkennung
+  const CMP_DOMAINS = [
+    { domain: 'cookiebot.com', provider: 'Cookiebot' },
+    { domain: 'consent.cookiebot.com', provider: 'Cookiebot' },
+    { domain: 'onetrust.com', provider: 'OneTrust' },
+    { domain: 'cdn.cookielaw.org', provider: 'OneTrust' },
+    { domain: 'usercentrics.eu', provider: 'Usercentrics' },
+    { domain: 'app.usercentrics.eu', provider: 'Usercentrics' },
+    { domain: 'privacy-mgmt.com', provider: 'Sourcepoint' },
+    { domain: 'quantcast.com', provider: 'Quantcast' },
+    { domain: 'quantcast.mgr.consensu.org', provider: 'Quantcast' },
+    { domain: 'didomi.io', provider: 'Didomi' },
+    { domain: 'sdk.privacy-center.org', provider: 'Didomi' },
+    { domain: 'trustarc.com', provider: 'TrustArc' },
+    { domain: 'consent-manager.trustarc.com', provider: 'TrustArc' },
+    { domain: 'iubenda.com', provider: 'Iubenda' },
+    { domain: 'cdn.iubenda.com', provider: 'Iubenda' },
+    { domain: 'termly.io', provider: 'Termly' },
+    { domain: 'app.termly.io', provider: 'Termly' },
+    { domain: 'osano.com', provider: 'Osano' },
+    { domain: 'cmp.osano.com', provider: 'Osano' },
+    { domain: 'cookieyes.com', provider: 'CookieYes' },
+    { domain: 'cdn-cookieyes.com', provider: 'CookieYes' },
+    { domain: 'klaro.org', provider: 'Klaro' },
+    { domain: 'consentmanager.net', provider: 'Consentmanager' },
+    { domain: 'delivery.consentmanager.net', provider: 'Consentmanager' },
+  ];
+
+  // CMP Provider erkennen (HTML + Scripts)
   let detectedProvider: string | undefined;
   for (const provider of CMP_PROVIDERS) {
     for (const pattern of provider.patterns) {
@@ -56,6 +117,20 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
       }
     }
     if (detectedProvider) break;
+  }
+  
+  // Fallback: CMP-Erkennung über Netzwerkanfragen (Domain-basiert)
+  if (!detectedProvider) {
+    for (const request of networkRequests) {
+      const urlLower = request.url.toLowerCase();
+      for (const cmpDomain of CMP_DOMAINS) {
+        if (urlLower.includes(cmpDomain.domain)) {
+          detectedProvider = cmpDomain.provider;
+          break;
+        }
+      }
+      if (detectedProvider) break;
+    }
   }
 
   // Banner-Erkennung durch Keywords und Struktur
@@ -101,6 +176,25 @@ function detectBannerPresence(htmlLower: string, combinedLower: string): boolean
     'cookieconsent',
     'cookie_banner',
     'consent_banner',
+    'cybotcookiebot',
+    'onetrust',
+    'ot-sdk-container',
+    'usercentrics',
+    'uc-banner',
+    'uc-center-container',
+    'real-cookie-banner',
+    'rcb-consent',
+    'rcb-banner',
+    'borlabs',
+    'cmplz',
+    'didomi-notice',
+    'didomi-popup',
+    'qc-cmp',
+    'klaro',
+    'iubenda',
+    'termly',
+    'cookieyes',
+    'cky-consent',
   ];
 
   for (const pattern of bannerPatterns) {
@@ -109,10 +203,43 @@ function detectBannerPresence(htmlLower: string, combinedLower: string): boolean
     }
   }
 
+  // DSGVO-konform: Prüfe auf role="dialog" und aria-modal="true" (Standard-Attribute für Consent-Banner)
+  const dialogPatterns = [
+    'role="dialog"',
+    "role='dialog'",
+    'role="alertdialog"',
+    "role='alertdialog'",
+    'aria-modal="true"',
+    "aria-modal='true'",
+    'data-consent',
+    'data-cookie',
+    'data-gdpr',
+    'data-privacy',
+    'data-cmp',
+  ];
+  
+  let hasDialogElement = false;
+  for (const pattern of dialogPatterns) {
+    if (htmlLower.includes(pattern)) {
+      hasDialogElement = true;
+      break;
+    }
+  }
+  
+  // Wenn ein Dialog-Element gefunden wurde UND Cookie/Consent Keywords vorhanden sind
+  if (hasDialogElement) {
+    const cookieKeywords = ['cookie', 'consent', 'datenschutz', 'privacy', 'dsgvo', 'gdpr'];
+    for (const keyword of cookieKeywords) {
+      if (htmlLower.includes(keyword)) {
+        return true;
+      }
+    }
+  }
+
   // Prüfe auf Kombination von Keywords die auf einen Banner hindeuten
   let keywordCount = 0;
   for (const keyword of BANNER_KEYWORDS) {
-    if (htmlLower.includes(keyword)) {
+    if (htmlLower.includes(keyword) || combinedLower.includes(keyword)) {
       keywordCount++;
     }
   }
@@ -123,62 +250,133 @@ function detectBannerPresence(htmlLower: string, combinedLower: string): boolean
 
 function detectAcceptButton(htmlLower: string): boolean {
   const acceptPatterns = [
+    // Englisch
     'accept',
+    'accept all',
+    'accept cookies',
+    'allow all',
+    'allow all cookies',
+    'agree',
+    'agree to all',
+    'i agree',
+    'i accept',
+    'consent',
+    'got it',
+    'okay',
+    'ok',
+    'yes',
+    'allow',
+    'continue',
+    'proceed',
+    'enable all',
+    'accept & close',
+    'accept and close',
+    'accept & continue',
+    // Deutsch
     'akzeptieren',
     'alle akzeptieren',
-    'accept all',
-    'zustimmen',
-    'agree',
-    'einverstanden',
-    'ok',
-    'verstanden',
-    'got it',
-    'allow',
+    'alles akzeptieren',
+    'alle cookies akzeptieren',
+    'cookies akzeptieren',
+    'alle erlauben',
     'erlauben',
+    'zustimmen',
+    'allen zustimmen',
+    'einverstanden',
+    'verstanden',
+    'einwilligen',
+    'annehmen',
+    'alle annehmen',
+    'weiter',
+    'fortfahren',
+    'aktivieren',
+    'alle aktivieren',
+    // Button-Varianten
+    'submit',
+    'confirm all',
+    'bestätigen',
+    'alle bestätigen',
   ];
 
-  // Prüfe auf Button-ähnliche Elemente mit Accept-Text
-  for (const pattern of acceptPatterns) {
-    const buttonRegex = new RegExp(
-      `<(button|a|div|span)[^>]*>([^<]*${pattern}[^<]*)</(button|a|div|span)>`,
-      'i'
-    );
-    if (buttonRegex.test(htmlLower)) {
-      return true;
-    }
-  }
-
-  return false;
+  return hasButtonPattern(htmlLower, acceptPatterns);
 }
 
 function detectRejectButton(htmlLower: string): boolean {
   const rejectPatterns = [
+    // Englisch
     'reject',
-    'ablehnen',
-    'alle ablehnen',
     'reject all',
     'decline',
+    'decline all',
     'deny',
+    'deny all',
     'refuse',
-    'nur notwendige',
+    'refuse all',
+    'no thanks',
+    'no, thanks',
+    'no thank you',
+    'disagree',
+    'do not accept',
+    'don\'t accept',
+    'not now',
+    'later',
+    'skip',
+    'close',
+    'x',
+    'dismiss',
+    'opt out',
+    'opt-out',
+    'optout',
+    'disable',
+    'disable all',
+    'block all',
     'only necessary',
-    'nur erforderliche',
+    'only essential',
     'essential only',
-    'keine cookies',
+    'necessary only',
+    'strictly necessary',
+    'required only',
+    'minimal',
+    'continue without',
+    'without accepting',
     'no cookies',
+    'no tracking',
+    // Deutsch
+    'ablehnen',
+    'alle ablehnen',
+    'verweigern',
+    'nicht akzeptieren',
+    'nicht zustimmen',
+    'nein danke',
+    'nein, danke',
+    'später',
+    'schließen',
+    'abbrechen',
+    'überspringen',
+    'nur essenzielle',
+    'nur essenziell',
+    'nur notwendige',
+    'nur erforderliche',
+    'nur technische',
+    'nur technisch',
+    'nur funktionale',
+    'essentielle cookies',
+    'notwendige cookies',
+    'erforderliche cookies',
+    'technische cookies',
+    'keine cookies',
+    'ohne tracking',
+    'ohne cookies',
+    'minimale cookies',
+    'weiter ohne',
+    'ohne akzeptieren',
+    'deaktivieren',
+    'alle deaktivieren',
+    'nicht einverstanden',
+    'widersprechen',
   ];
 
-  for (const pattern of rejectPatterns) {
-    const buttonRegex = new RegExp(
-      `<(button|a|div|span)[^>]*>([^<]*${pattern}[^<]*)</(button|a|div|span)>`,
-      'i'
-    );
-    if (buttonRegex.test(htmlLower)) {
-      return true;
-    }
-  }
-
-  return false;
+  return hasButtonPattern(htmlLower, rejectPatterns);
 }
 
 function detectEssentialSaveButton(htmlLower: string): boolean {
@@ -209,19 +407,12 @@ function detectEssentialSaveButton(htmlLower: string): boolean {
     'necessary cookies only',
     'erforderliche cookies',
     'notwendige cookies',
+    'nur technisch',
+    'nur funktional',
+    'technical only',
   ];
 
-  for (const pattern of savePatterns) {
-    const buttonRegex = new RegExp(
-      `<(button|a|div|span)[^>]*>([^<]*${pattern}[^<]*)</(button|a|div|span)>`,
-      'i'
-    );
-    if (buttonRegex.test(htmlLower)) {
-      return true;
-    }
-  }
-
-  return false;
+  return hasButtonPattern(htmlLower, savePatterns);
 }
 
 function detectSettingsOption(htmlLower: string): boolean {
@@ -239,16 +430,17 @@ function detectSettingsOption(htmlLower: string): boolean {
     'cookie-einstellungen',
     'cookie settings',
     'privacy settings',
+    'privatsphäre',
+    'privatsphaere',
     'datenschutzeinstellungen',
+    'privatsphäre-einstellungen',
+    'privatsphaere-einstellungen',
+    'datenschutz-einstellungen',
+    'privacy center',
+    'datenschutz center',
   ];
 
-  for (const pattern of settingsPatterns) {
-    if (htmlLower.includes(pattern)) {
-      return true;
-    }
-  }
-
-  return false;
+  return hasButtonPattern(htmlLower, settingsPatterns);
 }
 
 function detectContentBlocking(html: string): boolean {
@@ -269,10 +461,10 @@ function detectContentBlocking(html: string): boolean {
 
   // Prüfe auf body-Klassen die auf Blocking hindeuten
   const blockingClasses = ['no-scroll', 'modal-open', 'overflow-hidden', 'body-locked'];
-  const hasBlockingClass = blockingClasses.some((cls) => 
-    html.toLowerCase().includes(`class="[^"]*${cls}`) || 
-    html.toLowerCase().includes(`class='[^']*${cls}`)
-  );
+  const hasBlockingClass = blockingClasses.some((cls) => {
+    const regex = new RegExp(`class=["'][^"']*${cls}[^"']*["']`, 'i');
+    return regex.test(html);
+  });
 
   return hasOverlay || hasBlockingClass;
 }
@@ -303,4 +495,39 @@ function detectPrivacyPolicyLink(htmlLower: string, combinedLower: string): bool
   }
 
   return false;
+}
+
+function hasButtonPattern(htmlLower: string, patterns: string[]): boolean {
+  for (const pattern of patterns) {
+    const safePattern = escapeRegex(pattern);
+    const buttonRegex = new RegExp(
+      `<(button|a|div|span|input)[^>]*>[\\s\\S]*?${safePattern}[\\s\\S]*?</(button|a|div|span|input)>`,
+      'i'
+    );
+    if (buttonRegex.test(htmlLower)) {
+      return true;
+    }
+
+    const roleRegex = new RegExp(
+      `<[^>]*role=["']button["'][^>]*>[\\s\\S]*?${safePattern}[\\s\\S]*?</[^>]+>`,
+      'i'
+    );
+    if (roleRegex.test(htmlLower)) {
+      return true;
+    }
+
+    const attrRegex = new RegExp(
+      `(aria-label|title|value|data-testid|data-qa|data-action|data-consent)=["'][^"']*${safePattern}[^"']*["']`,
+      'i'
+    );
+    if (attrRegex.test(htmlLower)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
