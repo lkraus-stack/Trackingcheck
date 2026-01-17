@@ -159,6 +159,28 @@ export function ResultCard({ result }: ResultCardProps) {
                 ⚠️ Tracking vor Consent erkannt - DSGVO-Verstoß
               </div>
             )}
+            
+            {/* NEU: Anzeige der Reject-Methode */}
+            {result.cookieConsentTest.afterReject.rejectMethod && result.cookieConsentTest.afterReject.rejectMethod !== 'unknown' && (
+              <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-300">
+                ℹ️ Ablehnung via: {
+                  result.cookieConsentTest.afterReject.rejectMethod === 'essential-only' ? '"Nur Essenzielle" Button' :
+                  result.cookieConsentTest.afterReject.rejectMethod === 'save-button' ? '"Speichern" Button' :
+                  result.cookieConsentTest.afterReject.rejectMethod === 'direct' ? 'Direkter Ablehnen-Button' :
+                  'Unbekannt'
+                }
+                {result.cookieConsentTest.afterReject.buttonText && (
+                  <span className="ml-1 opacity-70">({result.cookieConsentTest.afterReject.buttonText.substring(0, 30)}...)</span>
+                )}
+              </div>
+            )}
+            
+            {/* Marketing korrekt abgelehnt */}
+            {result.cookieConsentTest.analysis.marketingRejectedProperly && result.cookieConsentTest.afterReject.clickSuccessful && (
+              <div className="p-2.5 bg-green-500/10 border border-green-500/30 rounded-lg text-xs text-green-400">
+                ✅ Marketing-Cookies wurden erfolgreich abgelehnt
+              </div>
+            )}
           </div>
         </Section>
       )}
@@ -181,6 +203,10 @@ export function ResultCard({ result }: ResultCardProps) {
           <StatusItem label="Ablehnen" value={result.cookieBanner.hasRejectButton} />
           <StatusItem label="Einstellungen" value={result.cookieBanner.hasSettingsOption} />
           <StatusItem label="Blockiert" value={result.cookieBanner.blocksContent} invertColor />
+          {/* NEU: hasEssentialSaveButton anzeigen */}
+          {result.cookieBanner.hasEssentialSaveButton && (
+            <StatusItem label="Nur Essenzielle" value={true} />
+          )}
         </div>
       </Section>
 

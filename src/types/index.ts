@@ -443,6 +443,7 @@ export interface CookieConsentTestResult {
     newCookies: CookieResult[];
     clickSuccessful: boolean;
     buttonFound: boolean;
+    buttonText?: string; // Text des geklickten Buttons
   };
   // Cookies nach "Ablehnen" (separater Test)
   afterReject: {
@@ -451,6 +452,9 @@ export interface CookieConsentTestResult {
     newCookies: CookieResult[];
     clickSuccessful: boolean;
     buttonFound: boolean;
+    buttonText?: string; // Text des geklickten Buttons
+    // NEU: Zeigt an, wie die Ablehnung erfolgte
+    rejectMethod?: 'direct' | 'essential-only' | 'save-button' | 'settings-toggle' | 'unknown';
   };
   // Analyse/Bewertung
   analysis: {
@@ -458,6 +462,10 @@ export interface CookieConsentTestResult {
     rejectWorksProperly: boolean;
     trackingBeforeConsent: boolean;
     issues: CookieConsentIssue[];
+    // NEU: Zusätzliche Analyse-Details
+    rejectViaEssentialButton?: boolean;
+    rejectViaSaveButton?: boolean;
+    marketingRejectedProperly?: boolean;
   };
 }
 

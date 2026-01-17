@@ -236,9 +236,9 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
 
 // Cookie-Consent-Test Daten verarbeiten
 function processCookieConsentTest(testData: CookieConsentTestData): CookieConsentTestResult {
-  const beforeCookies = categorizeCookies(testData.beforeConsent.cookies);
-  const afterAcceptCookies = categorizeCookies(testData.afterAccept.cookies);
-  const afterRejectCookies = categorizeCookies(testData.afterReject.cookies);
+  const beforeCookies = categorizeCookies(testData.beforeConsent.cookies, testData.pageDomain);
+  const afterAcceptCookies = categorizeCookies(testData.afterAccept.cookies, testData.pageDomain);
+  const afterRejectCookies = categorizeCookies(testData.afterReject.cookies, testData.pageDomain);
   
   const beforeCookieNames = new Set(beforeCookies.map(c => c.name));
   const newCookiesAfterAccept = afterAcceptCookies.filter(c => !beforeCookieNames.has(c.name));
@@ -252,22 +252,58 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     c => c.category === 'analytics' || c.category === 'marketing'
   );
   
+  const buttonText = testData.afterReject.buttonText?.toLowerCase() || '';
+  
+  // Erweiterte Pattern-Erkennung für Ablehn-Aktionen
+  const rejectPatterns = [
+    // Deutsch
+    'ablehnen', 'alle ablehnen', 'verweigern', 'nicht einverstanden', 'nicht akzeptieren',
+    'nur essenzielle', 'nur essenziell', 'nur notwendige', 'nur erforderliche',
+    'nur technische', 'nur technisch', 'essentielle', 'essentiell',
+    'notwendige cookies', 'notwendig', 'erforderlich',
+    'ohne tracking', 'ohne marketing', 'ohne analyse',
+    'weiter ohne', 'nur minimale', 'minimal',
+    'datenschutzfreundlich', 'privatsphäre', 'einschränken',
+    // Englisch  
+    'reject', 'reject all', 'decline', 'deny', 'deny all',
+    'only essential', 'only necessary', 'essential only', 'necessary only',
+    'refuse', 'refuse all', 'no thanks', 'no thank you',
+    'minimal cookies', 'strictly necessary', 'required only',
+    'continue without', 'without tracking', 'without marketing',
+  ];
+  
+  const savePatterns = ['speichern', 'save', 'confirm', 'bestätigen', 'auswahl bestätigen', 'save preferences'];
+  
+  const acceptPatterns = [
+    // Deutsch
+    'alle akzeptieren', 'alle annehmen', 'alle cookies akzeptieren', 
+    'akzeptieren', 'annehmen', 'zustimmen', 'einverstanden',
+    // Englisch
+    'accept all', 'accept cookies', 'accept', 'agree', 'allow all', 'allow',
+    'i agree', 'i accept', 'yes', 'ok', 'okay',
+  ];
+  
   // Prüfen ob "Speichern"-Button verwendet wurde
-  const isSaveButton = Boolean(testData.afterReject.buttonText && 
-    (testData.afterReject.buttonText.toLowerCase().includes('speichern') || 
-     testData.afterReject.buttonText.toLowerCase().includes('save')));
+  const isSaveButton = savePatterns.some(p => buttonText.includes(p)) && 
+    !rejectPatterns.some(p => buttonText.includes(p)) &&
+    !acceptPatterns.some(p => buttonText.includes(p));
+  
+  // Prüfen ob ein "Nur Essenzielle" Button verwendet wurde
+  const isEssentialOnlyButton = rejectPatterns.some(p => buttonText.includes(p));
   
   // WICHTIG: "Speichern" kann sowohl Akzeptieren als auch Ablehnen sein
   // Nur wenn NUR essentielle Cookies gesetzt wurden, ist es eine Ablehnung für Marketing
   // Wenn auch Marketing/Analytics Cookies gesetzt wurden, ist es eine Akzeptanz
   const onlyEssentialCookiesAfterSave = isSaveButton && 
     afterRejectCookies.length > 0 &&
-    afterRejectCookies.every(c => c.category === 'necessary');
+    afterRejectCookies.every(c => c.category === 'necessary' || c.category === 'functional');
   
   // Wenn "Speichern" verwendet wurde, aber auch Marketing/Analytics Cookies gesetzt wurden,
   // dann war es KEINE Ablehnung, sondern eine Akzeptanz
   const saveButtonAcceptedMarketing = isSaveButton && 
     afterRejectCookies.some(c => c.category === 'analytics' || c.category === 'marketing');
+  const isEssentialOnlyAction = isEssentialOnlyButton || onlyEssentialCookiesAfterSave;
+  const treatAsAccept = saveButtonAcceptedMarketing && !isEssentialOnlyAction;
   
   const issues: CookieConsentIssue[] = [];
   
@@ -281,7 +317,7 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
   
   // Nur Fehler melden, wenn es wirklich eine Ablehnung war
   // Wenn "Speichern" verwendet wurde und Marketing-Cookies gesetzt wurden, war es eine Akzeptanz
-  if (trackingCookiesAfterReject.length > 0 && !saveButtonAcceptedMarketing) {
+  if (trackingCookiesAfterReject.length > 0 && !treatAsAccept) {
     issues.push({
       severity: 'error',
       title: 'Tracking-Cookies trotz Ablehnung',
@@ -314,18 +350,20 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     });
   }
   
-  // Info hinzufügen, wenn "Speichern"-Button verwendet wurde
-  if (isSaveButton) {
-    if (onlyEssentialCookiesAfterSave) {
-      // "Speichern" mit nur essentiellen Cookies = Ablehnung für Marketing (korrekt)
-    } else if (saveButtonAcceptedMarketing) {
-      // "Speichern" mit Marketing-Cookies = Akzeptanz (nicht als Ablehnung werten)
-      issues.push({
-        severity: 'info',
-        title: '"Speichern"-Button verwendet',
-        description: 'Ein "Speichern"-Button wurde verwendet. Da auch Marketing/Analytics Cookies gesetzt wurden, wurde dies als Akzeptanz gewertet, nicht als Ablehnung.',
-      });
-    }
+  // Info hinzufügen, wenn essenzielle Auswahl erkannt wurde
+  if (isEssentialOnlyAction) {
+    issues.push({
+      severity: 'info',
+      title: 'Nur essenzielle Cookies gewählt',
+      description: 'Es wurden nur essenzielle Cookies gewählt. Marketing/Analytics gilt als abgelehnt.',
+    });
+  } else if (isSaveButton && saveButtonAcceptedMarketing) {
+    // "Speichern" mit Marketing-Cookies = Akzeptanz (nicht als Ablehnung werten)
+    issues.push({
+      severity: 'info',
+      title: '"Speichern"-Button verwendet',
+      description: 'Ein "Speichern"-Button wurde verwendet. Da auch Marketing/Analytics Cookies gesetzt wurden, wurde dies als Akzeptanz gewertet, nicht als Ablehnung.',
+    });
   }
   
   const consentWorksProperly = 
@@ -336,10 +374,20 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
   // 1. Expliziter Ablehnen-Button geklickt wurde und keine Tracking-Cookies gesetzt wurden
   // 2. ODER "Speichern"-Button wurde verwendet und NUR essentielle Cookies gesetzt wurden
   // NICHT als Ablehnung werten, wenn "Speichern" Marketing-Cookies gesetzt hat
-  const rejectWorksProperly = 
-    (testData.afterReject.clickSuccessful && trackingCookiesAfterReject.length === 0 && !saveButtonAcceptedMarketing) ||
-    Boolean(isSaveButton && onlyEssentialCookiesAfterSave);
+  const rejectWorksProperly = isEssentialOnlyAction
+    ? trackingCookiesAfterReject.length === 0
+    : (testData.afterReject.clickSuccessful && trackingCookiesAfterReject.length === 0 && !treatAsAccept);
   
+  // Bestimme die Reject-Methode
+  let rejectMethod: 'direct' | 'essential-only' | 'save-button' | 'settings-toggle' | 'unknown' = 'unknown';
+  if (isEssentialOnlyButton) {
+    rejectMethod = 'essential-only';
+  } else if (isSaveButton) {
+    rejectMethod = 'save-button';
+  } else if (testData.afterReject.clickSuccessful) {
+    rejectMethod = 'direct';
+  }
+
   return {
     beforeConsent: {
       cookies: beforeCookies,
@@ -352,6 +400,7 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
       newCookies: newCookiesAfterAccept,
       clickSuccessful: testData.afterAccept.clickSuccessful,
       buttonFound: testData.afterAccept.buttonFound,
+      buttonText: testData.afterAccept.buttonText,
     },
     afterReject: {
       cookies: afterRejectCookies,
@@ -359,12 +408,18 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
       newCookies: newCookiesAfterReject,
       clickSuccessful: testData.afterReject.clickSuccessful,
       buttonFound: testData.afterReject.buttonFound,
+      buttonText: testData.afterReject.buttonText,
+      rejectMethod,
     },
     analysis: {
       consentWorksProperly,
       rejectWorksProperly,
       trackingBeforeConsent: trackingCookiesBefore.length > 0,
       issues,
+      // NEU: Detaillierte Analyse
+      rejectViaEssentialButton: isEssentialOnlyButton,
+      rejectViaSaveButton: isSaveButton && !saveButtonAcceptedMarketing,
+      marketingRejectedProperly: trackingCookiesAfterReject.length === 0,
     },
   };
 }
@@ -394,67 +449,272 @@ function categorizeCookies(cookies: Array<{
   httpOnly: boolean;
   secure: boolean;
   sameSite?: string;
-}>): CookieResult[] {
+}>, pageDomain?: string): CookieResult[] {
   const now = Date.now();
 
+  // Erweiterte Cookie-Kategorien
   const cookieCategories: Record<string, CookieResult['category']> = {
+    // === ESSENTIELLE/NOTWENDIGE COOKIES ===
+    // Session Cookies
     'PHPSESSID': 'necessary',
     'JSESSIONID': 'necessary',
-    'csrf': 'necessary',
-    '_csrf': 'necessary',
+    'ASP.NET_SessionId': 'necessary',
+    'ASPSESSIONID': 'necessary',
     'session': 'necessary',
     'sessionid': 'necessary',
+    'session_id': 'necessary',
+    'connect.sid': 'necessary',
+    
+    // Security/CSRF
+    'csrf': 'necessary',
+    '_csrf': 'necessary',
+    'csrftoken': 'necessary',
+    '__csrf_token': 'necessary',
+    'XSRF-TOKEN': 'necessary',
+    '_xsrf': 'necessary',
+    
+    // CDN/Sicherheit
     '__cf': 'necessary',
     'cf_clearance': 'necessary',
+    '__cfduid': 'necessary',
+    '__cf_bm': 'necessary',
+    '_cfuvid': 'necessary',
     
+    // WordPress/CMS
+    'wordpress_logged_in': 'necessary',
+    'wp-settings': 'necessary',
+    
+    // === CMP COOKIES (ESSENZIELL) ===
+    // Usercentrics
+    'uc_consent': 'necessary',
+    'UC_USER_INTERACTION': 'necessary',
+    'ucData': 'necessary',
+    'uc_user_interaction': 'necessary',
+    'ucCookies': 'necessary',
+    
+    // Real Cookie Banner
+    'rcb_consent': 'necessary',
+    'real_cookie_banner': 'necessary',
+    'rcb-': 'necessary',
+    
+    // OneTrust
+    'OptanonConsent': 'necessary',
+    'OptanonAlertBoxClosed': 'necessary',
+    'OTGPPConsent': 'necessary',
+    'euconsent-v2': 'necessary',
+    
+    // Cookiebot
+    'CookieConsent': 'necessary',
+    'CookieConsentBulkSetting': 'necessary',
+    
+    // Didomi
+    'didomi_token': 'necessary',
+    'euconsent': 'necessary',
+    
+    // Borlabs
+    'borlabs-cookie': 'necessary',
+    'BorlabsCookie': 'necessary',
+    
+    // Complianz
+    'cmplz_': 'necessary',
+    'cmplz_banner-status': 'necessary',
+    'cmplz_consent': 'necessary',
+    
+    // Klaro
+    'klaro': 'necessary',
+    
+    // Generische Consent Cookies
+    'cookie_consent': 'necessary',
+    'cookieconsent': 'necessary',
+    'cookie-consent': 'necessary',
+    'consent': 'necessary',
+    'gdpr_consent': 'necessary',
+    'cookies_accepted': 'necessary',
+    'cookies_preferences_set': 'necessary',
+    
+    // TCF Cookies
+    'eupubconsent': 'necessary',
+    'eupubconsent-v2': 'necessary',
+    '__tcfapi': 'necessary',
+    
+    // === ANALYTICS COOKIES ===
+    // Google Analytics
     '_ga': 'analytics',
     '_gid': 'analytics',
     '_gat': 'analytics',
+    '_ga_': 'analytics',
     '__utma': 'analytics',
     '__utmb': 'analytics',
     '__utmc': 'analytics',
+    '__utmt': 'analytics',
     '__utmz': 'analytics',
+    
+    // Hotjar
     '_hjid': 'analytics',
     '_hjSessionUser': 'analytics',
-    'amplitude': 'analytics',
-    'mixpanel': 'analytics',
+    '_hjSession': 'analytics',
+    '_hjAbsoluteSessionInProgress': 'analytics',
+    '_hjFirstSeen': 'analytics',
+    '_hjTLDTest': 'analytics',
+    '_hjIncludedInSessionSample': 'analytics',
+    
+    // Microsoft Clarity
     '_clck': 'analytics',
     '_clsk': 'analytics',
+    'CLID': 'analytics',
     
+    // Mixpanel
+    'mp_': 'analytics',
+    'mixpanel': 'analytics',
+    
+    // Amplitude
+    'amplitude': 'analytics',
+    'amp_': 'analytics',
+    
+    // Matomo/Piwik
+    '_pk_id': 'analytics',
+    '_pk_ses': 'analytics',
+    '_pk_ref': 'analytics',
+    'piwik_': 'analytics',
+    'matomo_': 'analytics',
+    
+    // Lucky Orange
+    '_lo_': 'analytics',
+    
+    // Heap
+    '_hp2_': 'analytics',
+    
+    // === MARKETING COOKIES ===
+    // Meta/Facebook
     '_fbp': 'marketing',
     '_fbc': 'marketing',
     'fr': 'marketing',
-    '_gcl': 'marketing',
+    'sb': 'marketing',
+    'datr': 'marketing',
+    
+    // Google Ads
+    '_gcl_au': 'marketing',
+    '_gcl_aw': 'marketing',
+    '_gcl_dc': 'marketing',
+    '_gcl_gb': 'marketing',
+    '_gcl_gf': 'marketing',
+    '_gcl_ha': 'marketing',
     'IDE': 'marketing',
     'NID': 'marketing',
+    'DSID': 'marketing',
+    '__gads': 'marketing',
+    '__gpi': 'marketing',
+    'ANID': 'marketing',
+    '1P_JAR': 'marketing',
+    'DV': 'marketing',
+    
+    // TikTok
+    '_tt_enable_cookie': 'marketing',
+    '_ttp': 'marketing',
+    'tt_appId': 'marketing',
+    'tt_sessionId': 'marketing',
+    'tt_scid': 'marketing',
+    
+    // Pinterest
     '_pin_unauth': 'marketing',
+    '_pinterest_cm': 'marketing',
+    '_pinterest_sess': 'marketing',
+    '_routing_id': 'marketing',
+    
+    // LinkedIn
     'lidc': 'marketing',
     'bcookie': 'marketing',
-    '_tt_': 'marketing',
-    '_ttp': 'marketing',
-    '_scid': 'marketing',
-    '_rdt_uuid': 'marketing',
-    'muc_ads': 'marketing',
-    'personalization_id': 'marketing',
+    'li_sugr': 'marketing',
+    'li_': 'marketing',
+    'AnalyticsSyncHistory': 'marketing',
+    'UserMatchHistory': 'marketing',
+    'ln_or': 'marketing',
     
+    // Twitter/X
+    'personalization_id': 'marketing',
+    'muc_ads': 'marketing',
+    'guest_id': 'marketing',
+    'guest_id_ads': 'marketing',
+    'guest_id_marketing': 'marketing',
+    'twid': 'marketing',
+    
+    // Reddit
+    '_rdt_uuid': 'marketing',
+    
+    // Snapchat
+    '_scid': 'marketing',
+    '_scid_r': 'marketing',
+    'sc_at': 'marketing',
+    
+    // Criteo
+    'cto_': 'marketing',
+    'cto_bundle': 'marketing',
+    
+    // Microsoft/Bing
+    '_uetsid': 'marketing',
+    '_uetvid': 'marketing',
+    'MUID': 'marketing',
+    'MUIDB': 'marketing',
+    
+    // Taboola
+    't_gid': 'marketing',
+    'taboola': 'marketing',
+    
+    // Outbrain
+    'outbrain_': 'marketing',
+    
+    // === FUNKTIONALE COOKIES ===
     'lang': 'functional',
+    'language': 'functional',
     'locale': 'functional',
     'timezone': 'functional',
     'currency': 'functional',
+    'country': 'functional',
+    'region': 'functional',
+    'theme': 'functional',
+    'dark_mode': 'functional',
+    'font_size': 'functional',
+    'accessibility': 'functional',
   };
 
   // Bekannte Cookie-Dienste
   const cookieServices: Record<string, string> = {
     '_ga': 'Google Analytics',
     '_gid': 'Google Analytics',
+    '_ga_': 'Google Analytics 4',
     '_fbp': 'Meta/Facebook',
     '_fbc': 'Meta/Facebook',
+    'fr': 'Meta/Facebook',
     '_gcl': 'Google Ads',
+    'IDE': 'Google DoubleClick',
     '_hjid': 'Hotjar',
+    '_hjSession': 'Hotjar',
     '_clck': 'Microsoft Clarity',
+    '_clsk': 'Microsoft Clarity',
     '_tt_': 'TikTok',
+    '_ttp': 'TikTok',
     '_pin': 'Pinterest',
     'li_': 'LinkedIn',
+    'lidc': 'LinkedIn',
+    'bcookie': 'LinkedIn',
+    '_scid': 'Snapchat',
+    '_rdt_uuid': 'Reddit',
+    'personalization_id': 'Twitter/X',
+    'muc_ads': 'Twitter/X',
+    '_pk_': 'Matomo/Piwik',
+    'mp_': 'Mixpanel',
+    'amplitude': 'Amplitude',
+    '_uetsid': 'Bing/Microsoft Ads',
+    '_uetvid': 'Bing/Microsoft Ads',
+    'cto_': 'Criteo',
+    'OptanonConsent': 'OneTrust',
+    'CookieConsent': 'Cookiebot',
+    'didomi_token': 'Didomi',
+    'borlabs-cookie': 'Borlabs Cookie',
+    'real_cookie_banner': 'Real Cookie Banner',
+    'rcb_consent': 'Real Cookie Banner',
+    'uc_consent': 'Usercentrics',
+    'cmplz_': 'Complianz',
   };
 
   return cookies.map(cookie => {
@@ -473,14 +733,63 @@ function categorizeCookies(cookies: Array<{
     }
     
     if (category === 'unknown') {
-      if (cookie.domain.includes('google') || cookie.domain.includes('doubleclick')) {
-        category = cookie.name.startsWith('_g') ? 'analytics' : 'marketing';
-      } else if (cookie.domain.includes('facebook') || cookie.domain.includes('fb.com')) {
+      const domain = cookie.domain.toLowerCase();
+      
+      // Analytics-Domains
+      if (domain.includes('google-analytics') || 
+          domain.includes('analytics.google') ||
+          domain.includes('hotjar') ||
+          domain.includes('clarity.ms') ||
+          domain.includes('mixpanel') ||
+          domain.includes('amplitude') ||
+          domain.includes('heap') ||
+          domain.includes('fullstory') ||
+          domain.includes('matomo') ||
+          domain.includes('piwik')) {
+        category = 'analytics';
+      }
+      // Google (differenziert)
+      else if (domain.includes('google') || domain.includes('doubleclick') || domain.includes('googlesyndication')) {
+        category = cookie.name.startsWith('_g') && !cookie.name.startsWith('_gcl') ? 'analytics' : 'marketing';
+      }
+      // Social Media Marketing
+      else if (domain.includes('facebook') || domain.includes('fb.com') || domain.includes('fbcdn') || domain.includes('meta.com')) {
         category = 'marketing';
-      } else if (cookie.domain.includes('linkedin')) {
+      }
+      else if (domain.includes('linkedin')) {
         category = 'marketing';
-      } else if (cookie.domain.includes('tiktok')) {
+      }
+      else if (domain.includes('tiktok') || domain.includes('byteoversea') || domain.includes('tiktokcdn')) {
         category = 'marketing';
+      }
+      else if (domain.includes('twitter') || domain.includes('x.com') || domain.includes('twimg')) {
+        category = 'marketing';
+      }
+      else if (domain.includes('pinterest')) {
+        category = 'marketing';
+      }
+      else if (domain.includes('snapchat') || domain.includes('snapkit')) {
+        category = 'marketing';
+      }
+      else if (domain.includes('reddit')) {
+        category = 'marketing';
+      }
+      // Werbung/Retargeting
+      else if (domain.includes('criteo') || domain.includes('taboola') || domain.includes('outbrain') || 
+               domain.includes('adsrvr') || domain.includes('adnxs') || domain.includes('bing.com') ||
+               domain.includes('msn.com') || domain.includes('yahoo') || domain.includes('amazon-adsystem')) {
+        category = 'marketing';
+      }
+      // CMP Cookies sind essenziell
+      else if (domain.includes('usercentrics') || domain.includes('cookiebot') || 
+               domain.includes('onetrust') || domain.includes('didomi') ||
+               domain.includes('quantcast') || domain.includes('trustarc')) {
+        category = 'necessary';
+      }
+      // First-Party Cookies ohne erkannte Muster als functional behandeln
+      else if (pageDomain && (domain.includes(pageDomain) || domain === '' || domain.startsWith('.'))) {
+        // First-party Cookie - eher als functional einstufen wenn unklar
+        category = 'functional';
       }
     }
 
