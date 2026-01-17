@@ -31,7 +31,23 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
         body: JSON.stringify({ analysisResult: result }),
       });
 
-      const data = await response.json();
+      // Sicher JSON parsen
+      let data: any;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          const errorText = await response.text();
+          throw new Error(`Server-Antwort konnte nicht als JSON gelesen werden: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorText = await response.text();
+        throw new Error(response.ok 
+          ? 'Unerwartetes Antwortformat vom Server'
+          : `Server-Fehler (${response.status}): ${errorText.substring(0, 100)}`);
+      }
 
       if (!response.ok) {
         if (data.configured === false) {
@@ -65,7 +81,23 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
         body: JSON.stringify({ question: userMessage, context: result }),
       });
 
-      const data = await response.json();
+      // Sicher JSON parsen
+      let data: any;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          const errorText = await response.text();
+          throw new Error(`Server-Antwort konnte nicht als JSON gelesen werden: ${errorText.substring(0, 100)}`);
+        }
+      } else {
+        const errorText = await response.text();
+        throw new Error(response.ok 
+          ? 'Unerwartetes Antwortformat vom Server'
+          : `Server-Fehler (${response.status}): ${errorText.substring(0, 100)}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.details || data.error || 'Antwort fehlgeschlagen');

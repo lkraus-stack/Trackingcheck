@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { ChatInterface } from '@/components/ChatInterface';
 import { HeroSection } from '@/components/HeroSection';
 import { ProblemSection } from '@/components/ProblemSection';
@@ -20,18 +20,22 @@ import {
 
 export default function Home() {
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const analysisRef = useRef<HTMLDivElement>(null);
 
-  const scrollToAnalysis = () => {
-    analysisRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Hash aus URL entfernen falls vorhanden, aber KEIN automatisches Scrollen
+  useEffect(() => {
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    // KEIN window.scrollTo - der User bleibt wo er ist
+  }, []);
 
-  // Show scroll-to-top button when scrolled down
-  if (typeof window !== 'undefined') {
-    window.addEventListener('scroll', () => {
+  useEffect(() => {
+    const handleScroll = () => {
       setShowScrollTop(window.scrollY > 500);
-    });
-  }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-grid-pattern hero-pattern">
@@ -53,15 +57,15 @@ export default function Home() {
             
             {/* Navigation */}
             <nav className="hidden md:flex items-center gap-6">
-              <a href="#analysis-section" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+              <button onClick={() => document.getElementById('analysis-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
                 Analyse
-              </a>
-              <a href="#problems-section" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+              </button>
+              <button onClick={() => document.getElementById('problems-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
                 Warum wichtig?
-              </a>
-              <a href="#agency-section" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+              </button>
+              <button onClick={() => document.getElementById('agency-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
                 Über uns
-              </a>
+              </button>
             </nav>
 
             {/* Right Side */}
@@ -88,14 +92,13 @@ export default function Home() {
       {/* Main Content - Scrollable Sections */}
       <main>
         {/* Hero Section */}
-        <HeroSection onStartAnalysis={scrollToAnalysis} />
+        <HeroSection />
 
         {/* Divider */}
         <div className="section-divider max-w-4xl mx-auto" />
 
         {/* Analysis Section */}
         <section 
-          ref={analysisRef}
           id="analysis-section" 
           className="py-12 sm:py-16 px-4"
         >
@@ -163,19 +166,19 @@ export default function Home() {
               <h4 className="font-semibold text-slate-200 mb-4">Links</h4>
               <ul className="space-y-2">
                 <li>
-                  <a href="#analysis-section" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+                  <button onClick={() => document.getElementById('analysis-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
                     Analyse starten
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#problems-section" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+                  <button onClick={() => document.getElementById('problems-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
                     Warum Tracking wichtig ist
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a href="#agency-section" className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
+                  <button onClick={() => document.getElementById('agency-section')?.scrollIntoView({ behavior: 'smooth' })} className="text-sm text-slate-400 hover:text-slate-200 transition-colors">
                     Über uns
-                  </a>
+                  </button>
                 </li>
                 <li>
                   <a 

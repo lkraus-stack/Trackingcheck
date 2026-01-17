@@ -147,13 +147,13 @@ export function ProblemSection() {
           <p className="text-slate-400 mb-4">
             Die gute Nachricht: All diese Probleme sind lösbar.
           </p>
-          <a 
-            href="#analysis-section"
+          <button 
+            onClick={() => document.getElementById('analysis-section')?.scrollIntoView({ behavior: 'smooth' })}
             className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
           >
             Jetzt deine Website prüfen
             <ChevronRight className="w-4 h-4" />
-          </a>
+          </button>
         </div>
       </div>
     </section>

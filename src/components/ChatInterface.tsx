@@ -47,20 +47,14 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // History laden
   useEffect(() => {
     setHistory(getAnalysisHistory());
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  // KEIN automatisches Scrollen - der User scrollt selbst wenn gewünscht
 
   const isValidUrl = (string: string) => {
     try {
@@ -159,7 +153,33 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         }),
       });
 
-      const data = await response.json();
+      // Sicher JSON parsen - prüfe Content-Type und handle Fehler
+      let data: any;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (jsonError) {
+          // Wenn JSON-Parsing fehlschlägt, versuche Text zu lesen
+          const errorText = await response.text();
+          throw {
+            type: 'JSON-Parsing-Fehler',
+            message: 'Die Server-Antwort konnte nicht als JSON gelesen werden.',
+            technical: errorText.substring(0, 200),
+          };
+        }
+      } else {
+        // Wenn kein JSON-Content-Type, lese als Text
+        const errorText = await response.text();
+        throw {
+          type: response.ok ? 'Unerwartetes Format' : 'Server-Fehler',
+          message: response.ok 
+            ? 'Die Server-Antwort hat ein unerwartetes Format.'
+            : `Server-Fehler (${response.status}): ${errorText.substring(0, 100)}`,
+          technical: errorText.substring(0, 200),
+        };
+      }
 
       if (!response.ok) {
         throw {
@@ -236,11 +256,11 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   return (
     <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 ${
       embedded 
-        ? 'min-h-[500px] max-h-[800px]' 
+        ? 'min-h-[600px] h-[70vh] max-h-[900px]' 
         : 'h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)]'
     }`}>
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -324,7 +344,6 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* History Panel */}

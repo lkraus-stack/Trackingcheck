@@ -25,6 +25,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className="dark">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Scroll Restoration deaktivieren - Browser soll Scroll-Position nicht wiederherstellen
+              if ('scrollRestoration' in history) {
+                history.scrollRestoration = 'manual';
+              }
+              // KEIN window.scrollTo - Seite bleibt an aktueller Position
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} antialiased bg-slate-950 text-slate-100 min-h-screen`}
       >
