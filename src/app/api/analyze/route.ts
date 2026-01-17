@@ -4,7 +4,10 @@ import { AnalysisRequest } from '@/types';
 import { getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
 
 // Vercel Serverless Konfiguration
-export const maxDuration = 60; // 60 Sekunden Timeout
+// Vercel Pro: max 300 Sekunden, Hobby: max 60 Sekunden
+// Verwende 60 Sekunden als sicheres Limit (funktioniert auf allen Plänen)
+// Bei Bedarf kann maxDuration auf 300 erhöht werden (nur Pro Plan)
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
@@ -52,9 +55,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Analyse durchführen (Quick oder Full)
-    const result = quickScan 
-      ? await analyzeWebsiteQuick(url)
-      : await analyzeWebsite(url);
+    // Bei Full-Scan: Timeout-Schutz mit Fallback auf Quick-Scan
+    let result;
+    if (quickScan) {
+      result = await analyzeWebsiteQuick(url);
+    } else {
+      try {
+        // Timeout-Wrapper für Full-Scan (50 Sekunden, damit noch Zeit für Fallback bleibt)
+        const timeoutWrapper = 50000; // 50 Sekunden
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('TIMEOUT_PROTECTION')), timeoutWrapper)
+        );
+        
+        result = await Promise.race([
+          analyzeWebsite(url),
+          timeoutPromise
+        ]) as Awaited<ReturnType<typeof analyzeWebsite>>;
+      } catch (error) {
+        // Bei Timeout: Fallback auf Quick-Scan
+        if (error instanceof Error && error.message === 'TIMEOUT_PROTECTION') {
+          console.warn(`Full-Scan timeout für ${url}, fallback auf Quick-Scan`);
+          result = await analyzeWebsiteQuick(url);
+          // Markiere als Quick-Scan
+          result.scanMode = 'quick';
+          result.status = 'partial' as const;
+        } else {
+          throw error;
+        }
+      }
+    }
 
     // Ergebnis cachen (nur bei Full-Scan)
     if (!quickScan) {
@@ -64,7 +93,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...result,
       fromCache: false,
-      scanMode: quickScan ? 'quick' : 'full',
+      scanMode: quickScan || (result as any).scanMode === 'quick' ? 'quick' : 'full',
     });
   } catch (error) {
     console.error('Analyse-Fehler:', error);
