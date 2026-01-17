@@ -1,4 +1,7 @@
 // Vantero KI API Client (OpenAI-kompatibel)
+import { reduceAnalysisResultForAI, reduceForQuestion, reduceForSection } from './dataReducer';
+import { getCachedReducedData, setCachedReducedData } from '@/lib/cache/analysisCache';
+import { AnalysisResult } from '@/types';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -67,6 +70,8 @@ export class VanteroClient {
           messages,
           temperature: options?.temperature ?? 0.7,
           max_tokens: options?.maxTokens ?? 2000,
+          // Kompaktes JSON ohne Formatierung spart Token
+          // JSON.stringify ohne null, 2
         }),
         signal: controller.signal,
       });
@@ -114,7 +119,21 @@ export class VanteroClient {
       throw new Error(errorMessage);
     }
 
-    const data: ChatCompletionResponse = await response.json();
+    // Sicher JSON parsen
+    let data: ChatCompletionResponse;
+    const contentType = response.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        const errorText = await response.text();
+        throw new Error(`Vantero API: Antwort konnte nicht als JSON gelesen werden. Status: ${response.status}, Antwort: ${errorText.substring(0, 200)}`);
+      }
+    } else {
+      const errorText = await response.text();
+      throw new Error(`Vantero API: Unerwartetes Antwortformat. Status: ${response.status}, Content-Type: ${contentType}, Antwort: ${errorText.substring(0, 200)}`);
+    }
     
     // Prüfe ob Antwort-Struktur korrekt ist
     if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
@@ -130,6 +149,23 @@ export class VanteroClient {
   }
 
   async analyzeTrackingResults(analysisData: unknown): Promise<string> {
+    // Cache-Check: Prüfe ob reduzierte Daten bereits gecacht sind
+    const dataUrl = (analysisData as AnalysisResult)?.url;
+    const cacheKey = dataUrl ? `reduced:${dataUrl}` : null;
+    
+    let reducedData: Partial<AnalysisResult>;
+    if (cacheKey) {
+      const cached = getCachedReducedData(cacheKey);
+      if (cached) {
+        reducedData = cached;
+      } else {
+        reducedData = reduceAnalysisResultForAI(analysisData as AnalysisResult);
+        setCachedReducedData(cacheKey, reducedData);
+      }
+    } else {
+      reducedData = reduceAnalysisResultForAI(analysisData as AnalysisResult);
+    }
+
     const systemPrompt = `Du bist ein erfahrener Experte für Web-Tracking, DSGVO-Compliance, Consent Management und Datenschutz-Audits.
 Du erstellst ausführliche, professionelle Analyse-Berichte für Website-Betreiber, Marketing-Verantwortliche und Datenschutzbeauftragte.
 
@@ -143,7 +179,7 @@ Antworte immer auf Deutsch und strukturiere deine Antwort klar mit Überschrifte
 
     const userPrompt = `Hier sind die Analyse-Ergebnisse einer Website:
 
-${JSON.stringify(analysisData, null, 2)}
+${JSON.stringify(reducedData)}
 
 Erstelle einen **ausführlichen und professionellen Analyse-Bericht** mit folgender Struktur:
 
@@ -237,12 +273,15 @@ Sei ausführlich, erkläre Fachbegriffe und gib konkrete, umsetzbare Handlungsem
   }
 
   async answerQuestion(question: string, context: unknown): Promise<string> {
+    // Reduziere Kontext basierend auf der Frage (nur relevante Teile)
+    const reducedContext = reduceForQuestion(context as AnalysisResult, question);
+
     const systemPrompt = `Du bist ein Experte für Web-Tracking und DSGVO-Compliance.
 Dir liegen Analyse-Ergebnisse einer Website vor. Beantworte Fragen basierend auf diesen Daten.
 Antworte präzise, hilfreich und auf Deutsch.`;
 
     const userPrompt = `Analyse-Kontext:
-${JSON.stringify(context, null, 2)}
+${JSON.stringify(reducedContext)}
 
 Frage des Nutzers: ${question}`;
 
@@ -255,112 +294,22 @@ Frage des Nutzers: ${question}`;
     });
   }
 
-  async explainSection(sectionName: string, sectionData: unknown, fullAnalysis: unknown): Promise<string> {
-    const systemPrompt = `Du bist ein geduldiger, erfahrener Experte für Web-Tracking, DSGVO-Compliance und Consent Management.
-Deine Aufgabe ist es, komplexe technische Themen so zu erklären, dass auch absolute Anfänger ohne technisches Vorwissen sie verstehen können.
-
-Deine Erklärungen sind:
-- **Anfängerfreundlich**: Keine Fachbegriffe ohne Erklärung, einfache Sprache
-- **Ausführlich**: Jeder Punkt wird detailliert erklärt, keine Abkürzungen
-- **Praktisch**: Konkrete Beispiele und reale Situationen
-- **Strukturiert**: Klare Abschnitte mit Überschriften für bessere Lesbarkeit
-- **Handlungsorientiert**: Klare Anweisungen, was zu tun ist
-
-Antworte immer auf Deutsch und verwende Markdown-Formatierung (## für Überschriften, ** für Fettdruck, - für Aufzählungen).`;
-
-    const userPrompt = `Erkläre die Sektion "${sectionName}" in einem Tracking-Checker so ausführlich und anfängerfreundlich wie möglich.
-
-## Struktur deiner Erklärung:
-
-### 1. Einführung: Was ist diese Sektion?
-Beginne mit einer einfachen, verständlichen Erklärung:
-- Was bedeutet der Name dieser Sektion in einfachen Worten?
-- Warum gibt es diese Sektion überhaupt?
-- Was ist das Ziel dieser Analyse?
-
-### 2. Was wird hier genau analysiert?
-Erkläre detailliert, aber verständlich:
-- Welche Daten werden in dieser Sektion gesammelt und untersucht?
-- Welche Technologien, Standards oder Mechanismen werden geprüft?
-- Wie funktioniert die Analyse technisch? (in einfachen Worten)
-- Welche konkreten Elemente der Website werden dabei betrachtet?
-
-**Wichtig**: Erkläre jeden Fachbegriff, als ob der Leser noch nie davon gehört hätte.
-
-### 3. Wofür ist diese Analyse wichtig?
-Erkläre den praktischen Nutzen:
-- Welche Probleme kann diese Analyse identifizieren?
-- Welche rechtlichen Anforderungen werden damit überprüft? (z.B. DSGVO, ePrivacy-Richtlinie)
-- Warum ist das für Website-Betreiber wichtig?
-- Was passiert, wenn diese Analyse nicht durchgeführt wird?
-- Welche Risiken können dadurch entstehen?
-
-### 4. Welche Funktion hat diese Sektion?
-Erkläre die praktische Funktion:
-- Was kann der Website-Betreiber mit den Ergebnissen dieser Sektion machen?
-- Wie hilft diese Analyse bei der Verbesserung der Datenschutz-Compliance?
-- Welche Entscheidungen können basierend auf diesen Daten getroffen werden?
-- Wie integriert sich diese Sektion in den Gesamtprozess der Datenschutz-Prüfung?
-
-### 5. Wie bewertet man die Ergebnisse?
-Gib eine klare Anleitung zur Bewertung:
-- Was sind "gute" Ergebnisse in dieser Sektion? Was bedeutet das?
-- Was sind "schlechte" oder "problematische" Ergebnisse? Warum?
-- Welche Werte/Status sind kritisch und erfordern sofortiges Handeln?
-- Welche Werte/Status sind akzeptabel?
-- Wie interpretiert man die verschiedenen Status-Indikatoren (z.B. grüne/rote/gelbe Markierungen)?
-- Gibt es Schwellenwerte oder Richtlinien, an denen man sich orientieren kann?
-
-### 6. Konkrete Beispiele aus den aktuellen Daten
-Analysiere die tatsächlichen Daten dieser Website:
-- Was zeigt die aktuelle Analyse konkret?
-- Ist das Ergebnis gut, mittelmäßig oder problematisch? Warum?
-- Was bedeutet das spezifisch für diese Website?
-- Gibt es konkrete Probleme, die identifiziert wurden?
-
-### 7. Was sollte der Website-Betreiber jetzt tun?
-Gib konkrete, umsetzbare Handlungsempfehlungen:
-- Wenn die Ergebnisse gut sind: Was sollte beibehalten werden?
-- Wenn die Ergebnisse problematisch sind: Welche konkreten Schritte müssen unternommen werden?
-- Wer ist für die Umsetzung verantwortlich? (z.B. Entwickler, Datenschutzbeauftragter, Marketing)
-- Wie dringend ist das? (Sofort, innerhalb einer Woche, kann warten)
-
-### 8. Häufige Fragen (FAQ)
-Beantworte typische Fragen, die Anfänger haben könnten:
-- "Was bedeutet [Fachbegriff] in einfachen Worten?"
-- "Ist das jetzt gut oder schlecht?"
-- "Muss ich sofort etwas ändern?"
-- "Kann ich das selbst umsetzen oder brauche ich Hilfe?"
-
----
-
-**Sektions-Daten für diese Website:**
-${JSON.stringify(sectionData, null, 2)}
-
-**Vollständige Analyse (für Kontext):**
-${JSON.stringify(fullAnalysis, null, 2)}
-
-**Wichtig**: 
-- Sei SEHR ausführlich - mindestens 800-1000 Wörter
-- Erkläre jeden Fachbegriff beim ersten Auftreten
-- Verwende einfache, verständliche Sprache
-- Gib konkrete Beispiele
-- Strukturiere mit Markdown-Überschriften (##, ###)
-- Stelle sicher, dass auch jemand ohne technisches Vorwissen alles versteht`;
-
-    return this.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ], {
-      temperature: 0.5,
-      maxTokens: 2500,
-    });
-  }
-
   async validateAndReviewAnalysis(
     analysisData: unknown,
     initialAnalysis: string
   ): Promise<string> {
+    // Reduziere analysisData - keine Notwendigkeit für vollständige Daten bei Validierung
+    // Die initialAnalysis enthält bereits alle relevanten Informationen
+    const reducedData = reduceAnalysisResultForAI(analysisData as AnalysisResult);
+    
+    // Kürze initialAnalysis auf max. 2000 Wörter (ca. 2500 Token) wenn zu lang
+    let analysisSummary = initialAnalysis;
+    if (initialAnalysis.length > 8000) { // ~1000 Wörter
+      const sentences = initialAnalysis.split(/[.!?]\s+/);
+      analysisSummary = sentences.slice(0, Math.ceil(sentences.length * 0.7)).join('. ') + '.';
+      analysisSummary += '\n\n[Hinweis: Bericht wurde gekürzt, da zu lang für Validierung]';
+    }
+
     const systemPrompt = `Du bist ein kritischer Datenschutz-Auditor und QA-Experte für Web-Tracking und DSGVO-Compliance.
 Deine Aufgabe ist es, Analyse-Berichte kritisch zu überprüfen und zusätzliche wichtige Hinweise zu geben.
 
@@ -371,13 +320,13 @@ Du bist:
 
 Antworte auf Deutsch mit klarer Struktur.`;
 
-    const userPrompt = `Hier sind die original Analyse-Ergebnisse einer Website:
+    const userPrompt = `Hier sind die reduzierten Analyse-Ergebnisse einer Website (für Kontext):
 
-${JSON.stringify(analysisData, null, 2)}
+${JSON.stringify(reducedData)}
 
-Und hier ist der Analyse-Bericht:
+Und hier ist der Analyse-Bericht zum Überprüfen:
 
-${initialAnalysis}
+${analysisSummary}
 
 Erstelle eine **Qualitätssicherungs-Überprüfung** mit folgender Struktur:
 

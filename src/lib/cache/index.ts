@@ -7,4 +7,7 @@ export {
   removeFromHistory,
   clearHistory,
   compareAnalyses,
+  getCachedReducedData,
+  setCachedReducedData,
+  clearReducedDataCache,
 } from './analysisCache';
