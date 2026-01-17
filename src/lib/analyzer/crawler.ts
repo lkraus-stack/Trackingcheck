@@ -594,7 +594,7 @@ export class WebCrawler {
       '[role="alertdialog"]',
     ];
 
-    const waits = bannerSelectors.map(selector =>
+    const waits: Promise<any>[] = bannerSelectors.map(selector =>
       page.waitForSelector(selector, { timeout: 3500, visible: true }).catch(() => null)
     );
     
