@@ -1882,7 +1882,7 @@ export class WebCrawler {
       await new Promise(resolve => setTimeout(resolve, 2500));
       
       // Warten auf Tracking Scripts die nach Reload laden
-      await this.waitForTrackingObjects(page);
+      await this.waitForTrackingObjects(page, 3000);
       
       // Zusätzliches Warten auf async Cookie-Setzung
       await new Promise(resolve => setTimeout(resolve, 1500));
