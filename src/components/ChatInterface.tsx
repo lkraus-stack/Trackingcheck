@@ -48,6 +48,9 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Prüfe ob ein fertiger Bericht vorhanden ist
+  const hasCompletedAnalysis = messages.some(msg => msg.analysisResult && !msg.isLoading);
 
   // History laden
   useEffect(() => {
@@ -255,23 +258,44 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
 
   return (
     <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 ${
-      embedded 
+      hasCompletedAnalysis 
+        ? '' // Keine feste Höhe wenn Bericht fertig ist
+        : embedded 
         ? 'min-h-[600px] h-[70vh] max-h-[900px]' 
         : 'h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)]'
     }`}>
       {/* Messages Area */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0">
-        {messages.map((message) => (
+      <div 
+        ref={messagesContainerRef} 
+        className={`${
+          hasCompletedAnalysis 
+            ? 'py-3 sm:py-4 space-y-3 sm:space-y-4' // Normales Scrollen der Seite
+            : 'flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0' // Scrollbarer Container
+        }`}
+      >
+        {messages.map((message) => {
+          // Wenn Bericht fertig ist, verstecke alle Chat-Nachrichten außer dem Bericht
+          if (hasCompletedAnalysis && !message.analysisResult) {
+            return null;
+          }
+          
+          return (
           <div
             key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`w-full sm:max-w-[90%] lg:max-w-[85%] rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
+              className={`${
+                hasCompletedAnalysis && message.analysisResult
+                  ? 'w-full' // Volle Breite für Bericht
+                  : 'w-full sm:max-w-[90%] lg:max-w-[85%]'
+              } rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
                 message.role === 'user'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ml-auto max-w-[85%] sm:max-w-[70%]'
                   : message.role === 'system'
                   ? 'bg-slate-800/50 text-slate-200 border border-slate-700'
+                  : hasCompletedAnalysis && message.analysisResult
+                  ? 'bg-transparent' // Transparent für Bericht
                   : 'bg-slate-800 text-slate-200'
               }`}
             >
@@ -308,17 +332,19 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm">{message.content}</p>
-                    {message.fromCache && (
-                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Cache
-                      </span>
-                    )}
-                  </div>
+                  {!hasCompletedAnalysis || message.analysisResult ? (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm">{message.content}</p>
+                      {message.fromCache && (
+                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Cache
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
                   {message.analysisResult && (
-                    <div className="mt-3">
+                    <div className={hasCompletedAnalysis ? 'mt-0 -mx-3 sm:-mx-4 lg:-mx-6' : 'mt-3'}>
                       {message.fromCache && (
                         <button
                           onClick={() => handleRefresh(message.analysisResult!.url)}
@@ -335,15 +361,18 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                   )}
                 </>
               )}
-              <span className="text-xs opacity-50 mt-2 block">
-                {message.timestamp.toLocaleTimeString('de-DE', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+              {!hasCompletedAnalysis || !message.analysisResult ? (
+                <span className="text-xs opacity-50 mt-2 block">
+                  {message.timestamp.toLocaleTimeString('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              ) : null}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* History Panel */}
@@ -408,7 +437,9 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       )}
 
       {/* Input Area */}
-      <div className="border-t border-slate-800 py-3 sm:py-4 bg-slate-900/50 backdrop-blur shrink-0">
+      <div className={`border-t border-slate-800 py-3 sm:py-4 bg-slate-900/50 backdrop-blur ${
+        hasCompletedAnalysis ? 'sticky bottom-0 z-10' : 'shrink-0'
+      }`}>
         <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3">
           {/* Action Buttons */}
           <div className="hidden min-[480px]:flex gap-2 sm:gap-3">

@@ -960,28 +960,11 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
     const googleConsentMode = analyzeGoogleConsentMode(crawlResult);
     const trackingTags = analyzeTrackingTags(crawlResult);
     const cookies = categorizeCookies(crawlResult.cookies);
-    addStep('analyze', 'completed', 'Basis-Analyse abgeschlossen');
     
-    // Leere/minimale Ergebnisse für nicht durchgeführte Analysen
-    const dataLayerAnalysis: DataLayerAnalysisResult = {
-      hasDataLayer: crawlResult.windowObjects.hasDataLayer,
-      events: [],
-      ecommerce: {
-        detected: false,
-        events: [],
-        valueTracking: {
-          hasTransactionValue: false,
-          hasCurrency: false,
-          hasItemData: false,
-          hasUserData: false,
-          valueParameters: [],
-          missingRecommended: [],
-        },
-        issues: [],
-      },
-      customDimensions: [],
-      userProperties: [],
-    };
+    // DataLayer-Analyse (schnell, aber funktional)
+    const dataLayerAnalysis = analyzeDataLayer(crawlResult);
+    
+    addStep('analyze', 'completed', 'Basis-Analyse abgeschlossen');
 
     const thirdPartyDomains: ThirdPartyDomainsResult = {
       totalCount: 0,
@@ -1045,6 +1028,28 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
       });
     }
     
+    // Performance Marketing Analysen (auch im Quick Scan)
+    addStep('analyze_performance', 'running', 'Performance Marketing Analyse läuft...');
+    
+    const eventQualityScore = analyzeEventQuality(crawlResult, trackingTags, dataLayerAnalysis);
+    const funnelValidation = analyzeFunnelValidation(crawlResult, dataLayerAnalysis);
+    const cookieLifetimeAudit = analyzeCookieLifetime(cookies, trackingTags);
+    const unusedPotential = analyzeUnusedPotential(crawlResult, trackingTags, dataLayerAnalysis);
+    const roasQuality = dataLayerAnalysis.ecommerce.detected 
+      ? analyzeROASQuality(dataLayerAnalysis)
+      : undefined;
+    const conversionTrackingAudit = analyzeConversionTrackingAudit(crawlResult, trackingTags, dataLayerAnalysis);
+    const campaignAttribution = analyzeCampaignAttribution(crawlResult, trackingTags);
+    const gtmAudit = analyzeGTMAudit(crawlResult, trackingTags);
+    const privacySandbox = analyzePrivacySandbox(crawlResult);
+    const ecommerceDeepDive = dataLayerAnalysis.ecommerce.detected
+      ? analyzeEcommerceDeepDive(dataLayerAnalysis)
+      : undefined;
+    
+    addStep('analyze_performance', 'completed', 
+      `Event Quality: ${eventQualityScore.overallScore}%${funnelValidation.isEcommerce ? ` | Funnel: ${funnelValidation.overallScore}%` : ''} | Conversion Audit: ${conversionTrackingAudit.overallScore}%`
+    );
+    
     // Schneller Score
     let score = 100;
     if (!cookieBanner.detected && (trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected)) score -= 20;
@@ -1068,6 +1073,17 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
       score: Math.max(0, Math.min(100, score)),
       issues,
       analysisSteps,
+      // Performance Marketing (auch im Quick Scan)
+      eventQualityScore,
+      funnelValidation,
+      cookieLifetimeAudit,
+      unusedPotential,
+      roasQuality,
+      conversionTrackingAudit,
+      campaignAttribution,
+      gtmAudit,
+      privacySandbox,
+      ecommerceDeepDive,
     };
   } catch (error) {
     console.error('Quick analysis error:', error);
