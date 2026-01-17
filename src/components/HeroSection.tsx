@@ -3,24 +3,12 @@
 import { useState, useEffect } from 'react';
 import { Shield, ChevronDown, CheckCircle2, Sparkles, Zap, TrendingUp, Lock } from 'lucide-react';
 
-interface HeroSectionProps {
-  onStartAnalysis: () => void;
-}
-
-export function HeroSection({ onStartAnalysis }: HeroSectionProps) {
+export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
-
-  const scrollToAnalysis = () => {
-    onStartAnalysis();
-    const analysisSection = document.getElementById('analysis-section');
-    if (analysisSection) {
-      analysisSection.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
 
   return (
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 py-16 overflow-hidden">
@@ -60,8 +48,11 @@ export function HeroSection({ onStartAnalysis }: HeroSectionProps) {
       {/* CTA Button */}
       <div className={`transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <button
-          onClick={scrollToAnalysis}
-          className="group relative px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold text-lg shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-105 transition-all duration-300"
+          onClick={() => {
+            const el = document.getElementById('analysis-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
+          className="group relative inline-flex px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold text-lg shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:shadow-indigo-500/30 hover:scale-105 transition-all duration-300"
         >
           <span className="flex items-center gap-3">
             <Shield className="w-5 h-5" />
@@ -107,7 +98,10 @@ export function HeroSection({ onStartAnalysis }: HeroSectionProps) {
       {/* Scroll Indicator */}
       <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 transition-all duration-700 delay-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <button 
-          onClick={scrollToAnalysis}
+          onClick={() => {
+            const el = document.getElementById('analysis-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }}
           className="flex flex-col items-center gap-2 text-slate-500 hover:text-slate-300 transition-colors"
         >
           <span className="text-xs">Zur Analyse</span>
