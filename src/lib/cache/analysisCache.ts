@@ -2,10 +2,14 @@ import { AnalysisResult, CachedAnalysis, AnalysisHistoryItem } from '@/types';
 
 // Cache-Dauer: 24 Stunden
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000;
+// Cache-Dauer für reduzierte KI-Daten: 1 Stunde (kürzer, da weniger wertvoll)
+const REDUCED_DATA_CACHE_DURATION_MS = 60 * 60 * 1000;
 const HISTORY_MAX_ITEMS = 50;
 
 // Server-Side Cache (In-Memory für Vercel Serverless)
 const memoryCache: Map<string, CachedAnalysis> = new Map();
+// Cache für reduzierte KI-Daten (zur Token-Einsparung)
+const reducedDataCache: Map<string, { data: Partial<AnalysisResult>; expiresAt: number }> = new Map();
 
 // Cache-Key generieren
 function getCacheKey(url: string): string {
@@ -208,4 +212,52 @@ export function compareAnalyses(
     resolvedIssues,
     trackingChanges,
   };
+}
+
+// Cache für reduzierte KI-Daten
+export function getCachedReducedData(cacheKey: string): Partial<AnalysisResult> | null {
+  const cached = reducedDataCache.get(cacheKey);
+  
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log(`Cache hit for reduced data: ${cacheKey}`);
+    return cached.data;
+  }
+  
+  // Abgelaufenen Cache entfernen
+  if (cached) {
+    reducedDataCache.delete(cacheKey);
+  }
+  
+  return null;
+}
+
+export function setCachedReducedData(
+  cacheKey: string,
+  data: Partial<AnalysisResult>
+): void {
+  const now = Date.now();
+  
+  reducedDataCache.set(cacheKey, {
+    data,
+    expiresAt: now + REDUCED_DATA_CACHE_DURATION_MS,
+  });
+  
+  console.log(`Cached reduced data: ${cacheKey}`);
+  
+  // Cache-Größe begrenzen
+  if (reducedDataCache.size > 100) {
+    const entries = Array.from(reducedDataCache.entries());
+    entries
+      .sort((a, b) => a[1].expiresAt - b[1].expiresAt)
+      .slice(0, 20)
+      .forEach(([key]) => reducedDataCache.delete(key));
+  }
+}
+
+export function clearReducedDataCache(cacheKey?: string): void {
+  if (cacheKey) {
+    reducedDataCache.delete(cacheKey);
+  } else {
+    reducedDataCache.clear();
+  }
 }

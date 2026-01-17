@@ -14,15 +14,11 @@ import {
   BarChart3,
   ExternalLink,
   Download,
-  Server,
   ShoppingCart,
   Globe2,
   Scale,
   FileCheck,
   Search,
-  Filter,
-  ArrowUpDown,
-  Zap,
   HelpCircle,
 } from 'lucide-react';
 import { AnalysisResult, Issue, CookieResult } from '@/types';
@@ -39,15 +35,16 @@ interface ResultCardProps {
 
 export function ResultCard({ result }: ResultCardProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    cookieBanner: true,
-    googleConsentMode: true,
+    consentTest: false,
+    cookieBanner: false,
+    googleConsentMode: false,
     tracking: false,
     ecommerce: false,
     thirdParty: false,
     cookies: false,
     gdpr: false,
     dma: false,
-    issues: true,
+    issues: true, // Issues bleiben offen da wichtig
   });
 
   // Cookie-Filter und Sortierung
@@ -86,30 +83,23 @@ export function ResultCard({ result }: ResultCardProps) {
     });
 
   return (
-    <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
-      {/* Score Card */}
-      <div className={`bg-gradient-to-r ${getScoreBackground(result.score)} rounded-lg sm:rounded-xl p-3 sm:p-4 border border-slate-700`}>
+    <div className="mt-2 space-y-2">
+      {/* Score Card - Compact */}
+      <div className={`bg-gradient-to-r ${getScoreBackground(result.score)} rounded-lg p-3 border border-slate-700`}>
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs sm:text-sm">Compliance Score</p>
-            <p className={`text-3xl sm:text-4xl font-bold ${getScoreColor(result.score)}`}>{result.score}/100</p>
-          </div>
-          <div className="text-right">
-            <p className="text-slate-400 text-[10px] sm:text-xs">Analysiert am</p>
-            <p className="text-slate-300 text-xs sm:text-sm">
-              {new Date(result.timestamp).toLocaleDateString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-            {result.gdprChecklist && (
-              <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
-                DSGVO: {result.gdprChecklist.score}%
+          <div className="flex items-center gap-3">
+            <p className={`text-3xl font-bold ${getScoreColor(result.score)}`}>{result.score}</p>
+            <div>
+              <p className="text-slate-300 text-sm font-medium">Compliance Score</p>
+              <p className="text-slate-500 text-xs">
+                {new Date(result.timestamp).toLocaleDateString('de-DE')} • {result.gdprChecklist ? `DSGVO ${result.gdprChecklist.score}%` : ''}
               </p>
-            )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {result.cookieBanner.detected && <MiniStatus good label="Banner" />}
+            {result.googleConsentMode.version === 'v2' && <MiniStatus good label="CM v2" />}
+            {result.trackingTags.serverSideTracking?.detected && <MiniStatus good label="sGTM" />}
           </div>
         </div>
       </div>
@@ -117,8 +107,8 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Cookie Consent Test */}
       {result.cookieConsentTest && (
         <Section
-          title="Cookie-Consent Test"
-          icon={<Shield className="w-4 h-4 sm:w-5 sm:h-5" />}
+          title="Consent Test"
+          icon={<Shield className="w-4 h-4" />}
           status={
             result.cookieConsentTest.analysis.consentWorksProperly &&
             result.cookieConsentTest.analysis.rejectWorksProperly
@@ -137,58 +127,36 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.cookieConsentTest}
           fullAnalysis={result}
         >
-          <div className="space-y-2 sm:space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <ConsentTestPhase
-                phase="Vor Consent"
+                phase="Vorher"
                 cookieCount={result.cookieConsentTest.beforeConsent.cookieCount}
                 trackingFound={result.cookieConsentTest.beforeConsent.trackingCookiesFound}
                 status={!result.cookieConsentTest.beforeConsent.trackingCookiesFound ? 'good' : 'bad'}
               />
               <ConsentTestPhase
-                phase="Nach Akzeptieren"
+                phase="Akzeptiert"
                 cookieCount={result.cookieConsentTest.afterAccept.cookieCount}
                 newCookies={result.cookieConsentTest.afterAccept.newCookies.length}
-                buttonFound={result.cookieConsentTest.afterAccept.buttonFound}
-                clickSuccessful={result.cookieConsentTest.afterAccept.clickSuccessful}
                 status={result.cookieConsentTest.afterAccept.clickSuccessful ? 'good' : 'neutral'}
               />
               <ConsentTestPhase
-                phase="Nach Ablehnen"
+                phase="Abgelehnt"
                 cookieCount={result.cookieConsentTest.afterReject.cookieCount}
                 newCookies={result.cookieConsentTest.afterReject.newCookies.length}
-                buttonFound={result.cookieConsentTest.afterReject.buttonFound}
-                clickSuccessful={result.cookieConsentTest.afterReject.clickSuccessful}
                 status={
                   result.cookieConsentTest.afterReject.clickSuccessful &&
                   result.cookieConsentTest.afterReject.newCookies.filter(
                     c => c.category === 'marketing' || c.category === 'analytics'
-                  ).length === 0
-                    ? 'good'
-                    : result.cookieConsentTest.afterReject.buttonFound
-                    ? 'bad'
-                    : 'neutral'
+                  ).length === 0 ? 'good' : result.cookieConsentTest.afterReject.buttonFound ? 'bad' : 'neutral'
                 }
               />
             </div>
             
             {result.cookieConsentTest.analysis.trackingBeforeConsent && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                <p className="text-sm text-red-400 font-medium">⚠️ Tracking vor Einwilligung erkannt!</p>
-                <p className="text-xs text-red-400/80 mt-1">
-                  Dies ist ein DSGVO-Verstoß. Cookies dürfen erst nach Einwilligung gesetzt werden.
-                </p>
-              </div>
-            )}
-            
-            {result.cookieConsentTest.analysis.consentWorksProperly &&
-              result.cookieConsentTest.analysis.rejectWorksProperly &&
-              !result.cookieConsentTest.analysis.trackingBeforeConsent && (
-              <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                <p className="text-sm text-green-400 font-medium">✅ Cookie-Consent funktioniert korrekt</p>
-                <p className="text-xs text-green-400/80 mt-1">
-                  Der Banner reagiert korrekt auf Akzeptieren und Ablehnen.
-                </p>
+              <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
+                ⚠️ Tracking vor Consent erkannt - DSGVO-Verstoß
               </div>
             )}
           </div>
@@ -198,7 +166,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Cookie Banner Section */}
       <Section
         title="Cookie Banner"
-        icon={<Cookie className="w-4 h-4 sm:w-5 sm:h-5" />}
+        icon={<Cookie className="w-4 h-4" />}
         status={result.cookieBanner.detected}
         expanded={expandedSections.cookieBanner}
         onToggle={() => toggleSection('cookieBanner')}
@@ -206,44 +174,20 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.cookieBanner}
         fullAnalysis={result}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-          <StatusItem
-            label="Banner erkannt"
-            value={result.cookieBanner.detected}
-          />
-          <StatusItem
-            label="Provider"
-            value={result.cookieBanner.provider || 'Unbekannt'}
-            isText
-          />
-          <StatusItem
-            label="Akzeptieren-Button"
-            value={result.cookieBanner.hasAcceptButton}
-          />
-          <StatusItem
-            label="Ablehnen-Button"
-            value={result.cookieBanner.hasRejectButton}
-          />
-          <StatusItem
-            label="Essenzielle auswählen"
-            value={result.cookieBanner.hasEssentialSaveButton ?? false}
-          />
-          <StatusItem
-            label="Einstellungen-Option"
-            value={result.cookieBanner.hasSettingsOption}
-          />
-          <StatusItem
-            label="Blockiert Content"
-            value={result.cookieBanner.blocksContent}
-            invertColor
-          />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          <StatusItem label="Erkannt" value={result.cookieBanner.detected} />
+          <StatusItem label="Provider" value={result.cookieBanner.provider || '?'} isText />
+          <StatusItem label="Akzeptieren" value={result.cookieBanner.hasAcceptButton} />
+          <StatusItem label="Ablehnen" value={result.cookieBanner.hasRejectButton} />
+          <StatusItem label="Einstellungen" value={result.cookieBanner.hasSettingsOption} />
+          <StatusItem label="Blockiert" value={result.cookieBanner.blocksContent} invertColor />
         </div>
       </Section>
 
       {/* Google Consent Mode Section */}
       <Section
-        title="Google Consent Mode"
-        icon={<Shield className="w-4 h-4 sm:w-5 sm:h-5" />}
+        title={`Consent Mode ${result.googleConsentMode.version || ''}`}
+        icon={<Shield className="w-4 h-4" />}
         status={result.googleConsentMode.detected}
         expanded={expandedSections.googleConsentMode}
         onToggle={() => toggleSection('googleConsentMode')}
@@ -251,52 +195,20 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.googleConsentMode}
         fullAnalysis={result}
       >
-        <div className="space-y-2 sm:space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-            <StatusItem
-              label="Consent Mode erkannt"
-              value={result.googleConsentMode.detected}
-            />
-            <StatusItem
-              label="Version"
-              value={result.googleConsentMode.version || 'Nicht erkannt'}
-              isText
-              highlight={result.googleConsentMode.version === 'v2'}
-            />
-            <StatusItem
-              label="Update-Funktion"
-              value={result.googleConsentMode.updateConsent?.detected || false}
-            />
-            <StatusItem
-              label="Wait for Update"
-              value={result.googleConsentMode.waitForUpdate?.detected || false}
-            />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <StatusItem label="Erkannt" value={result.googleConsentMode.detected} />
+            <StatusItem label="Version" value={result.googleConsentMode.version || '?'} isText highlight={result.googleConsentMode.version === 'v2'} />
+            <StatusItem label="Update" value={result.googleConsentMode.updateConsent?.detected || false} />
+            <StatusItem label="Wait" value={result.googleConsentMode.waitForUpdate?.detected || false} />
           </div>
-          
-          {result.googleConsentMode.updateConsent?.detected && (
-            <div className="p-2 bg-slate-700/50 rounded-lg">
-              <p className="text-xs text-slate-400">
-                Update-Trigger: <span className="text-slate-300">{result.googleConsentMode.updateConsent.updateTrigger || 'Unbekannt'}</span>
-              </p>
-            </div>
-          )}
 
-          <div className="border-t border-slate-700 pt-2 sm:pt-3">
-            <p className="text-[10px] sm:text-xs text-slate-400 mb-2">Parameter Status:</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2">
-              {Object.entries(result.googleConsentMode.parameters).map(([key, value]) => (
-                <div key={key} className="flex items-center gap-2">
-                  {value ? (
-                    <CheckCircle2 className="w-3 h-3 text-green-400" />
-                  ) : (
-                    <XCircle className="w-3 h-3 text-slate-500" />
-                  )}
-                  <span className={`text-xs ${value ? 'text-slate-300' : 'text-slate-500'}`}>
-                    {key}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1">
+            {Object.entries(result.googleConsentMode.parameters).map(([key, value]) => (
+              <span key={key} className={`px-1.5 py-0.5 rounded text-[10px] ${value ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'}`}>
+                {key}
+              </span>
+            ))}
           </div>
         </div>
       </Section>
@@ -375,7 +287,7 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Tracking Tags Section */}
       <Section
         title="Tracking Tags"
-        icon={<Tag className="w-4 h-4 sm:w-5 sm:h-5" />}
+        icon={<Tag className="w-4 h-4" />}
         status={
           result.trackingTags.googleAnalytics.detected ||
           result.trackingTags.googleTagManager.detected ||
@@ -387,92 +299,19 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.trackingTags}
         fullAnalysis={result}
       >
-        <div className="space-y-2 sm:space-y-3">
-          <TrackingItem
-            name="Google Analytics"
-            detected={result.trackingTags.googleAnalytics.detected}
-            identifier={result.trackingTags.googleAnalytics.measurementIds?.[0]}
-            extraCount={
-              result.trackingTags.googleAnalytics.measurementIds?.length > 1
-                ? result.trackingTags.googleAnalytics.measurementIds.length - 1
-                : undefined
-            }
-            badge={result.trackingTags.googleAnalytics.version}
-          />
-          <TrackingItem
-            name="Google Tag Manager"
-            detected={result.trackingTags.googleTagManager.detected}
-            identifier={result.trackingTags.googleTagManager.containerId}
-          />
-          {result.trackingTags.googleAdsConversion?.detected && (
-            <TrackingItem
-              name="Google Ads"
-              detected={true}
-              identifier={result.trackingTags.googleAdsConversion.conversionId}
-              badge={result.trackingTags.googleAdsConversion.hasRemarketing ? 'Remarketing' : undefined}
-            />
-          )}
-          <TrackingItem
-            name="Meta Pixel"
-            detected={result.trackingTags.metaPixel.detected}
-            identifier={result.trackingTags.metaPixel.pixelId}
-          />
-          <TrackingItem
-            name="LinkedIn Insight"
-            detected={result.trackingTags.linkedInInsight.detected}
-            identifier={result.trackingTags.linkedInInsight.partnerId}
-          />
-          <TrackingItem
-            name="TikTok Pixel"
-            detected={result.trackingTags.tiktokPixel.detected}
-            identifier={result.trackingTags.tiktokPixel.pixelId}
-          />
-          {result.trackingTags.pinterestTag?.detected && (
-            <TrackingItem name="Pinterest Tag" detected={true} identifier={result.trackingTags.pinterestTag.tagId} />
-          )}
-          {result.trackingTags.snapchatPixel?.detected && (
-            <TrackingItem name="Snapchat Pixel" detected={true} identifier={result.trackingTags.snapchatPixel.pixelId} />
-          )}
-          {result.trackingTags.twitterPixel?.detected && (
-            <TrackingItem name="Twitter/X Pixel" detected={true} identifier={result.trackingTags.twitterPixel.pixelId} />
-          )}
-          {result.trackingTags.bingAds?.detected && (
-            <TrackingItem name="Bing Ads" detected={true} identifier={result.trackingTags.bingAds.tagId} />
-          )}
-          {result.trackingTags.criteo?.detected && (
-            <TrackingItem name="Criteo" detected={true} identifier={result.trackingTags.criteo.accountId} />
-          )}
+        <div className="space-y-1.5">
+          <TrackingItem name="GA4" detected={result.trackingTags.googleAnalytics.detected} identifier={result.trackingTags.googleAnalytics.measurementIds?.[0]} badge={result.trackingTags.googleAnalytics.version} />
+          <TrackingItem name="GTM" detected={result.trackingTags.googleTagManager.detected} identifier={result.trackingTags.googleTagManager.containerId} />
+          {result.trackingTags.googleAdsConversion?.detected && <TrackingItem name="Google Ads" detected={true} identifier={result.trackingTags.googleAdsConversion.conversionId} />}
+          <TrackingItem name="Meta Pixel" detected={result.trackingTags.metaPixel.detected} identifier={result.trackingTags.metaPixel.pixelId} />
+          {result.trackingTags.linkedInInsight.detected && <TrackingItem name="LinkedIn" detected={true} identifier={result.trackingTags.linkedInInsight.partnerId} />}
+          {result.trackingTags.tiktokPixel.detected && <TrackingItem name="TikTok" detected={true} identifier={result.trackingTags.tiktokPixel.pixelId} />}
           
-          {result.trackingTags.other.length > 0 && (
-            <div className="border-t border-slate-700 pt-2 mt-2">
-              <p className="text-xs text-slate-400 mb-2">Weitere erkannt:</p>
-              <div className="flex flex-wrap gap-2">
-                {result.trackingTags.other.map((tag) => (
-                  <span key={tag.name} className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-300">
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {result.trackingTags.serverSideTracking.detected && (
-            <div className="border-t border-slate-700 pt-2 mt-2">
-              <p className="text-xs text-slate-400 mb-2 flex items-center gap-1">
-                <Server className="w-3 h-3" />
-                Server-Side Tracking:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {result.trackingTags.serverSideTracking.summary.hasServerSideGTM && (
-                  <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">sGTM</span>
-                )}
-                {result.trackingTags.serverSideTracking.summary.hasMetaCAPI && (
-                  <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">Meta CAPI</span>
-                )}
-                {result.trackingTags.serverSideTracking.summary.hasCookieBridging && (
-                  <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs">Cookie Bridging</span>
-                )}
-              </div>
+          {result.trackingTags.serverSideTracking?.detected && (
+            <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-700/50 mt-1">
+              <span className="text-[10px] text-slate-500 mr-1">Server-Side:</span>
+              {result.trackingTags.serverSideTracking.summary.hasServerSideGTM && <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px]">sGTM</span>}
+              {result.trackingTags.serverSideTracking.summary.hasMetaCAPI && <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px]">CAPI</span>}
             </div>
           )}
         </div>
@@ -541,10 +380,10 @@ export function ResultCard({ result }: ResultCardProps) {
         </Section>
       )}
 
-      {/* Cookies Section - Erweitert */}
+      {/* Cookies Section - Compact */}
       <Section
         title={`Cookies (${result.cookies.length})`}
-        icon={<BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />}
+        icon={<BarChart3 className="w-4 h-4" />}
         status={result.cookies.length > 0}
         expanded={expandedSections.cookies}
         onToggle={() => toggleSection('cookies')}
@@ -552,73 +391,45 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={{ cookies: result.cookies, count: result.cookies.length }}
         fullAnalysis={result}
       >
-        <div className="space-y-2 sm:space-y-3">
-          {/* Filter und Suche */}
-          <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[150px]">
+        <div className="space-y-2">
+          {/* Cookie Categories Summary - Compact */}
+          <div className="flex flex-wrap gap-1.5">
+            <CookieCategorySummary category="Notw." count={result.cookies.filter((c) => c.category === 'necessary').length} color="bg-green-500" />
+            <CookieCategorySummary category="Analytics" count={result.cookies.filter((c) => c.category === 'analytics').length} color="bg-yellow-500" />
+            <CookieCategorySummary category="Marketing" count={result.cookies.filter((c) => c.category === 'marketing').length} color="bg-red-500" />
+            <CookieCategorySummary category="Andere" count={result.cookies.filter((c) => c.category === 'functional' || c.category === 'unknown').length} color="bg-slate-500" />
+          </div>
+
+          {/* Filter Row */}
+          <div className="flex gap-1.5">
+            <div className="relative flex-1">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
               <input
                 type="text"
-                placeholder="Cookie suchen..."
+                placeholder="Suchen..."
                 value={cookieSearch}
                 onChange={(e) => setCookieSearch(e.target.value)}
-                className="w-full pl-7 pr-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200"
+                className="w-full pl-7 pr-2 py-1 bg-slate-800/50 border border-slate-700 rounded text-[10px] text-slate-200"
               />
             </div>
             <select
               value={cookieFilter}
               onChange={(e) => setCookieFilter(e.target.value)}
-              className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200"
+              className="px-2 py-1 bg-slate-800/50 border border-slate-700 rounded text-[10px] text-slate-200"
             >
               <option value="all">Alle</option>
-              <option value="necessary">Notwendig</option>
-              <option value="functional">Funktional</option>
-              <option value="analytics">Analytics</option>
               <option value="marketing">Marketing</option>
-              <option value="unknown">Unbekannt</option>
+              <option value="analytics">Analytics</option>
             </select>
-            <select
-              value={cookieSort}
-              onChange={(e) => setCookieSort(e.target.value as any)}
-              className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200"
-            >
-              <option value="category">Nach Kategorie</option>
-              <option value="name">Nach Name</option>
-              <option value="lifetime">Nach Laufzeit</option>
-            </select>
-          </div>
-
-          {/* Cookie Categories Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
-            <CookieCategorySummary
-              category="Notwendig"
-              count={result.cookies.filter((c) => c.category === 'necessary').length}
-              color="bg-green-500"
-            />
-            <CookieCategorySummary
-              category="Analytics"
-              count={result.cookies.filter((c) => c.category === 'analytics').length}
-              color="bg-yellow-500"
-            />
-            <CookieCategorySummary
-              category="Marketing"
-              count={result.cookies.filter((c) => c.category === 'marketing').length}
-              color="bg-red-500"
-            />
-            <CookieCategorySummary
-              category="Andere"
-              count={result.cookies.filter((c) => c.category === 'functional' || c.category === 'unknown').length}
-              color="bg-slate-500"
-            />
           </div>
 
           {/* Cookie List */}
-          <div className="max-h-60 overflow-y-auto space-y-1">
-            {filteredCookies.map((cookie, index) => (
+          <div className="max-h-32 overflow-y-auto space-y-0.5">
+            {filteredCookies.slice(0, 10).map((cookie, index) => (
               <CookieItem key={index} cookie={cookie} />
             ))}
-            {filteredCookies.length === 0 && (
-              <p className="text-xs text-slate-500 text-center py-4">Keine Cookies gefunden</p>
+            {filteredCookies.length > 10 && (
+              <p className="text-[10px] text-slate-500 text-center py-1">+{filteredCookies.length - 10} weitere</p>
             )}
           </div>
         </div>
@@ -719,8 +530,8 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* Issues Section */}
       {result.issues.length > 0 && (
         <Section
-          title={`Probleme & Hinweise (${result.issues.length})`}
-          icon={<AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />}
+          title={`Probleme (${result.issues.length})`}
+          icon={<AlertTriangle className="w-4 h-4" />}
           status={false}
           expanded={expandedSections.issues}
           onToggle={() => toggleSection('issues')}
@@ -729,7 +540,7 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={{ issues: result.issues, count: result.issues.length }}
           fullAnalysis={result}
         >
-          <div className="space-y-2 sm:space-y-3 max-h-72 sm:max-h-96 overflow-y-auto">
+          <div className="space-y-1 max-h-48 overflow-y-auto">
             {result.issues.map((issue, index) => (
               <IssueItem key={index} issue={issue} />
             ))}
@@ -760,23 +571,23 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* KI-Analyse */}
       <AIAnalysis result={result} />
 
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
+      {/* Actions - Compact */}
+      <div className="flex gap-2 pt-2">
         <button
           onClick={() => exportAnalysisToPDF(result)}
-          className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg sm:rounded-xl font-medium text-sm sm:text-base transition-all"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg font-medium text-xs transition-all"
         >
-          <Download className="w-4 h-4" />
-          PDF Export
+          <Download className="w-3.5 h-3.5" />
+          PDF
         </button>
         <a
           href={result.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg sm:rounded-xl font-medium text-sm sm:text-base transition-colors"
+          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium text-xs transition-colors"
         >
-          <ExternalLink className="w-4 h-4" />
-          Website öffnen
+          <ExternalLink className="w-3.5 h-3.5" />
+          Website
         </a>
       </div>
     </div>
@@ -808,42 +619,48 @@ function Section({
   fullAnalysis?: AnalysisResult;
 }) {
   return (
-    <div className="bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-slate-800/40 rounded-lg border border-slate-700/50 overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-2.5 sm:p-3 hover:bg-slate-700/30 transition-colors"
+        className="w-full flex items-center justify-between p-2 hover:bg-slate-700/30 transition-colors"
       >
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <span className={`shrink-0 ${statusColor || (status ? 'text-green-400' : 'text-slate-500')}`}>
             {icon}
           </span>
-          <span className="font-medium text-slate-200 text-sm sm:text-base truncate">{title}</span>
-          {sectionName && sectionData !== undefined && sectionData !== null && fullAnalysis && (
+          <span className="font-medium text-slate-200 text-xs sm:text-sm truncate">{title}</span>
+          {sectionName && (
             <SectionInfoPopup
               sectionName={sectionName}
-              sectionData={sectionData}
-              fullAnalysis={fullAnalysis}
-              trigger={<HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+              trigger={<HelpCircle className="w-3 h-3" />}
             />
           )}
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {!statusColor && (
             status ? (
-              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-400" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
             ) : (
-              <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />
+              <XCircle className="w-3.5 h-3.5 text-slate-500" />
             )
           )}
           {expanded ? (
-            <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+            <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           )}
         </div>
       </button>
-      {expanded && <div className="px-2.5 sm:px-3 pb-2.5 sm:pb-3">{children}</div>}
+      {expanded && <div className="px-2 pb-2">{children}</div>}
     </div>
+  );
+}
+
+function MiniStatus({ good, label }: { good: boolean; label: string }) {
+  return (
+    <span className={`px-2 py-0.5 rounded text-xs ${good ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+      {label}
+    </span>
   );
 }
 
@@ -864,15 +681,15 @@ function StatusItem({
   const isPositive = isBoolean ? (invertColor ? !value : value) : false;
 
   return (
-    <div className="flex items-center justify-between p-2 bg-slate-800 rounded">
-      <span className="text-xs text-slate-400">{label}</span>
+    <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded text-xs">
+      <span className="text-slate-400">{label}</span>
       {isText ? (
-        <span className={`text-xs font-medium ${highlight ? 'text-green-400' : 'text-slate-300'}`}>
+        <span className={`font-medium ${highlight ? 'text-green-400' : 'text-slate-300'}`}>
           {value}
         </span>
       ) : (
-        <span className={`text-xs font-medium ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-          {value ? 'Ja' : 'Nein'}
+        <span className={`font-medium ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+          {value ? '✓' : '✗'}
         </span>
       )}
     </div>
@@ -893,24 +710,23 @@ function TrackingItem({
   extraCount?: number;
 }) {
   return (
-    <div className="flex items-center justify-between p-2 bg-slate-800 rounded">
-      <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
+      <div className="flex items-center gap-1.5">
         {detected ? (
-          <CheckCircle2 className="w-4 h-4 text-green-400" />
+          <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
         ) : (
-          <XCircle className="w-4 h-4 text-slate-500" />
+          <XCircle className="w-3.5 h-3.5 text-slate-500" />
         )}
-        <span className={`text-sm ${detected ? 'text-slate-200' : 'text-slate-500'}`}>{name}</span>
+        <span className={`text-xs ${detected ? 'text-slate-200' : 'text-slate-500'}`}>{name}</span>
         {badge && (
-          <span className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 text-[10px] rounded">
+          <span className="px-1 py-0.5 bg-indigo-500/20 text-indigo-400 text-[9px] rounded">
             {badge}
           </span>
         )}
       </div>
       {identifier && (
-        <span className="text-xs text-slate-400 font-mono">
-          {identifier}
-          {extraCount ? ` (+${extraCount})` : ''}
+        <span className="text-[10px] text-slate-500 font-mono">
+          {identifier}{extraCount ? ` +${extraCount}` : ''}
         </span>
       )}
     </div>
@@ -927,55 +743,29 @@ function CookieCategorySummary({
   color: string;
 }) {
   return (
-    <div className="flex items-center gap-2 p-2 bg-slate-800 rounded">
-      <div className={`w-2 h-2 rounded-full ${color}`} />
-      <span className="text-xs text-slate-400">{category}</span>
-      <span className="text-xs font-medium text-slate-300 ml-auto">{count}</span>
+    <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded">
+      <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
+      <span className="text-[10px] text-slate-400">{category}</span>
+      <span className="text-[10px] font-medium text-slate-300">{count}</span>
     </div>
   );
 }
 
 function CookieItem({ cookie }: { cookie: CookieResult }) {
-  const [expanded, setExpanded] = useState(false);
-
   return (
-    <div className="bg-slate-800/50 rounded overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between text-xs p-2 hover:bg-slate-700/30"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-slate-300 font-mono truncate max-w-[150px]">{cookie.name}</span>
-          {cookie.isLongLived && <span className="text-orange-400" title="Lange Laufzeit">⏰</span>}
-          {cookie.isThirdParty && <span className="text-blue-400" title="Third-Party">🌐</span>}
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`px-2 py-0.5 rounded text-[10px] ${
-              cookie.category === 'necessary'
-                ? 'bg-green-500/20 text-green-400'
-                : cookie.category === 'analytics'
-                ? 'bg-yellow-500/20 text-yellow-400'
-                : cookie.category === 'marketing'
-                ? 'bg-red-500/20 text-red-400'
-                : cookie.category === 'functional'
-                ? 'bg-blue-500/20 text-blue-400'
-                : 'bg-slate-600 text-slate-400'
-            }`}
-          >
-            {cookie.category}
-          </span>
-          <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        </div>
-      </button>
-      {expanded && (
-        <div className="px-2 pb-2 text-[10px] text-slate-400 space-y-1 border-t border-slate-700/50 pt-2">
-          <p><span className="text-slate-500">Domain:</span> {cookie.domain}</p>
-          <p><span className="text-slate-500">Laufzeit:</span> {cookie.lifetimeDays !== undefined ? `${cookie.lifetimeDays} Tage` : 'Session'}</p>
-          {cookie.service && <p><span className="text-slate-500">Service:</span> {cookie.service}</p>}
-          <p><span className="text-slate-500">Secure:</span> {cookie.secure ? 'Ja' : 'Nein'} | <span className="text-slate-500">HttpOnly:</span> {cookie.httpOnly ? 'Ja' : 'Nein'}</p>
-        </div>
-      )}
+    <div className="flex items-center justify-between text-[10px] p-1 bg-slate-800/30 rounded">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="text-slate-300 font-mono truncate max-w-[120px]">{cookie.name}</span>
+        {cookie.isThirdParty && <span className="text-blue-400">3rd</span>}
+      </div>
+      <span className={`px-1 py-0.5 rounded text-[9px] ${
+        cookie.category === 'necessary' ? 'bg-green-500/20 text-green-400' :
+        cookie.category === 'analytics' ? 'bg-yellow-500/20 text-yellow-400' :
+        cookie.category === 'marketing' ? 'bg-red-500/20 text-red-400' :
+        'bg-slate-600 text-slate-400'
+      }`}>
+        {cookie.category === 'necessary' ? 'N' : cookie.category === 'analytics' ? 'A' : cookie.category === 'marketing' ? 'M' : '?'}
+      </span>
     </div>
   );
 }
@@ -985,8 +775,6 @@ function ConsentTestPhase({
   cookieCount,
   trackingFound,
   newCookies,
-  buttonFound,
-  clickSuccessful,
   status,
 }: {
   phase: string;
@@ -998,21 +786,20 @@ function ConsentTestPhase({
   status: 'good' | 'bad' | 'neutral';
 }) {
   return (
-    <div className={`p-2 rounded-lg border ${
+    <div className={`p-1.5 rounded border text-center ${
       status === 'good' ? 'bg-green-500/10 border-green-500/30' :
       status === 'bad' ? 'bg-red-500/10 border-red-500/30' :
       'bg-slate-700/50 border-slate-600'
     }`}>
-      <p className="text-xs font-medium text-slate-300 mb-1">{phase}</p>
-      <p className="text-lg font-bold text-slate-200">{cookieCount}</p>
-      <p className="text-[10px] text-slate-500">Cookies</p>
+      <p className="text-[10px] text-slate-400">{phase}</p>
+      <p className="text-sm font-bold text-slate-200">{cookieCount}</p>
       {trackingFound !== undefined && (
-        <p className={`text-[10px] mt-1 ${trackingFound ? 'text-red-400' : 'text-green-400'}`}>
-          {trackingFound ? '⚠️ Tracking!' : '✓ Kein Tracking'}
+        <p className={`text-[9px] ${trackingFound ? 'text-red-400' : 'text-green-400'}`}>
+          {trackingFound ? '⚠️' : '✓'}
         </p>
       )}
-      {newCookies !== undefined && (
-        <p className="text-[10px] text-slate-500 mt-1">+{newCookies} neue</p>
+      {newCookies !== undefined && newCookies > 0 && (
+        <p className="text-[9px] text-slate-500">+{newCookies}</p>
       )}
     </div>
   );
@@ -1022,11 +809,11 @@ function IssueItem({ issue }: { issue: Issue }) {
   const getIcon = () => {
     switch (issue.severity) {
       case 'error':
-        return <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />;
+        return <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />;
       case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />;
+        return <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 flex-shrink-0" />;
       case 'info':
-        return <Info className="w-4 h-4 text-blue-400 flex-shrink-0" />;
+        return <Info className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />;
     }
   };
 
@@ -1042,14 +829,14 @@ function IssueItem({ issue }: { issue: Issue }) {
   };
 
   return (
-    <div className={`p-3 bg-slate-800 rounded border-l-2 ${getBorderColor()}`}>
+    <div className={`p-2 bg-slate-800/50 rounded border-l-2 ${getBorderColor()}`}>
       <div className="flex items-start gap-2">
         {getIcon()}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-200">{issue.title}</p>
-          <p className="text-xs text-slate-400 mt-1">{issue.description}</p>
+          <p className="text-xs font-medium text-slate-200">{issue.title}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">{issue.description}</p>
           {issue.recommendation && (
-            <p className="text-xs text-indigo-400 mt-2">💡 {issue.recommendation}</p>
+            <p className="text-[10px] text-indigo-400 mt-1">💡 {issue.recommendation}</p>
           )}
         </div>
       </div>
