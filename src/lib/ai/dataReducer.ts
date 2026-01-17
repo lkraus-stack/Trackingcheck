@@ -283,21 +283,8 @@ export function reduceForSection(
       return {
         ...base,
         cookieBanner: data.cookieBanner,
-        cookieConsentTest: data.cookieConsentTest ? {
-          analysis: data.cookieConsentTest.analysis,
-          beforeConsent: {
-            cookieCount: data.cookieConsentTest.beforeConsent.cookieCount,
-            trackingCookiesFound: data.cookieConsentTest.beforeConsent.trackingCookiesFound,
-          },
-          afterAccept: {
-            cookieCount: data.cookieConsentTest.afterAccept.cookieCount,
-            clickSuccessful: data.cookieConsentTest.afterAccept.clickSuccessful,
-          },
-          afterReject: {
-            cookieCount: data.cookieConsentTest.afterReject.cookieCount,
-            clickSuccessful: data.cookieConsentTest.afterReject.clickSuccessful,
-          },
-        } : undefined,
+        // cookieConsentTest nicht inkludiert - würde große Arrays benötigen
+        // Nur die Zusammenfassung ist verfügbar über cookieBanner-Ergebnisse
         cookies: data.cookies?.slice(0, 20),
       };
 
