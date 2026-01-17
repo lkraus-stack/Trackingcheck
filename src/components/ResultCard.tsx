@@ -83,7 +83,7 @@ export function ResultCard({ result }: ResultCardProps) {
     });
 
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-2 space-y-3">
       {/* Score Card - Compact */}
       <div className={`bg-gradient-to-r ${getScoreBackground(result.score)} rounded-lg p-3 border border-slate-700`}>
         <div className="flex items-center justify-between">
@@ -127,8 +127,8 @@ export function ResultCard({ result }: ResultCardProps) {
           sectionData={result.cookieConsentTest}
           fullAnalysis={result}
         >
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-1.5">
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-3 gap-2">
               <ConsentTestPhase
                 phase="Vorher"
                 cookieCount={result.cookieConsentTest.beforeConsent.cookieCount}
@@ -155,7 +155,7 @@ export function ResultCard({ result }: ResultCardProps) {
             </div>
             
             {result.cookieConsentTest.analysis.trackingBeforeConsent && (
-              <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
+              <div className="p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400">
                 ⚠️ Tracking vor Consent erkannt - DSGVO-Verstoß
               </div>
             )}
@@ -174,7 +174,7 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.cookieBanner}
         fullAnalysis={result}
       >
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
           <StatusItem label="Erkannt" value={result.cookieBanner.detected} />
           <StatusItem label="Provider" value={result.cookieBanner.provider || '?'} isText />
           <StatusItem label="Akzeptieren" value={result.cookieBanner.hasAcceptButton} />
@@ -195,17 +195,17 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.googleConsentMode}
         fullAnalysis={result}
       >
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+        <div className="space-y-3 pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <StatusItem label="Erkannt" value={result.googleConsentMode.detected} />
             <StatusItem label="Version" value={result.googleConsentMode.version || '?'} isText highlight={result.googleConsentMode.version === 'v2'} />
             <StatusItem label="Update" value={result.googleConsentMode.updateConsent?.detected || false} />
             <StatusItem label="Wait" value={result.googleConsentMode.waitForUpdate?.detected || false} />
           </div>
 
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {Object.entries(result.googleConsentMode.parameters).map(([key, value]) => (
-              <span key={key} className={`px-1.5 py-0.5 rounded text-[10px] ${value ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'}`}>
+              <span key={key} className={`px-2 py-1 rounded text-xs ${value ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-500'}`}>
                 {key}
               </span>
             ))}
@@ -299,7 +299,7 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={result.trackingTags}
         fullAnalysis={result}
       >
-        <div className="space-y-1.5">
+        <div className="space-y-2 pt-1">
           <TrackingItem name="GA4" detected={result.trackingTags.googleAnalytics.detected} identifier={result.trackingTags.googleAnalytics.measurementIds?.[0]} badge={result.trackingTags.googleAnalytics.version} />
           <TrackingItem name="GTM" detected={result.trackingTags.googleTagManager.detected} identifier={result.trackingTags.googleTagManager.containerId} />
           {result.trackingTags.googleAdsConversion?.detected && <TrackingItem name="Google Ads" detected={true} identifier={result.trackingTags.googleAdsConversion.conversionId} />}
@@ -308,10 +308,10 @@ export function ResultCard({ result }: ResultCardProps) {
           {result.trackingTags.tiktokPixel.detected && <TrackingItem name="TikTok" detected={true} identifier={result.trackingTags.tiktokPixel.pixelId} />}
           
           {result.trackingTags.serverSideTracking?.detected && (
-            <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-700/50 mt-1">
-              <span className="text-[10px] text-slate-500 mr-1">Server-Side:</span>
-              {result.trackingTags.serverSideTracking.summary.hasServerSideGTM && <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px]">sGTM</span>}
-              {result.trackingTags.serverSideTracking.summary.hasMetaCAPI && <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px]">CAPI</span>}
+            <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-700/50 mt-2">
+              <span className="text-xs text-slate-400 mr-1">Server-Side:</span>
+              {result.trackingTags.serverSideTracking.summary.hasServerSideGTM && <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">sGTM</span>}
+              {result.trackingTags.serverSideTracking.summary.hasMetaCAPI && <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">CAPI</span>}
             </div>
           )}
         </div>
@@ -391,9 +391,9 @@ export function ResultCard({ result }: ResultCardProps) {
         sectionData={{ cookies: result.cookies, count: result.cookies.length }}
         fullAnalysis={result}
       >
-        <div className="space-y-2">
+        <div className="space-y-3 pt-1">
           {/* Cookie Categories Summary - Compact */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             <CookieCategorySummary category="Notw." count={result.cookies.filter((c) => c.category === 'necessary').length} color="bg-green-500" />
             <CookieCategorySummary category="Analytics" count={result.cookies.filter((c) => c.category === 'analytics').length} color="bg-yellow-500" />
             <CookieCategorySummary category="Marketing" count={result.cookies.filter((c) => c.category === 'marketing').length} color="bg-red-500" />
@@ -401,7 +401,7 @@ export function ResultCard({ result }: ResultCardProps) {
           </div>
 
           {/* Filter Row */}
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
               <input
@@ -409,13 +409,13 @@ export function ResultCard({ result }: ResultCardProps) {
                 placeholder="Suchen..."
                 value={cookieSearch}
                 onChange={(e) => setCookieSearch(e.target.value)}
-                className="w-full pl-7 pr-2 py-1 bg-slate-800/50 border border-slate-700 rounded text-[10px] text-slate-200"
+                className="w-full pl-7 pr-2 py-1.5 bg-slate-800/50 border border-slate-700 rounded text-xs text-slate-200"
               />
             </div>
             <select
               value={cookieFilter}
               onChange={(e) => setCookieFilter(e.target.value)}
-              className="px-2 py-1 bg-slate-800/50 border border-slate-700 rounded text-[10px] text-slate-200"
+              className="px-2 py-1.5 bg-slate-800/50 border border-slate-700 rounded text-xs text-slate-200"
             >
               <option value="all">Alle</option>
               <option value="marketing">Marketing</option>
@@ -424,12 +424,12 @@ export function ResultCard({ result }: ResultCardProps) {
           </div>
 
           {/* Cookie List */}
-          <div className="max-h-32 overflow-y-auto space-y-0.5">
+          <div className="max-h-32 overflow-y-auto space-y-1">
             {filteredCookies.slice(0, 10).map((cookie, index) => (
               <CookieItem key={index} cookie={cookie} />
             ))}
             {filteredCookies.length > 10 && (
-              <p className="text-[10px] text-slate-500 text-center py-1">+{filteredCookies.length - 10} weitere</p>
+              <p className="text-xs text-slate-500 text-center py-1.5">+{filteredCookies.length - 10} weitere</p>
             )}
           </div>
         </div>
@@ -622,13 +622,13 @@ function Section({
     <div className="bg-slate-800/40 rounded-lg border border-slate-700/50 overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-2 hover:bg-slate-700/30 transition-colors"
+        className="w-full flex items-center justify-between p-2.5 hover:bg-slate-700/30 transition-colors"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className={`shrink-0 ${statusColor || (status ? 'text-green-400' : 'text-slate-500')}`}>
             {icon}
           </span>
-          <span className="font-medium text-slate-200 text-xs sm:text-sm truncate">{title}</span>
+          <span className="font-medium text-slate-200 text-sm sm:text-base truncate">{title}</span>
           {sectionName && (
             <SectionInfoPopup
               sectionName={sectionName}
@@ -651,7 +651,7 @@ function Section({
           )}
         </div>
       </button>
-      {expanded && <div className="px-2 pb-2">{children}</div>}
+      {expanded && <div className="px-3 pb-3 border-t border-slate-700/30">{children}</div>}
     </div>
   );
 }
@@ -681,8 +681,8 @@ function StatusItem({
   const isPositive = isBoolean ? (invertColor ? !value : value) : false;
 
   return (
-    <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded text-xs">
-      <span className="text-slate-400">{label}</span>
+    <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-slate-700/30 text-xs">
+      <span className="text-slate-400 font-medium">{label}</span>
       {isText ? (
         <span className={`font-medium ${highlight ? 'text-green-400' : 'text-slate-300'}`}>
           {value}
@@ -710,7 +710,7 @@ function TrackingItem({
   extraCount?: number;
 }) {
   return (
-    <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
+    <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
       <div className="flex items-center gap-1.5">
         {detected ? (
           <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
@@ -725,7 +725,7 @@ function TrackingItem({
         )}
       </div>
       {identifier && (
-        <span className="text-[10px] text-slate-500 font-mono">
+        <span className="text-xs text-slate-400 font-mono">
           {identifier}{extraCount ? ` +${extraCount}` : ''}
         </span>
       )}
@@ -743,22 +743,22 @@ function CookieCategorySummary({
   color: string;
 }) {
   return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-slate-800/50 rounded">
-      <div className={`w-1.5 h-1.5 rounded-full ${color}`} />
-      <span className="text-[10px] text-slate-400">{category}</span>
-      <span className="text-[10px] font-medium text-slate-300">{count}</span>
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800/50 rounded-lg border border-slate-700/30">
+      <div className={`w-2 h-2 rounded-full ${color}`} />
+      <span className="text-xs text-slate-400">{category}</span>
+      <span className="text-xs font-medium text-slate-300">{count}</span>
     </div>
   );
 }
 
 function CookieItem({ cookie }: { cookie: CookieResult }) {
   return (
-    <div className="flex items-center justify-between text-[10px] p-1 bg-slate-800/30 rounded">
+    <div className="flex items-center justify-between text-xs p-1.5 bg-slate-800/30 rounded border border-slate-700/20">
       <div className="flex items-center gap-1.5 min-w-0">
-        <span className="text-slate-300 font-mono truncate max-w-[120px]">{cookie.name}</span>
-        {cookie.isThirdParty && <span className="text-blue-400">3rd</span>}
+        <span className="text-slate-300 font-mono truncate max-w-[140px]">{cookie.name}</span>
+        {cookie.isThirdParty && <span className="text-blue-400 text-[10px]">3rd</span>}
       </div>
-      <span className={`px-1 py-0.5 rounded text-[9px] ${
+      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
         cookie.category === 'necessary' ? 'bg-green-500/20 text-green-400' :
         cookie.category === 'analytics' ? 'bg-yellow-500/20 text-yellow-400' :
         cookie.category === 'marketing' ? 'bg-red-500/20 text-red-400' :
@@ -786,20 +786,20 @@ function ConsentTestPhase({
   status: 'good' | 'bad' | 'neutral';
 }) {
   return (
-    <div className={`p-1.5 rounded border text-center ${
+    <div className={`p-2.5 rounded-lg border-2 text-center ${
       status === 'good' ? 'bg-green-500/10 border-green-500/30' :
       status === 'bad' ? 'bg-red-500/10 border-red-500/30' :
       'bg-slate-700/50 border-slate-600'
     }`}>
-      <p className="text-[10px] text-slate-400">{phase}</p>
-      <p className="text-sm font-bold text-slate-200">{cookieCount}</p>
+      <p className="text-xs text-slate-400 font-medium mb-1">{phase}</p>
+      <p className="text-base font-bold text-slate-200">{cookieCount}</p>
       {trackingFound !== undefined && (
-        <p className={`text-[9px] ${trackingFound ? 'text-red-400' : 'text-green-400'}`}>
+        <p className={`text-xs mt-1 ${trackingFound ? 'text-red-400' : 'text-green-400'}`}>
           {trackingFound ? '⚠️' : '✓'}
         </p>
       )}
       {newCookies !== undefined && newCookies > 0 && (
-        <p className="text-[9px] text-slate-500">+{newCookies}</p>
+        <p className="text-xs text-slate-400 mt-1">+{newCookies}</p>
       )}
     </div>
   );

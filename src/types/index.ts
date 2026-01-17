@@ -3,7 +3,8 @@
 export interface AnalysisResult {
   url: string;
   timestamp: string;
-  status: 'success' | 'error' | 'pending';
+  status: 'success' | 'error' | 'pending' | 'partial';
+  scanMode?: 'full' | 'quick';
   
   // Cookie Banner / CMP
   cookieBanner: CookieBannerResult;

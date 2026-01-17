@@ -286,9 +286,10 @@ export class WebCrawler {
 
     try {
       // Seite laden und warten bis alles geladen ist
+      // Timeout reduziert auf 25 Sekunden für bessere Performance
       await page.goto(url, {
         waitUntil: 'networkidle2',
-        timeout: 30000,
+        timeout: 25000,
       });
 
       // Erweiterte Wartezeit für GTM und dynamisch geladene Pixel
@@ -930,8 +931,9 @@ export class WebCrawler {
     await this.setupPage(pageAccept);
     
     try {
-      await pageAccept.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Reduzierte Timeouts für Cookie-Consent-Test
+      await pageAccept.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Cookies VOR jeder Interaktion sammeln
       const cookiesBefore = await pageAccept.cookies();
@@ -945,7 +947,7 @@ export class WebCrawler {
 
       // Warten auf Cookie-Änderungen
       if (acceptResult.clicked) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
       // Cookies NACH Akzeptieren sammeln
@@ -965,8 +967,9 @@ export class WebCrawler {
     await client.send('Network.clearBrowserCookies');
     
     try {
-      await pageReject.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Reduzierte Timeouts für Cookie-Consent-Test (Reject)
+      await pageReject.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Ablehnen-Button finden und klicken
       const rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
@@ -982,7 +985,7 @@ export class WebCrawler {
           result.afterReject.buttonText = saveResult.buttonText;
           
           if (saveResult.clicked) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1500));
             const cookiesAfterSave = await pageReject.cookies();
             result.afterReject.cookies = cookiesAfterSave.map(c => this.mapCookie(c));
           }
@@ -998,7 +1001,7 @@ export class WebCrawler {
 
         // Warten auf Cookie-Änderungen
         if (rejectResult.clicked) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
 
         // Cookies NACH Ablehnen sammeln
