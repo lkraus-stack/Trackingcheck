@@ -105,7 +105,7 @@ export function addToHistory(result: AnalysisResult): void {
       url: result.url,
       timestamp: result.timestamp,
       score: result.score,
-      status: result.status === 'pending' ? 'success' : result.status,
+      status: result.status === 'error' ? 'error' : 'success',
       summary: {
         cookieBannerDetected: result.cookieBanner.detected,
         consentModeVersion: result.googleConsentMode.version,
