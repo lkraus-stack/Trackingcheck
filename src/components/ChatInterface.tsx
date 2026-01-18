@@ -7,6 +7,7 @@ import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
 import { SetupWizard } from './SetupWizard';
 import { ExpertRecommendation } from './ExpertRecommendation';
+import { UpgradePrompt } from './UpgradePrompt';
 import { getAnalysisHistory, addToHistory, removeFromHistory, clearHistory } from '@/lib/cache/analysisCache';
 import { saveAnalysis } from '@/lib/storage/projectStorage';
 
@@ -24,6 +25,10 @@ interface Message {
     details?: string;
   };
   fromCache?: boolean;
+  upgradeRequired?: boolean;
+  currentUsage?: number;
+  limit?: number;
+  resetDate?: string;
 }
 
 interface ChatInterfaceProps {
@@ -185,6 +190,19 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       }
 
       if (!response.ok) {
+        // Check if it's a limit error (429)
+        if (response.status === 429 && data.upgradeRequired) {
+          throw {
+            type: data.error || 'Limit erreicht',
+            message: data.details || 'Analyse-Limit erreicht',
+            technical: data.technicalError,
+            upgradeRequired: true,
+            currentUsage: data.currentUsage,
+            limit: data.limit,
+            resetDate: data.resetDate,
+          };
+        }
+        
         throw {
           type: data.error || 'Analyse fehlgeschlagen',
           message: data.details || 'Ein unbekannter Fehler ist aufgetreten.',
@@ -224,7 +242,15 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         )
       );
     } catch (error) {
-      const errorInfo = error as { type?: string; message?: string; technical?: string };
+      const errorInfo = error as { 
+        type?: string; 
+        message?: string; 
+        technical?: string;
+        upgradeRequired?: boolean;
+        currentUsage?: number;
+        limit?: number;
+        resetDate?: string;
+      };
       
       setMessages((prev) =>
         prev.map((msg) =>
@@ -238,6 +264,10 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                   message: errorInfo.message || 'Unbekannter Fehler',
                   details: errorInfo.technical,
                 },
+                upgradeRequired: errorInfo.upgradeRequired,
+                currentUsage: errorInfo.currentUsage,
+                limit: errorInfo.limit,
+                resetDate: errorInfo.resetDate,
               }
             : msg
         )
@@ -311,24 +341,37 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                   </div>
                 </div>
               ) : message.error ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <XCircle className="w-5 h-5 text-red-400" />
-                    <span className="font-medium text-red-400">{message.error.type}</span>
-                  </div>
-                  <p className="text-sm text-slate-300">{message.error.message}</p>
-                  {message.error.details && (
-                    <p className="text-xs text-slate-500 mt-2 font-mono bg-slate-900/50 p-2 rounded">
-                      {message.error.details}
-                    </p>
+                <div className="space-y-3">
+                  {message.upgradeRequired ? (
+                    <UpgradePrompt
+                      type="limit-reached"
+                      message={message.error.message}
+                      currentUsage={message.currentUsage}
+                      limit={message.limit}
+                      plan="free"
+                      showDismiss={true}
+                    />
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <XCircle className="w-5 h-5 text-red-400" />
+                        <span className="font-medium text-red-400">{message.error.type}</span>
+                      </div>
+                      <p className="text-sm text-slate-300">{message.error.message}</p>
+                      {message.error.details && (
+                        <p className="text-xs text-slate-500 mt-2 font-mono bg-slate-900/50 p-2 rounded">
+                          {message.error.details}
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent, messages[messages.length - 2]?.content)}
+                        className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Erneut versuchen
+                      </button>
+                    </>
                   )}
-                  <button
-                    onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent, messages[messages.length - 2]?.content)}
-                    className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    Erneut versuchen
-                  </button>
                 </div>
               ) : (
                 <>

@@ -1,0 +1,2980 @@
+{
+  "summaries": [
+    {
+      "url": "https://www.rhoen-park-hotel.de/",
+      "status": "success",
+      "score": 66,
+      "cookieBanner": {
+        "detected": true,
+        "provider": "Real Cookie Banner",
+        "hasAcceptButton": true,
+        "hasRejectButton": false,
+        "hasEssentialSaveButton": true,
+        "hasSettingsOption": true,
+        "blocksContent": true
+      },
+      "consentTest": {
+        "trackingBeforeConsent": false,
+        "consentWorksProperly": false,
+        "rejectWorksProperly": false,
+        "beforeCookieCount": 1,
+        "afterAcceptCookieCount": 1,
+        "afterRejectCookieCount": 0,
+        "issues": [
+          {
+            "severity": "warning",
+            "title": "Akzeptieren-Button nicht gefunden"
+          },
+          {
+            "severity": "warning",
+            "title": "Ablehnen-Button nicht gefunden"
+          }
+        ]
+      },
+      "trackingTags": {
+        "googleAnalytics": true,
+        "googleTagManager": false,
+        "googleAds": true,
+        "metaPixel": true,
+        "linkedIn": false,
+        "tiktok": false,
+        "pinterest": false,
+        "snapchat": false,
+        "twitter": false,
+        "bingAds": false,
+        "criteo": false
+      },
+      "issues": [
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Akzeptieren-Button nicht gefunden"
+        },
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Ablehnen-Button nicht gefunden"
+        },
+        {
+          "severity": "warning",
+          "category": "cookie-banner",
+          "title": "Keine Ablehnen-Option erkannt"
+        },
+        {
+          "severity": "warning",
+          "category": "tcf",
+          "title": "Kein gültiger TC String"
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "GOOGLE: Server-Side fehlt"
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "META: Server-Side fehlt"
+        },
+        {
+          "severity": "warning",
+          "category": "attribution",
+          "title": "Google Click IDs fehlen"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "Meta Click ID fehlt"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "UTM Parameter nicht sichtbar"
+        },
+        {
+          "severity": "error",
+          "category": "gtm",
+          "title": "Kein GTM erkannt"
+        },
+        {
+          "severity": "info",
+          "category": "privacy",
+          "title": "Keine Privacy Sandbox Signale erkannt"
+        }
+      ]
+    },
+    {
+      "url": "https://www.franco-consulting.com/",
+      "status": "success",
+      "score": 46,
+      "cookieBanner": {
+        "detected": true,
+        "provider": "Usercentrics",
+        "hasAcceptButton": true,
+        "hasRejectButton": false,
+        "hasEssentialSaveButton": false,
+        "hasSettingsOption": true,
+        "blocksContent": true
+      },
+      "consentTest": {
+        "trackingBeforeConsent": false,
+        "consentWorksProperly": false,
+        "rejectWorksProperly": false,
+        "beforeCookieCount": 0,
+        "afterAcceptCookieCount": 0,
+        "afterRejectCookieCount": 0,
+        "issues": [
+          {
+            "severity": "warning",
+            "title": "Akzeptieren-Button nicht gefunden"
+          },
+          {
+            "severity": "warning",
+            "title": "Ablehnen-Button nicht gefunden"
+          }
+        ]
+      },
+      "trackingTags": {
+        "googleAnalytics": true,
+        "googleTagManager": true,
+        "googleAds": false,
+        "metaPixel": true,
+        "linkedIn": false,
+        "tiktok": false,
+        "pinterest": false,
+        "snapchat": false,
+        "twitter": false,
+        "bingAds": true,
+        "criteo": false
+      },
+      "issues": [
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Akzeptieren-Button nicht gefunden"
+        },
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Ablehnen-Button nicht gefunden"
+        },
+        {
+          "severity": "warning",
+          "category": "cookie-banner",
+          "title": "Keine Ablehnen-Option erkannt"
+        },
+        {
+          "severity": "warning",
+          "category": "consent-mode",
+          "title": "Consent Mode Update nicht erkannt"
+        },
+        {
+          "severity": "warning",
+          "category": "consent-mode",
+          "title": "Fehlende Consent Mode v2 Parameter"
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "GOOGLE: Server-Side fehlt"
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "META: Server-Side fehlt"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "Meta Click ID fehlt"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "UTM Parameter nicht sichtbar"
+        },
+        {
+          "severity": "warning",
+          "category": "gtm",
+          "title": "GTM nicht im Head"
+        },
+        {
+          "severity": "warning",
+          "category": "gtm",
+          "title": "Consent Default nach GTM"
+        },
+        {
+          "severity": "info",
+          "category": "privacy",
+          "title": "Keine Privacy Sandbox Signale erkannt"
+        },
+        {
+          "severity": "error",
+          "category": "gdpr",
+          "title": "DSGVO: Gleichwertige Ablehnen-Option"
+        },
+        {
+          "severity": "warning",
+          "category": "dma",
+          "title": "DMA: Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)"
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "url": "https://www.rhoen-park-hotel.de/",
+      "timestamp": "2026-01-17T14:55:21.567Z",
+      "status": "success",
+      "cookieBanner": {
+        "detected": true,
+        "provider": "Real Cookie Banner",
+        "hasAcceptButton": true,
+        "hasRejectButton": false,
+        "hasEssentialSaveButton": true,
+        "hasSettingsOption": true,
+        "blocksContent": true,
+        "hasPrivacyPolicyLink": true
+      },
+      "tcf": {
+        "detected": true,
+        "validTcString": false
+      },
+      "googleConsentMode": {
+        "detected": true,
+        "version": "v2",
+        "updateConsent": {
+          "detected": true,
+          "triggeredAfterBanner": true,
+          "updateTrigger": "unknown"
+        },
+        "parameters": {
+          "ad_storage": true,
+          "analytics_storage": true,
+          "ad_user_data": true,
+          "ad_personalization": true,
+          "functionality_storage": true,
+          "personalization_storage": true,
+          "security_storage": true
+        },
+        "regionSettings": {
+          "detected": true,
+          "regions": [
+            "EU"
+          ]
+        },
+        "waitForUpdate": {
+          "detected": true
+        }
+      },
+      "trackingTags": {
+        "googleAnalytics": {
+          "detected": true,
+          "version": "GA4",
+          "measurementId": "G-27S6ZZSFH5",
+          "measurementIds": [
+            "G-27S6ZZSFH5"
+          ],
+          "hasMultipleMeasurementIds": false,
+          "hasLegacyUA": false,
+          "loadedViaGTM": false
+        },
+        "googleTagManager": {
+          "detected": false,
+          "containerId": "GTM-NQ7DT2D",
+          "containerIds": [
+            "GTM-NQ7DT2D"
+          ],
+          "hasMultipleContainers": false,
+          "serverSideGTM": {
+            "detected": false,
+            "isFirstParty": false,
+            "firstPartyCookies": []
+          }
+        },
+        "googleAdsConversion": {
+          "detected": true,
+          "conversionId": "AW-10821618767",
+          "conversionIds": [
+            "AW-10821618767"
+          ],
+          "hasRemarketing": false,
+          "loadedViaGTM": false
+        },
+        "metaPixel": {
+          "detected": true,
+          "pixelIds": [],
+          "hasMultiplePixels": false,
+          "loadedViaGTM": false,
+          "detectionMethod": [
+            "script",
+            "dataLayer"
+          ],
+          "serverSide": {
+            "detected": false,
+            "hasConversionsAPI": false,
+            "eventIds": [],
+            "indicators": [],
+            "hasDedupe": false
+          }
+        },
+        "linkedInInsight": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "tiktokPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "pinterestTag": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "snapchatPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "twitterPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "redditPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "bingAds": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "criteo": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "other": [],
+        "marketingParameters": {
+          "gclid": false,
+          "dclid": false,
+          "wbraid": false,
+          "pbraid": false,
+          "fbclid": false,
+          "msclkid": false,
+          "ttclid": false,
+          "li_fat_id": false,
+          "utm": false,
+          "any": false
+        },
+        "serverSideTracking": {
+          "detected": false,
+          "indicators": [],
+          "firstPartyEndpoints": [],
+          "cookieBridging": {
+            "detected": false,
+            "confidence": "low",
+            "cookies": [],
+            "indicators": []
+          },
+          "summary": {
+            "hasServerSideGTM": false,
+            "hasMetaCAPI": false,
+            "hasFirstPartyProxy": false,
+            "hasTikTokEventsAPI": false,
+            "hasLinkedInCAPI": false,
+            "hasCookieBridging": false
+          }
+        }
+      },
+      "cookies": [
+        {
+          "name": "_lscache_vary",
+          "value": "eb28c90d1e291ce794c46a0945115f5d",
+          "domain": "www.rhoen-park-hotel.de",
+          "path": "/",
+          "expires": "2026-01-19T14:54:55.840Z",
+          "httpOnly": true,
+          "secure": true,
+          "category": "unknown",
+          "lifetimeDays": 2,
+          "isLongLived": false,
+          "isThirdParty": true
+        }
+      ],
+      "cookieConsentTest": {
+        "beforeConsent": {
+          "cookies": [
+            {
+              "name": "_lscache_vary",
+              "value": "eb28c90d1e291ce794c46a0945115f5d",
+              "domain": "www.rhoen-park-hotel.de",
+              "path": "/",
+              "expires": "2026-01-19T14:54:55.840Z",
+              "httpOnly": true,
+              "secure": true,
+              "category": "unknown",
+              "lifetimeDays": 2,
+              "isLongLived": false,
+              "isThirdParty": true
+            }
+          ],
+          "cookieCount": 1,
+          "trackingCookiesFound": false
+        },
+        "afterAccept": {
+          "cookies": [
+            {
+              "name": "_lscache_vary",
+              "value": "eb28c90d1e291ce794c46a0945115f5d",
+              "domain": "www.rhoen-park-hotel.de",
+              "path": "/",
+              "expires": "2026-01-19T14:54:55.840Z",
+              "httpOnly": true,
+              "secure": true,
+              "category": "unknown",
+              "lifetimeDays": 2,
+              "isLongLived": false,
+              "isThirdParty": true
+            }
+          ],
+          "cookieCount": 1,
+          "newCookies": [],
+          "clickSuccessful": false,
+          "buttonFound": false
+        },
+        "afterReject": {
+          "cookies": [],
+          "cookieCount": 0,
+          "newCookies": [],
+          "clickSuccessful": false,
+          "buttonFound": false
+        },
+        "analysis": {
+          "consentWorksProperly": false,
+          "rejectWorksProperly": false,
+          "trackingBeforeConsent": false,
+          "issues": [
+            {
+              "severity": "warning",
+              "title": "Akzeptieren-Button nicht gefunden",
+              "description": "Der Akzeptieren-Button konnte nicht automatisch erkannt werden."
+            },
+            {
+              "severity": "warning",
+              "title": "Ablehnen-Button nicht gefunden",
+              "description": "Der Ablehnen-Button konnte nicht automatisch erkannt werden. Möglicherweise ist keine einfache Ablehnung möglich."
+            }
+          ]
+        }
+      },
+      "dataLayerAnalysis": {
+        "hasDataLayer": true,
+        "events": [],
+        "ecommerce": {
+          "detected": false,
+          "platform": "unknown",
+          "events": [],
+          "valueTracking": {
+            "hasTransactionValue": true,
+            "hasCurrency": false,
+            "hasItemData": false,
+            "hasUserData": false,
+            "valueParameters": [
+              "value"
+            ],
+            "missingRecommended": []
+          },
+          "issues": []
+        },
+        "customDimensions": [
+          "cd06",
+          "cd2",
+          "cd1",
+          "cd5219",
+          "cd73146",
+          "custom_",
+          "Cd0",
+          "cd3"
+        ],
+        "userProperties": [],
+        "rawDataLayer": [
+          {
+            "index": 0,
+            "data": {
+              "0": "set",
+              "1": "url_passthrough",
+              "2": true
+            },
+            "type": "custom",
+            "hasEcommerce": false,
+            "hasConsent": false
+          },
+          {
+            "index": 1,
+            "data": {
+              "0": "set",
+              "1": "ads_data_redaction",
+              "2": true
+            },
+            "type": "custom",
+            "hasEcommerce": false,
+            "hasConsent": false
+          },
+          {
+            "index": 2,
+            "data": {
+              "0": "consent",
+              "1": "default",
+              "2": {
+                "ad_storage": "denied",
+                "ad_user_data": "denied",
+                "ad_personalization": "denied",
+                "analytics_storage": "denied",
+                "functionality_storage": "denied",
+                "personalization_storage": "denied",
+                "security_storage": "denied",
+                "ally-barrierefreiheitsplugin": "denied",
+                "chat": "denied",
+                "4bowl": "denied",
+                "elementor-popups": "denied",
+                "wordpress-emojis": "denied",
+                "youtube": "denied",
+                "pixelyoursite": "denied",
+                "google-analytics-analytics-4": "denied",
+                "facebook-pixel": "denied",
+                "google-ads-conversion-tracking": "denied",
+                "wait_for_update": 1000
+              }
+            },
+            "type": "consent",
+            "hasEcommerce": false,
+            "hasConsent": true
+          }
+        ]
+      },
+      "thirdPartyDomains": {
+        "totalCount": 1,
+        "domains": [
+          {
+            "domain": "",
+            "category": "unknown",
+            "requestCount": 25,
+            "cookiesSet": 0,
+            "dataTypes": [
+              "image",
+              "script"
+            ]
+          }
+        ],
+        "categories": {
+          "advertising": 0,
+          "analytics": 0,
+          "social": 0,
+          "cdn": 0,
+          "functional": 0,
+          "unknown": 1
+        },
+        "riskAssessment": {
+          "highRiskDomains": [],
+          "crossBorderTransfers": [],
+          "unknownDomains": [
+            ""
+          ]
+        }
+      },
+      "gdprChecklist": {
+        "score": 79,
+        "checks": [
+          {
+            "id": "consent_banner",
+            "category": "consent",
+            "title": "Cookie-Banner vorhanden",
+            "description": "Ein Cookie-Banner muss vor dem Setzen nicht-essentieller Cookies angezeigt werden.",
+            "legalReference": "Art. 6, Art. 7 DSGVO; § 25 TTDSG",
+            "recommendation": "Implementieren Sie einen DSGVO-konformen Cookie-Banner.",
+            "status": "passed",
+            "details": "Cookie-Banner erkannt (Real Cookie Banner)."
+          },
+          {
+            "id": "consent_reject_option",
+            "category": "consent",
+            "title": "Gleichwertige Ablehnen-Option",
+            "description": "Die Möglichkeit zur Ablehnung muss genauso einfach sein wie die Zustimmung.",
+            "legalReference": "Art. 7 Abs. 3 DSGVO; EuGH Planet49",
+            "recommendation": "Fügen Sie einen gleichwertigen \"Alle ablehnen\" Button hinzu.",
+            "status": "passed",
+            "details": "Essenziell-Speichern-Option im Banner gefunden (ersetzt Ablehnen-Button)."
+          },
+          {
+            "id": "consent_granular",
+            "category": "consent",
+            "title": "Granulare Einwilligung möglich",
+            "description": "Nutzer sollten einzelne Cookie-Kategorien auswählen können.",
+            "legalReference": "Art. 7 DSGVO; ErwGr. 32",
+            "recommendation": "Ermöglichen Sie die separate Zustimmung für verschiedene Zwecke.",
+            "status": "passed",
+            "details": "Einstellungen-Option für granulare Kontrolle vorhanden."
+          },
+          {
+            "id": "consent_no_preselection",
+            "category": "consent",
+            "title": "Keine vorausgewählten Checkboxen",
+            "description": "Optionale Cookies dürfen nicht vorausgewählt sein.",
+            "legalReference": "EuGH Planet49 (C-673/17)",
+            "recommendation": "Stellen Sie sicher, dass Marketing-Cookies standardmäßig deaktiviert sind.",
+            "status": "warning",
+            "details": "Default Consent-Einstellungen nicht erkannt."
+          },
+          {
+            "id": "consent_before_tracking",
+            "category": "consent",
+            "title": "Keine Cookies vor Einwilligung",
+            "description": "Marketing/Analytics-Cookies dürfen erst nach Einwilligung gesetzt werden.",
+            "legalReference": "§ 25 Abs. 1 TTDSG; Art. 5 Abs. 3 ePrivacy-RL",
+            "recommendation": "Implementieren Sie Consent Mode und blockieren Sie Tracking bis zur Zustimmung.",
+            "status": "passed",
+            "details": "Keine Tracking-Cookies vor Einwilligung erkannt."
+          },
+          {
+            "id": "consent_withdrawal",
+            "category": "consent",
+            "title": "Widerruf der Einwilligung möglich",
+            "description": "Nutzer müssen ihre Einwilligung jederzeit widerrufen können.",
+            "legalReference": "Art. 7 Abs. 3 DSGVO",
+            "recommendation": "Bieten Sie einen dauerhaft zugänglichen Link zu Cookie-Einstellungen.",
+            "status": "passed",
+            "details": "Einstellungen-Option ermöglicht Widerruf."
+          },
+          {
+            "id": "transparency_purpose",
+            "category": "transparency",
+            "title": "Zweck der Datenverarbeitung erklärt",
+            "description": "Der Zweck jeder Datenverarbeitung muss klar kommuniziert werden.",
+            "legalReference": "Art. 13, Art. 14 DSGVO",
+            "recommendation": "Erklären Sie im Banner, wofür Cookies verwendet werden.",
+            "status": "warning",
+            "details": "Banner vorhanden - Zweckerklärung sollte manuell geprüft werden."
+          },
+          {
+            "id": "transparency_third_parties",
+            "category": "transparency",
+            "title": "Drittanbieter offengelegt",
+            "description": "Alle Drittanbieter, die Daten erhalten, müssen genannt werden.",
+            "legalReference": "Art. 13 Abs. 1 lit. e DSGVO",
+            "recommendation": "Listen Sie alle Tracking-Dienste und deren Zweck auf.",
+            "status": "warning",
+            "details": "1 Drittanbieter erkannt. Prüfen Sie die Offenlegung."
+          },
+          {
+            "id": "transparency_data_transfer",
+            "category": "transparency",
+            "title": "Internationale Datentransfers transparent",
+            "description": "Übermittlungen in Drittländer müssen offengelegt werden.",
+            "legalReference": "Art. 13 Abs. 1 lit. f DSGVO; Kapitel V DSGVO",
+            "recommendation": "Informieren Sie über US-Transfers und deren Rechtsgrundlage.",
+            "status": "passed",
+            "details": "Keine Drittland-Transfers erkannt."
+          },
+          {
+            "id": "data_min_necessary",
+            "category": "data_minimization",
+            "title": "Nur notwendige Daten",
+            "description": "Es sollten nur die für den Zweck erforderlichen Daten erhoben werden.",
+            "legalReference": "Art. 5 Abs. 1 lit. c DSGVO",
+            "recommendation": "Prüfen Sie, ob alle Tracking-Tags wirklich benötigt werden.",
+            "status": "passed",
+            "details": "2 Tracking-Dienst(e) erkannt."
+          },
+          {
+            "id": "data_min_retention",
+            "category": "data_minimization",
+            "title": "Angemessene Speicherdauer",
+            "description": "Cookie-Laufzeiten sollten nicht länger als notwendig sein.",
+            "legalReference": "Art. 5 Abs. 1 lit. e DSGVO",
+            "recommendation": "Reduzieren Sie Cookie-Laufzeiten auf maximal 13 Monate.",
+            "status": "passed",
+            "details": "Keine übermäßig langen Cookie-Laufzeiten erkannt."
+          },
+          {
+            "id": "security_https",
+            "category": "security",
+            "title": "Sichere Übertragung (HTTPS)",
+            "description": "Cookies sollten nur über HTTPS übertragen werden.",
+            "legalReference": "Art. 32 DSGVO",
+            "recommendation": "Setzen Sie das Secure-Flag für alle Cookies.",
+            "status": "passed",
+            "details": "Alle relevanten Cookies haben Secure-Flag."
+          },
+          {
+            "id": "security_same_site",
+            "category": "security",
+            "title": "SameSite-Attribut gesetzt",
+            "description": "Cookies sollten SameSite-Attribut haben.",
+            "legalReference": "Art. 32 DSGVO; Best Practice",
+            "recommendation": "Setzen Sie SameSite=Strict oder SameSite=Lax.",
+            "status": "passed",
+            "details": "SameSite-Attribute korrekt gesetzt."
+          },
+          {
+            "id": "rights_access",
+            "category": "rights",
+            "title": "Zugang zu Datenschutzinformationen",
+            "description": "Datenschutzerklärung muss leicht zugänglich sein.",
+            "legalReference": "Art. 12, Art. 13 DSGVO",
+            "recommendation": "Verlinken Sie die Datenschutzerklärung im Cookie-Banner.",
+            "status": "passed",
+            "details": "Datenschutzerklärung ist im Cookie-Banner verlinkt."
+          }
+        ],
+        "summary": {
+          "passed": 11,
+          "failed": 0,
+          "warnings": 3,
+          "notApplicable": 0
+        }
+      },
+      "dmaCheck": {
+        "applicable": true,
+        "gatekeepersDetected": [
+          "Google",
+          "Meta"
+        ],
+        "checks": [
+          {
+            "id": "dma_consent_google",
+            "gatekeeper": "Google",
+            "requirement": "Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)",
+            "status": "compliant",
+            "details": "Google Consent Mode v2 mit Update-Funktion implementiert."
+          },
+          {
+            "id": "dma_data_combination_google",
+            "gatekeeper": "Google",
+            "requirement": "Keine Datenkombination ohne Einwilligung (Art. 5(2) DMA)",
+            "status": "compliant",
+            "details": "Consent-Parameter für Datenkombination (ad_user_data, ad_personalization) implementiert."
+          },
+          {
+            "id": "dma_consent_meta",
+            "gatekeeper": "Meta",
+            "requirement": "Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)",
+            "status": "requires_review",
+            "details": "Cookie-Banner erkannt. Prüfen Sie die LDU-Integration.",
+            "recommendation": "Implementieren Sie Meta Limited Data Use (LDU) für EU-Nutzer."
+          },
+          {
+            "id": "dma_data_combination_meta",
+            "gatekeeper": "Meta",
+            "requirement": "Keine Datenkombination ohne Einwilligung (Art. 5(2) DMA)",
+            "status": "compliant",
+            "details": "Consent-Parameter für Datenkombination (ad_user_data, ad_personalization) implementiert."
+          },
+          {
+            "id": "dma_encryption_meta",
+            "gatekeeper": "Meta",
+            "requirement": "Verschlüsselung von Nutzerdaten (Best Practice)",
+            "status": "requires_review",
+            "details": "Nur Client-Side Pixel erkannt.",
+            "recommendation": "Erwägen Sie die Implementierung der Conversions API mit verschlüsselten Daten."
+          }
+        ],
+        "summary": {
+          "compliant": 3,
+          "nonCompliant": 0,
+          "requiresReview": 2
+        }
+      },
+      "score": 66,
+      "issues": [
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Akzeptieren-Button nicht gefunden",
+          "description": "Der Akzeptieren-Button konnte nicht automatisch erkannt werden."
+        },
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Ablehnen-Button nicht gefunden",
+          "description": "Der Ablehnen-Button konnte nicht automatisch erkannt werden. Möglicherweise ist keine einfache Ablehnung möglich."
+        },
+        {
+          "severity": "warning",
+          "category": "cookie-banner",
+          "title": "Keine Ablehnen-Option erkannt",
+          "description": "Der Cookie-Banner scheint keine einfache Möglichkeit zur Ablehnung zu bieten.",
+          "recommendation": "DSGVO erfordert eine gleichwertige Ablehnen-Option neben der Akzeptieren-Option."
+        },
+        {
+          "severity": "warning",
+          "category": "tcf",
+          "title": "Kein gültiger TC String",
+          "description": "TCF erkannt, aber kein gültiger TC String gefunden.",
+          "recommendation": "Stellen Sie sicher, dass der Consent Manager einen gültigen TC String generiert."
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "GOOGLE: Server-Side fehlt",
+          "description": "Nur Client-Side Tracking erkannt.",
+          "recommendation": "Geringere Datenqualität & Attribution"
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "META: Server-Side fehlt",
+          "description": "Nur Client-Side Tracking erkannt.",
+          "recommendation": "Geringere Datenqualität & Attribution"
+        },
+        {
+          "severity": "warning",
+          "category": "attribution",
+          "title": "Google Click IDs fehlen",
+          "description": "gclid/wbraid/pbraid nicht erkannt.",
+          "recommendation": "Schwache Google Ads Attribution"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "Meta Click ID fehlt",
+          "description": "fbclid/_fbc nicht erkannt.",
+          "recommendation": "Schwächere Meta Attribution"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "UTM Parameter nicht sichtbar",
+          "description": "UTM Parameter konnten nicht gefunden werden.",
+          "recommendation": "Kampagnen-Reporting unvollständig"
+        },
+        {
+          "severity": "error",
+          "category": "gtm",
+          "title": "Kein GTM erkannt",
+          "description": "Google Tag Manager wurde nicht gefunden.",
+          "recommendation": "Kein zentrales Tag-Management"
+        },
+        {
+          "severity": "info",
+          "category": "privacy",
+          "title": "Keine Privacy Sandbox Signale erkannt",
+          "description": "Es wurden keine Topics/Attribution/Protected Audience Signale erkannt.",
+          "recommendation": "Cookie-less Tracking Roadmap prüfen."
+        }
+      ],
+      "analysisSteps": [
+        {
+          "step": "init",
+          "status": "running",
+          "message": "Browser wird initialisiert...",
+          "timestamp": 1768661684627
+        },
+        {
+          "step": "init",
+          "status": "completed",
+          "message": "Browser bereit",
+          "timestamp": 1768661687897
+        },
+        {
+          "step": "validate",
+          "status": "running",
+          "message": "URL wird validiert...",
+          "timestamp": 1768661687897
+        },
+        {
+          "step": "validate",
+          "status": "completed",
+          "message": "URL: https://www.rhoen-park-hotel.de/",
+          "timestamp": 1768661687897
+        },
+        {
+          "step": "crawl",
+          "status": "running",
+          "message": "Website wird geladen und analysiert...",
+          "details": "Netzwerk-Requests, Cookies und Scripts werden erfasst",
+          "timestamp": 1768661687897
+        },
+        {
+          "step": "crawl",
+          "status": "completed",
+          "message": "162 Requests erfasst",
+          "timestamp": 1768661694376
+        },
+        {
+          "step": "analyze_banner",
+          "status": "running",
+          "message": "Cookie-Banner wird analysiert...",
+          "timestamp": 1768661694376
+        },
+        {
+          "step": "analyze_banner",
+          "status": "completed",
+          "message": "Banner erkannt: Real Cookie Banner",
+          "timestamp": 1768661694418
+        },
+        {
+          "step": "analyze_tcf",
+          "status": "running",
+          "message": "TCF Framework wird geprüft...",
+          "timestamp": 1768661694418
+        },
+        {
+          "step": "analyze_tcf",
+          "status": "completed",
+          "message": "TCF 2.x erkannt",
+          "timestamp": 1768661694432
+        },
+        {
+          "step": "analyze_consent_mode",
+          "status": "running",
+          "message": "Google Consent Mode wird analysiert...",
+          "timestamp": 1768661694432
+        },
+        {
+          "step": "analyze_consent_mode",
+          "status": "completed",
+          "message": "Consent Mode v2 erkannt (mit Update)",
+          "timestamp": 1768661694581
+        },
+        {
+          "step": "analyze_tracking",
+          "status": "running",
+          "message": "Tracking-Tags werden identifiziert...",
+          "timestamp": 1768661694581
+        },
+        {
+          "step": "analyze_tracking",
+          "status": "completed",
+          "message": "2 Tracking-Dienst(e) erkannt",
+          "timestamp": 1768661694662
+        },
+        {
+          "step": "analyze_datalayer",
+          "status": "running",
+          "message": "DataLayer und E-Commerce Events werden analysiert...",
+          "timestamp": 1768661694662
+        },
+        {
+          "step": "analyze_datalayer",
+          "status": "completed",
+          "message": "0 DataLayer Events",
+          "timestamp": 1768661694696
+        },
+        {
+          "step": "consent_test",
+          "status": "running",
+          "message": "Cookie-Consent wird getestet...",
+          "details": "Cookies vor und nach Banner-Interaktion werden verglichen",
+          "timestamp": 1768661694696
+        },
+        {
+          "step": "consent_test",
+          "status": "completed",
+          "message": "Consent-Test abgeschlossen",
+          "timestamp": 1768661721559
+        },
+        {
+          "step": "analyze_cookies",
+          "status": "running",
+          "message": "Cookies werden kategorisiert...",
+          "timestamp": 1768661721559
+        },
+        {
+          "step": "analyze_cookies",
+          "status": "completed",
+          "message": "1 Cookies kategorisiert",
+          "timestamp": 1768661721559
+        },
+        {
+          "step": "analyze_third_party",
+          "status": "running",
+          "message": "Drittanbieter-Domains werden analysiert...",
+          "timestamp": 1768661721559
+        },
+        {
+          "step": "analyze_third_party",
+          "status": "completed",
+          "message": "1 Third-Party Domains",
+          "timestamp": 1768661721560
+        },
+        {
+          "step": "analyze_gdpr",
+          "status": "running",
+          "message": "DSGVO-Compliance wird geprüft...",
+          "timestamp": 1768661721560
+        },
+        {
+          "step": "analyze_gdpr",
+          "status": "completed",
+          "message": "DSGVO Score: 79%",
+          "timestamp": 1768661721560
+        },
+        {
+          "step": "analyze_dma",
+          "status": "running",
+          "message": "DMA-Compliance wird geprüft...",
+          "timestamp": 1768661721560
+        },
+        {
+          "step": "analyze_dma",
+          "status": "completed",
+          "message": "2 Gatekeeper erkannt",
+          "timestamp": 1768661721560
+        },
+        {
+          "step": "analyze_performance",
+          "status": "running",
+          "message": "Performance Marketing Analyse läuft...",
+          "timestamp": 1768661721560
+        },
+        {
+          "step": "analyze_performance",
+          "status": "completed",
+          "message": "Event Quality: 70% | Conversion Audit: 52%",
+          "timestamp": 1768661721566
+        },
+        {
+          "step": "generate_issues",
+          "status": "running",
+          "message": "Probleme und Empfehlungen werden generiert...",
+          "timestamp": 1768661721566
+        },
+        {
+          "step": "generate_issues",
+          "status": "completed",
+          "message": "11 Hinweise generiert",
+          "timestamp": 1768661721567
+        }
+      ],
+      "eventQualityScore": {
+        "overallScore": 70,
+        "platforms": {
+          "meta": {
+            "platform": "Meta",
+            "score": 75,
+            "parameters": [
+              {
+                "name": "em",
+                "displayName": "Email (gehasht)",
+                "status": "hashed",
+                "importance": "critical",
+                "impact": "Aktiv"
+              },
+              {
+                "name": "ph",
+                "displayName": "Telefon (gehasht)",
+                "status": "hashed",
+                "importance": "high",
+                "impact": "Aktiv"
+              },
+              {
+                "name": "external_id",
+                "displayName": "External ID",
+                "status": "missing",
+                "importance": "high",
+                "impact": "+10% Match Rate"
+              },
+              {
+                "name": "fbc",
+                "displayName": "Click ID Cookie (_fbc)",
+                "status": "missing",
+                "importance": "critical",
+                "impact": "Wichtig für Attribution"
+              },
+              {
+                "name": "fbp",
+                "displayName": "Browser ID Cookie (_fbp)",
+                "status": "missing",
+                "importance": "high",
+                "impact": "Wichtig für Remarketing"
+              }
+            ],
+            "hasServerSide": false,
+            "hasDedupe": false,
+            "estimatedMatchRate": 80
+          },
+          "google": {
+            "platform": "Google",
+            "score": 65,
+            "parameters": [
+              {
+                "name": "enhanced_conversions",
+                "displayName": "Enhanced Conversions",
+                "status": "present",
+                "importance": "critical",
+                "impact": "Aktiv"
+              },
+              {
+                "name": "gclid",
+                "displayName": "Google Click ID",
+                "status": "missing",
+                "importance": "critical",
+                "impact": "Wichtig für Attribution"
+              },
+              {
+                "name": "user_id",
+                "displayName": "User ID",
+                "status": "missing",
+                "importance": "medium",
+                "impact": "Cross-Device Tracking"
+              }
+            ],
+            "hasServerSide": false,
+            "hasDedupe": true,
+            "estimatedMatchRate": 75
+          }
+        },
+        "recommendations": [
+          {
+            "platform": "Meta",
+            "priority": "high",
+            "title": "Conversions API implementieren",
+            "description": "Server-Side Tracking verbessert die Match-Rate erheblich und ist robuster gegen Browser-Einschränkungen.",
+            "estimatedImpact": "+20-30% Event Match Quality"
+          },
+          {
+            "platform": "Meta",
+            "priority": "medium",
+            "title": "Event-Deduplizierung einrichten",
+            "description": "Ohne event_id werden Events möglicherweise doppelt gezählt.",
+            "estimatedImpact": "Genauere Conversion-Zahlen"
+          },
+          {
+            "platform": "Google",
+            "priority": "medium",
+            "title": "Server-Side GTM einrichten",
+            "description": "Verlängert Cookie-Lifetime und verbessert Datenqualität.",
+            "estimatedImpact": "+15-25% mehr Attribution"
+          }
+        ]
+      },
+      "funnelValidation": {
+        "isEcommerce": false,
+        "platform": "unknown",
+        "funnelSteps": [
+          {
+            "name": "Produktliste",
+            "event": "view_item_list",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Produktansicht",
+            "event": "view_item",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "In den Warenkorb",
+            "event": "add_to_cart",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Warenkorb",
+            "event": "view_cart",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Checkout Start",
+            "event": "begin_checkout",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Versand-Info",
+            "event": "add_shipping_info",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Zahlungs-Info",
+            "event": "add_payment_info",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Kauf",
+            "event": "purchase",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          }
+        ],
+        "overallScore": 0,
+        "criticalGaps": [
+          "add_to_cart",
+          "purchase"
+        ],
+        "recommendations": [
+          "⚠️ KRITISCH: Purchase-Event fehlt! Kein Conversion-Tracking möglich.",
+          "Add-to-Cart Event implementieren für bessere Funnel-Analyse.",
+          "View-Item Event für Dynamic Remarketing aktivieren."
+        ],
+        "conversionRateKillers": [
+          {
+            "severity": "high",
+            "title": "Purchase-Event fehlt",
+            "description": "Ohne Purchase-Event können Conversions nicht gemessen werden.",
+            "impact": "Kein ROAS/Conversion-Tracking",
+            "fix": "Purchase-Event mit value, currency und transaction_id implementieren."
+          },
+          {
+            "severity": "high",
+            "title": "Add-to-Cart fehlt",
+            "description": "Warenkorb-Hinzugefügt Event fehlt im Funnel.",
+            "impact": "Optimierung auf Warenkorb-Events nicht möglich",
+            "fix": "add_to_cart Event mit items, value und currency implementieren."
+          },
+          {
+            "severity": "medium",
+            "title": "Checkout-Start fehlt",
+            "description": "Kein begin_checkout Event erkannt.",
+            "impact": "Checkout-Abbruch nicht messbar",
+            "fix": "begin_checkout Event im Checkout-Start auslösen."
+          }
+        ],
+        "optimizations": [
+          {
+            "title": "Warenkorb-Event ergänzen",
+            "description": "view_cart erleichtert Abbruchanalysen und Remarketing.",
+            "estimatedImpact": "+5-10% bessere Funnel-Insights",
+            "effort": "low"
+          },
+          {
+            "title": "Versand-Info tracken",
+            "description": "add_shipping_info identifiziert Reibung im Checkout.",
+            "estimatedImpact": "Höhere Checkout-Conversion",
+            "effort": "medium"
+          },
+          {
+            "title": "Zahlungs-Info tracken",
+            "description": "add_payment_info hilft Payment-Methoden zu optimieren.",
+            "estimatedImpact": "Bessere Payment-Optimierung",
+            "effort": "medium"
+          }
+        ]
+      },
+      "cookieLifetimeAudit": {
+        "totalCookies": 1,
+        "impactedCookies": [],
+        "safariUserPercentage": 30,
+        "estimatedDataLoss": 0,
+        "recommendations": [],
+        "serverSideWouldHelp": false
+      },
+      "unusedPotential": {
+        "totalPotential": [
+          {
+            "type": "incomplete_setup",
+            "platform": "Meta",
+            "title": "Meta Conversions API fehlt",
+            "description": "Der Meta Pixel ist installiert, aber ohne Server-Side Integration.",
+            "currentState": "Nur Browser-Pixel aktiv",
+            "recommendation": "Meta CAPI implementieren für bessere Event-Qualität",
+            "estimatedImpact": "+20-30% Event Match Quality",
+            "difficulty": "medium"
+          },
+          {
+            "type": "incomplete_setup",
+            "platform": "Google Ads",
+            "title": "Enhanced Conversions nicht aktiv",
+            "description": "Google Ads ist installiert, aber Enhanced Conversions fehlt.",
+            "currentState": "Standard Conversion Tracking",
+            "recommendation": "Enhanced Conversions für bessere Attribution aktivieren",
+            "estimatedImpact": "+15% messbare Conversions",
+            "difficulty": "easy"
+          },
+          {
+            "type": "incomplete_setup",
+            "platform": "Alle",
+            "title": "Kein Server-Side Tracking",
+            "description": "Alle Tracking-Daten werden nur browser-seitig erfasst.",
+            "currentState": "Nur Client-Side Tracking",
+            "recommendation": "Server-Side GTM für robusteres Tracking implementieren",
+            "estimatedImpact": "+15-25% Datenqualität",
+            "difficulty": "hard"
+          }
+        ],
+        "estimatedMonthlyValue": 2100,
+        "quickWins": [
+          {
+            "type": "incomplete_setup",
+            "platform": "Google Ads",
+            "title": "Enhanced Conversions nicht aktiv",
+            "description": "Google Ads ist installiert, aber Enhanced Conversions fehlt.",
+            "currentState": "Standard Conversion Tracking",
+            "recommendation": "Enhanced Conversions für bessere Attribution aktivieren",
+            "estimatedImpact": "+15% messbare Conversions",
+            "difficulty": "easy"
+          }
+        ],
+        "missingPlatforms": [
+          {
+            "platform": "TikTok",
+            "reason": "Nicht installiert",
+            "audienceReach": "~25% der 18-34 Jährigen",
+            "recommendedFor": [
+              "E-Commerce",
+              "D2C Brands",
+              "Junge Zielgruppen"
+            ]
+          },
+          {
+            "platform": "LinkedIn",
+            "reason": "Nicht installiert",
+            "audienceReach": "~20% B2B Entscheider",
+            "recommendedFor": [
+              "B2B",
+              "SaaS",
+              "Recruiting",
+              "High-Value Products"
+            ]
+          }
+        ]
+      },
+      "conversionTrackingAudit": {
+        "overallScore": 52,
+        "platforms": [
+          {
+            "platform": "google",
+            "detected": true,
+            "hasServerSide": false,
+            "hasDedupe": true,
+            "hasValue": true,
+            "hasCurrency": false,
+            "hasEventId": false,
+            "coverageScore": 55,
+            "notes": [
+              "Google Ads Conversion Tag erkannt",
+              "GA4 erkannt"
+            ]
+          },
+          {
+            "platform": "meta",
+            "detected": true,
+            "hasServerSide": false,
+            "hasDedupe": false,
+            "hasValue": true,
+            "hasCurrency": false,
+            "hasEventId": false,
+            "coverageScore": 48,
+            "notes": [
+              "Meta Pixel erkannt"
+            ]
+          }
+        ],
+        "issues": [
+          {
+            "severity": "medium",
+            "title": "GOOGLE: Server-Side fehlt",
+            "description": "Nur Client-Side Tracking erkannt.",
+            "impact": "Geringere Datenqualität & Attribution"
+          },
+          {
+            "severity": "medium",
+            "title": "META: Server-Side fehlt",
+            "description": "Nur Client-Side Tracking erkannt.",
+            "impact": "Geringere Datenqualität & Attribution"
+          }
+        ],
+        "recommendations": [
+          {
+            "priority": "medium",
+            "title": "GOOGLE Server-Side Tracking",
+            "description": "Server-Side Implementierung erhöht Stabilität und Match-Rate.",
+            "estimatedImpact": "+15-25% mehr gemessene Conversions"
+          },
+          {
+            "priority": "medium",
+            "title": "META Server-Side Tracking",
+            "description": "Server-Side Implementierung erhöht Stabilität und Match-Rate.",
+            "estimatedImpact": "+15-25% mehr gemessene Conversions"
+          }
+        ]
+      },
+      "campaignAttribution": {
+        "overallScore": 50,
+        "clickIdStatus": [
+          {
+            "signal": "gclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "dclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "wbraid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "pbraid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "fbclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "msclkid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "ttclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "li_fat_id",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          }
+        ],
+        "utmStatus": [
+          {
+            "signal": "utm_source",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_medium",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_campaign",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_term",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_content",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          }
+        ],
+        "crossDomain": {
+          "detected": false,
+          "methods": [],
+          "warnings": [
+            "Keine Cross-Domain Konfiguration erkannt"
+          ]
+        },
+        "issues": [
+          {
+            "severity": "high",
+            "title": "Google Click IDs fehlen",
+            "description": "gclid/wbraid/pbraid nicht erkannt.",
+            "impact": "Schwache Google Ads Attribution"
+          },
+          {
+            "severity": "medium",
+            "title": "Meta Click ID fehlt",
+            "description": "fbclid/_fbc nicht erkannt.",
+            "impact": "Schwächere Meta Attribution"
+          },
+          {
+            "severity": "low",
+            "title": "UTM Parameter nicht sichtbar",
+            "description": "UTM Parameter konnten nicht gefunden werden.",
+            "impact": "Kampagnen-Reporting unvollständig"
+          }
+        ],
+        "recommendations": [
+          {
+            "priority": "high",
+            "title": "Click-ID Weitergabe sicherstellen",
+            "description": "gclid/wbraid/pbraid in URLs und Cookies erhalten.",
+            "estimatedImpact": "+10-20% bessere Ads Attribution"
+          },
+          {
+            "priority": "medium",
+            "title": "UTM Standards definieren",
+            "description": "UTM Parameter auf allen Kampagnen-URLs verwenden.",
+            "estimatedImpact": "Besseres Kampagnen-Reporting"
+          },
+          {
+            "priority": "low",
+            "title": "Cross-Domain Tracking prüfen",
+            "description": "Linker-Konfiguration für Checkout/Payment Domains prüfen.",
+            "estimatedImpact": "Stabilere Session-Zuordnung"
+          }
+        ]
+      },
+      "gtmAudit": {
+        "detected": false,
+        "containerIds": [
+          "GTM-NQ7DT2D"
+        ],
+        "hasMultipleContainers": false,
+        "hasNoScriptTag": false,
+        "snippetInHead": false,
+        "consentDefaultBeforeGtm": false,
+        "issues": [
+          {
+            "severity": "high",
+            "title": "Kein GTM erkannt",
+            "description": "Google Tag Manager wurde nicht gefunden.",
+            "impact": "Kein zentrales Tag-Management"
+          }
+        ],
+        "recommendations": [
+          {
+            "priority": "high",
+            "title": "GTM installieren",
+            "description": "GTM ermöglicht konsistentes Tracking und Consent-Management.",
+            "estimatedImpact": "Schnellere Tracking-Iterationen"
+          }
+        ],
+        "score": 0
+      },
+      "privacySandbox": {
+        "topicsApi": {
+          "detected": false,
+          "evidence": []
+        },
+        "protectedAudience": {
+          "detected": false,
+          "evidence": []
+        },
+        "attributionReporting": {
+          "detected": false,
+          "evidence": []
+        },
+        "privateAggregation": {
+          "detected": false,
+          "evidence": []
+        },
+        "chips": {
+          "detected": false,
+          "evidence": []
+        },
+        "firstPartySets": {
+          "detected": false,
+          "evidence": []
+        },
+        "summary": {
+          "detectedSignals": 0,
+          "readinessScore": 0,
+          "warnings": [
+            "Keine Privacy Sandbox Signale erkannt."
+          ]
+        }
+      }
+    },
+    {
+      "url": "https://www.franco-consulting.com/",
+      "timestamp": "2026-01-17T14:56:01.478Z",
+      "status": "success",
+      "cookieBanner": {
+        "detected": true,
+        "provider": "Usercentrics",
+        "hasAcceptButton": true,
+        "hasRejectButton": false,
+        "hasEssentialSaveButton": false,
+        "hasSettingsOption": true,
+        "blocksContent": true,
+        "hasPrivacyPolicyLink": true
+      },
+      "tcf": {
+        "detected": true,
+        "tcString": "ChZGcmFuY28gQ29uc3VsdGluZyBHbWJIkgEaaW50ZXJuZXRfbWFya2V0aW5nX3NlcnZpY2U",
+        "validTcString": true
+      },
+      "googleConsentMode": {
+        "detected": true,
+        "updateConsent": {
+          "detected": false,
+          "triggeredAfterBanner": false,
+          "updateTrigger": "unknown"
+        },
+        "parameters": {
+          "ad_storage": false,
+          "analytics_storage": false,
+          "ad_user_data": false,
+          "ad_personalization": false,
+          "functionality_storage": false,
+          "personalization_storage": false,
+          "security_storage": false
+        },
+        "regionSettings": {
+          "detected": true,
+          "regions": [
+            "EU"
+          ]
+        }
+      },
+      "trackingTags": {
+        "googleAnalytics": {
+          "detected": true,
+          "measurementIds": [],
+          "hasMultipleMeasurementIds": false,
+          "hasLegacyUA": false,
+          "loadedViaGTM": true
+        },
+        "googleTagManager": {
+          "detected": true,
+          "containerId": "GTM-TDQ8HH3D",
+          "containerIds": [
+            "GTM-TDQ8HH3D"
+          ],
+          "hasMultipleContainers": false,
+          "serverSideGTM": {
+            "detected": false,
+            "isFirstParty": false,
+            "firstPartyCookies": []
+          }
+        },
+        "googleAdsConversion": {
+          "detected": false,
+          "conversionIds": [],
+          "hasRemarketing": false,
+          "loadedViaGTM": false
+        },
+        "metaPixel": {
+          "detected": true,
+          "pixelIds": [],
+          "hasMultiplePixels": false,
+          "loadedViaGTM": true,
+          "detectionMethod": [
+            "dataLayer"
+          ],
+          "serverSide": {
+            "detected": false,
+            "hasConversionsAPI": false,
+            "eventIds": [],
+            "indicators": [],
+            "hasDedupe": false
+          }
+        },
+        "linkedInInsight": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "tiktokPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "pinterestTag": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "snapchatPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "twitterPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "redditPixel": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "bingAds": {
+          "detected": true,
+          "loadedViaGTM": true
+        },
+        "criteo": {
+          "detected": false,
+          "loadedViaGTM": false
+        },
+        "other": [
+          {
+            "name": "Usercentrics",
+            "detected": true,
+            "loadedViaGTM": true
+          }
+        ],
+        "marketingParameters": {
+          "gclid": false,
+          "dclid": false,
+          "wbraid": false,
+          "pbraid": false,
+          "fbclid": false,
+          "msclkid": false,
+          "ttclid": false,
+          "li_fat_id": false,
+          "utm": false,
+          "any": false
+        },
+        "serverSideTracking": {
+          "detected": false,
+          "indicators": [],
+          "firstPartyEndpoints": [],
+          "cookieBridging": {
+            "detected": false,
+            "confidence": "low",
+            "cookies": [],
+            "indicators": []
+          },
+          "summary": {
+            "hasServerSideGTM": false,
+            "hasMetaCAPI": false,
+            "hasFirstPartyProxy": false,
+            "hasTikTokEventsAPI": false,
+            "hasLinkedInCAPI": false,
+            "hasCookieBridging": false
+          }
+        }
+      },
+      "cookies": [],
+      "cookieConsentTest": {
+        "beforeConsent": {
+          "cookies": [],
+          "cookieCount": 0,
+          "trackingCookiesFound": false
+        },
+        "afterAccept": {
+          "cookies": [],
+          "cookieCount": 0,
+          "newCookies": [],
+          "clickSuccessful": false,
+          "buttonFound": false
+        },
+        "afterReject": {
+          "cookies": [],
+          "cookieCount": 0,
+          "newCookies": [],
+          "clickSuccessful": false,
+          "buttonFound": false
+        },
+        "analysis": {
+          "consentWorksProperly": false,
+          "rejectWorksProperly": false,
+          "trackingBeforeConsent": false,
+          "issues": [
+            {
+              "severity": "warning",
+              "title": "Akzeptieren-Button nicht gefunden",
+              "description": "Der Akzeptieren-Button konnte nicht automatisch erkannt werden."
+            },
+            {
+              "severity": "warning",
+              "title": "Ablehnen-Button nicht gefunden",
+              "description": "Der Ablehnen-Button konnte nicht automatisch erkannt werden. Möglicherweise ist keine einfache Ablehnung möglich."
+            }
+          ]
+        }
+      },
+      "dataLayerAnalysis": {
+        "hasDataLayer": true,
+        "events": [
+          {
+            "event": "consent_status",
+            "count": 1,
+            "hasEcommerceData": false,
+            "parameters": [
+              "action",
+              "type",
+              "ucCategory",
+              "Usercentrics Consent Management Platform",
+              "Facebook Pixel",
+              "Facebook Social Plugins",
+              "Google Analytics",
+              "Google Tag Manager",
+              "Hotjar",
+              "Join",
+              "Leadinfo",
+              "PostHog.com",
+              "TikTok",
+              "Vercel"
+            ]
+          }
+        ],
+        "ecommerce": {
+          "detected": false,
+          "platform": "unknown",
+          "events": [],
+          "valueTracking": {
+            "hasTransactionValue": true,
+            "hasCurrency": false,
+            "hasItemData": false,
+            "hasUserData": false,
+            "valueParameters": [
+              "value",
+              "price"
+            ],
+            "missingRecommended": []
+          },
+          "issues": []
+        },
+        "customDimensions": [],
+        "userProperties": [],
+        "rawDataLayer": [
+          {
+            "index": 0,
+            "data": {
+              "0": "set",
+              "1": "developer_id.dOThhZD",
+              "2": true
+            },
+            "type": "custom",
+            "hasEcommerce": false,
+            "hasConsent": false
+          },
+          {
+            "index": 1,
+            "data": {
+              "0": "set",
+              "1": "ads_data_redaction",
+              "2": true
+            },
+            "type": "custom",
+            "hasEcommerce": false,
+            "hasConsent": false
+          },
+          {
+            "index": 2,
+            "event": "consent_status",
+            "data": {
+              "action": "onInitialPageLoad",
+              "event": "consent_status",
+              "type": "IMPLICIT",
+              "ucCategory": {
+                "marketing": false,
+                "functional": false,
+                "essential": true
+              },
+              "Usercentrics Consent Management Platform": true,
+              "Facebook Pixel": false,
+              "Facebook Social Plugins": false,
+              "Google Analytics": false,
+              "Google Tag Manager": false,
+              "Hotjar": false,
+              "Join": false,
+              "Leadinfo": false,
+              "PostHog.com": false,
+              "TikTok": false,
+              "Vercel": false
+            },
+            "type": "consent",
+            "hasEcommerce": false,
+            "hasConsent": true
+          }
+        ]
+      },
+      "thirdPartyDomains": {
+        "totalCount": 3,
+        "domains": [
+          {
+            "domain": "usercentrics.eu",
+            "category": "functional",
+            "requestCount": 16,
+            "cookiesSet": 0,
+            "dataTypes": [
+              "script",
+              "fetch",
+              "image",
+              "other"
+            ],
+            "company": "Usercentrics",
+            "country": "DE",
+            "isEUBased": true
+          },
+          {
+            "domain": "vercel-storage.com",
+            "category": "unknown",
+            "requestCount": 1,
+            "cookiesSet": 0,
+            "dataTypes": [
+              "media"
+            ]
+          },
+          {
+            "domain": "",
+            "category": "unknown",
+            "requestCount": 1,
+            "cookiesSet": 0,
+            "dataTypes": [
+              "image"
+            ]
+          }
+        ],
+        "categories": {
+          "advertising": 0,
+          "analytics": 0,
+          "social": 0,
+          "cdn": 0,
+          "functional": 1,
+          "unknown": 2
+        },
+        "riskAssessment": {
+          "highRiskDomains": [],
+          "crossBorderTransfers": [],
+          "unknownDomains": [
+            "vercel-storage.com",
+            ""
+          ]
+        }
+      },
+      "gdprChecklist": {
+        "score": 71,
+        "checks": [
+          {
+            "id": "consent_banner",
+            "category": "consent",
+            "title": "Cookie-Banner vorhanden",
+            "description": "Ein Cookie-Banner muss vor dem Setzen nicht-essentieller Cookies angezeigt werden.",
+            "legalReference": "Art. 6, Art. 7 DSGVO; § 25 TTDSG",
+            "recommendation": "Implementieren Sie einen DSGVO-konformen Cookie-Banner.",
+            "status": "passed",
+            "details": "Cookie-Banner erkannt (Usercentrics)."
+          },
+          {
+            "id": "consent_reject_option",
+            "category": "consent",
+            "title": "Gleichwertige Ablehnen-Option",
+            "description": "Die Möglichkeit zur Ablehnung muss genauso einfach sein wie die Zustimmung.",
+            "legalReference": "Art. 7 Abs. 3 DSGVO; EuGH Planet49",
+            "recommendation": "Fügen Sie einen gleichwertigen \"Alle ablehnen\" Button hinzu.",
+            "status": "failed",
+            "details": "Keine gleichwertige Ablehnen-Option erkannt."
+          },
+          {
+            "id": "consent_granular",
+            "category": "consent",
+            "title": "Granulare Einwilligung möglich",
+            "description": "Nutzer sollten einzelne Cookie-Kategorien auswählen können.",
+            "legalReference": "Art. 7 DSGVO; ErwGr. 32",
+            "recommendation": "Ermöglichen Sie die separate Zustimmung für verschiedene Zwecke.",
+            "status": "passed",
+            "details": "Einstellungen-Option für granulare Kontrolle vorhanden."
+          },
+          {
+            "id": "consent_no_preselection",
+            "category": "consent",
+            "title": "Keine vorausgewählten Checkboxen",
+            "description": "Optionale Cookies dürfen nicht vorausgewählt sein.",
+            "legalReference": "EuGH Planet49 (C-673/17)",
+            "recommendation": "Stellen Sie sicher, dass Marketing-Cookies standardmäßig deaktiviert sind.",
+            "status": "warning",
+            "details": "Default Consent-Einstellungen nicht erkannt."
+          },
+          {
+            "id": "consent_before_tracking",
+            "category": "consent",
+            "title": "Keine Cookies vor Einwilligung",
+            "description": "Marketing/Analytics-Cookies dürfen erst nach Einwilligung gesetzt werden.",
+            "legalReference": "§ 25 Abs. 1 TTDSG; Art. 5 Abs. 3 ePrivacy-RL",
+            "recommendation": "Implementieren Sie Consent Mode und blockieren Sie Tracking bis zur Zustimmung.",
+            "status": "passed",
+            "details": "Keine Tracking-Cookies vor Einwilligung erkannt."
+          },
+          {
+            "id": "consent_withdrawal",
+            "category": "consent",
+            "title": "Widerruf der Einwilligung möglich",
+            "description": "Nutzer müssen ihre Einwilligung jederzeit widerrufen können.",
+            "legalReference": "Art. 7 Abs. 3 DSGVO",
+            "recommendation": "Bieten Sie einen dauerhaft zugänglichen Link zu Cookie-Einstellungen.",
+            "status": "passed",
+            "details": "Einstellungen-Option ermöglicht Widerruf."
+          },
+          {
+            "id": "transparency_purpose",
+            "category": "transparency",
+            "title": "Zweck der Datenverarbeitung erklärt",
+            "description": "Der Zweck jeder Datenverarbeitung muss klar kommuniziert werden.",
+            "legalReference": "Art. 13, Art. 14 DSGVO",
+            "recommendation": "Erklären Sie im Banner, wofür Cookies verwendet werden.",
+            "status": "warning",
+            "details": "Banner vorhanden - Zweckerklärung sollte manuell geprüft werden."
+          },
+          {
+            "id": "transparency_third_parties",
+            "category": "transparency",
+            "title": "Drittanbieter offengelegt",
+            "description": "Alle Drittanbieter, die Daten erhalten, müssen genannt werden.",
+            "legalReference": "Art. 13 Abs. 1 lit. e DSGVO",
+            "recommendation": "Listen Sie alle Tracking-Dienste und deren Zweck auf.",
+            "status": "warning",
+            "details": "3 Drittanbieter erkannt. Prüfen Sie die Offenlegung."
+          },
+          {
+            "id": "transparency_data_transfer",
+            "category": "transparency",
+            "title": "Internationale Datentransfers transparent",
+            "description": "Übermittlungen in Drittländer müssen offengelegt werden.",
+            "legalReference": "Art. 13 Abs. 1 lit. f DSGVO; Kapitel V DSGVO",
+            "recommendation": "Informieren Sie über US-Transfers und deren Rechtsgrundlage.",
+            "status": "passed",
+            "details": "Keine Drittland-Transfers erkannt."
+          },
+          {
+            "id": "data_min_necessary",
+            "category": "data_minimization",
+            "title": "Nur notwendige Daten",
+            "description": "Es sollten nur die für den Zweck erforderlichen Daten erhoben werden.",
+            "legalReference": "Art. 5 Abs. 1 lit. c DSGVO",
+            "recommendation": "Prüfen Sie, ob alle Tracking-Tags wirklich benötigt werden.",
+            "status": "passed",
+            "details": "3 Tracking-Dienst(e) erkannt."
+          },
+          {
+            "id": "data_min_retention",
+            "category": "data_minimization",
+            "title": "Angemessene Speicherdauer",
+            "description": "Cookie-Laufzeiten sollten nicht länger als notwendig sein.",
+            "legalReference": "Art. 5 Abs. 1 lit. e DSGVO",
+            "recommendation": "Reduzieren Sie Cookie-Laufzeiten auf maximal 13 Monate.",
+            "status": "passed",
+            "details": "Keine übermäßig langen Cookie-Laufzeiten erkannt."
+          },
+          {
+            "id": "security_https",
+            "category": "security",
+            "title": "Sichere Übertragung (HTTPS)",
+            "description": "Cookies sollten nur über HTTPS übertragen werden.",
+            "legalReference": "Art. 32 DSGVO",
+            "recommendation": "Setzen Sie das Secure-Flag für alle Cookies.",
+            "status": "passed",
+            "details": "Alle relevanten Cookies haben Secure-Flag."
+          },
+          {
+            "id": "security_same_site",
+            "category": "security",
+            "title": "SameSite-Attribut gesetzt",
+            "description": "Cookies sollten SameSite-Attribut haben.",
+            "legalReference": "Art. 32 DSGVO; Best Practice",
+            "recommendation": "Setzen Sie SameSite=Strict oder SameSite=Lax.",
+            "status": "passed",
+            "details": "SameSite-Attribute korrekt gesetzt."
+          },
+          {
+            "id": "rights_access",
+            "category": "rights",
+            "title": "Zugang zu Datenschutzinformationen",
+            "description": "Datenschutzerklärung muss leicht zugänglich sein.",
+            "legalReference": "Art. 12, Art. 13 DSGVO",
+            "recommendation": "Verlinken Sie die Datenschutzerklärung im Cookie-Banner.",
+            "status": "passed",
+            "details": "Datenschutzerklärung ist im Cookie-Banner verlinkt."
+          }
+        ],
+        "summary": {
+          "passed": 10,
+          "failed": 1,
+          "warnings": 3,
+          "notApplicable": 0
+        }
+      },
+      "dmaCheck": {
+        "applicable": true,
+        "gatekeepersDetected": [
+          "Google",
+          "Meta",
+          "Microsoft"
+        ],
+        "checks": [
+          {
+            "id": "dma_consent_google",
+            "gatekeeper": "Google",
+            "requirement": "Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)",
+            "status": "non_compliant",
+            "details": "Veraltete Consent Mode Version erkannt.",
+            "recommendation": "Aktualisieren Sie auf Google Consent Mode v2 (seit März 2024 erforderlich)."
+          },
+          {
+            "id": "dma_data_combination_google",
+            "gatekeeper": "Google",
+            "requirement": "Keine Datenkombination ohne Einwilligung (Art. 5(2) DMA)",
+            "status": "requires_review",
+            "details": "Consent-Mechanismus vorhanden, aber Parameter für Datenkombination prüfen.",
+            "recommendation": "Stellen Sie sicher, dass ad_user_data und ad_personalization Parameter gesetzt werden."
+          },
+          {
+            "id": "dma_consent_meta",
+            "gatekeeper": "Meta",
+            "requirement": "Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)",
+            "status": "requires_review",
+            "details": "Cookie-Banner erkannt. Prüfen Sie die LDU-Integration.",
+            "recommendation": "Implementieren Sie Meta Limited Data Use (LDU) für EU-Nutzer."
+          },
+          {
+            "id": "dma_data_combination_meta",
+            "gatekeeper": "Meta",
+            "requirement": "Keine Datenkombination ohne Einwilligung (Art. 5(2) DMA)",
+            "status": "requires_review",
+            "details": "Consent-Mechanismus vorhanden, aber Parameter für Datenkombination prüfen.",
+            "recommendation": "Stellen Sie sicher, dass ad_user_data und ad_personalization Parameter gesetzt werden."
+          },
+          {
+            "id": "dma_encryption_meta",
+            "gatekeeper": "Meta",
+            "requirement": "Verschlüsselung von Nutzerdaten (Best Practice)",
+            "status": "requires_review",
+            "details": "Nur Client-Side Pixel erkannt.",
+            "recommendation": "Erwägen Sie die Implementierung der Conversions API mit verschlüsselten Daten."
+          },
+          {
+            "id": "dma_consent_microsoft",
+            "gatekeeper": "Microsoft",
+            "requirement": "Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)",
+            "status": "requires_review",
+            "details": "Consent-Management erkannt. Prüfen Sie Microsoft-Integration."
+          },
+          {
+            "id": "dma_data_combination_microsoft",
+            "gatekeeper": "Microsoft",
+            "requirement": "Keine Datenkombination ohne Einwilligung (Art. 5(2) DMA)",
+            "status": "requires_review",
+            "details": "Consent-Mechanismus vorhanden, aber Parameter für Datenkombination prüfen.",
+            "recommendation": "Stellen Sie sicher, dass ad_user_data und ad_personalization Parameter gesetzt werden."
+          }
+        ],
+        "summary": {
+          "compliant": 0,
+          "nonCompliant": 1,
+          "requiresReview": 6
+        }
+      },
+      "score": 46,
+      "issues": [
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Akzeptieren-Button nicht gefunden",
+          "description": "Der Akzeptieren-Button konnte nicht automatisch erkannt werden."
+        },
+        {
+          "severity": "warning",
+          "category": "cookies",
+          "title": "Ablehnen-Button nicht gefunden",
+          "description": "Der Ablehnen-Button konnte nicht automatisch erkannt werden. Möglicherweise ist keine einfache Ablehnung möglich."
+        },
+        {
+          "severity": "warning",
+          "category": "cookie-banner",
+          "title": "Keine Ablehnen-Option erkannt",
+          "description": "Der Cookie-Banner scheint keine einfache Möglichkeit zur Ablehnung zu bieten.",
+          "recommendation": "DSGVO erfordert eine gleichwertige Ablehnen-Option neben der Akzeptieren-Option."
+        },
+        {
+          "severity": "warning",
+          "category": "consent-mode",
+          "title": "Consent Mode Update nicht erkannt",
+          "description": "Es wurde kein gtag(\"consent\", \"update\", {...}) Aufruf erkannt.",
+          "recommendation": "Stellen Sie sicher, dass nach Banner-Interaktion der Consent Mode aktualisiert wird."
+        },
+        {
+          "severity": "warning",
+          "category": "consent-mode",
+          "title": "Fehlende Consent Mode v2 Parameter",
+          "description": "Folgende v2 Parameter fehlen: ad_user_data, ad_personalization",
+          "recommendation": "Fügen Sie die fehlenden Parameter für volle Google Ads Funktionalität hinzu."
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "GOOGLE: Server-Side fehlt",
+          "description": "Nur Client-Side Tracking erkannt.",
+          "recommendation": "Geringere Datenqualität & Attribution"
+        },
+        {
+          "severity": "warning",
+          "category": "conversion",
+          "title": "META: Server-Side fehlt",
+          "description": "Nur Client-Side Tracking erkannt.",
+          "recommendation": "Geringere Datenqualität & Attribution"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "Meta Click ID fehlt",
+          "description": "fbclid/_fbc nicht erkannt.",
+          "recommendation": "Schwächere Meta Attribution"
+        },
+        {
+          "severity": "info",
+          "category": "attribution",
+          "title": "UTM Parameter nicht sichtbar",
+          "description": "UTM Parameter konnten nicht gefunden werden.",
+          "recommendation": "Kampagnen-Reporting unvollständig"
+        },
+        {
+          "severity": "warning",
+          "category": "gtm",
+          "title": "GTM nicht im Head",
+          "description": "GTM-Snippet sollte im <head> platziert werden.",
+          "recommendation": "Später Tag-Load"
+        },
+        {
+          "severity": "warning",
+          "category": "gtm",
+          "title": "Consent Default nach GTM",
+          "description": "Consent Default sollte vor GTM gesetzt werden.",
+          "recommendation": "Tags können vor Consent feuern"
+        },
+        {
+          "severity": "info",
+          "category": "privacy",
+          "title": "Keine Privacy Sandbox Signale erkannt",
+          "description": "Es wurden keine Topics/Attribution/Protected Audience Signale erkannt.",
+          "recommendation": "Cookie-less Tracking Roadmap prüfen."
+        },
+        {
+          "severity": "error",
+          "category": "gdpr",
+          "title": "DSGVO: Gleichwertige Ablehnen-Option",
+          "description": "Keine gleichwertige Ablehnen-Option erkannt.",
+          "recommendation": "Fügen Sie einen gleichwertigen \"Alle ablehnen\" Button hinzu."
+        },
+        {
+          "severity": "warning",
+          "category": "dma",
+          "title": "DMA: Einwilligungssignale an Gatekeeper übermitteln (Art. 5 DMA)",
+          "description": "Google: Veraltete Consent Mode Version erkannt.",
+          "recommendation": "Aktualisieren Sie auf Google Consent Mode v2 (seit März 2024 erforderlich)."
+        }
+      ],
+      "analysisSteps": [
+        {
+          "step": "init",
+          "status": "running",
+          "message": "Browser wird initialisiert...",
+          "timestamp": 1768661721800
+        },
+        {
+          "step": "init",
+          "status": "completed",
+          "message": "Browser bereit",
+          "timestamp": 1768661723932
+        },
+        {
+          "step": "validate",
+          "status": "running",
+          "message": "URL wird validiert...",
+          "timestamp": 1768661723932
+        },
+        {
+          "step": "validate",
+          "status": "completed",
+          "message": "URL: https://www.franco-consulting.com/",
+          "timestamp": 1768661723932
+        },
+        {
+          "step": "crawl",
+          "status": "running",
+          "message": "Website wird geladen und analysiert...",
+          "details": "Netzwerk-Requests, Cookies und Scripts werden erfasst",
+          "timestamp": 1768661723932
+        },
+        {
+          "step": "crawl",
+          "status": "completed",
+          "message": "78 Requests erfasst",
+          "timestamp": 1768661730405
+        },
+        {
+          "step": "analyze_banner",
+          "status": "running",
+          "message": "Cookie-Banner wird analysiert...",
+          "timestamp": 1768661730405
+        },
+        {
+          "step": "analyze_banner",
+          "status": "completed",
+          "message": "Banner erkannt: Usercentrics",
+          "timestamp": 1768661730437
+        },
+        {
+          "step": "analyze_tcf",
+          "status": "running",
+          "message": "TCF Framework wird geprüft...",
+          "timestamp": 1768661730437
+        },
+        {
+          "step": "analyze_tcf",
+          "status": "completed",
+          "message": "TCF 2.x erkannt",
+          "timestamp": 1768661730443
+        },
+        {
+          "step": "analyze_consent_mode",
+          "status": "running",
+          "message": "Google Consent Mode wird analysiert...",
+          "timestamp": 1768661730443
+        },
+        {
+          "step": "analyze_consent_mode",
+          "status": "completed",
+          "message": "Consent Mode  erkannt",
+          "timestamp": 1768661730460
+        },
+        {
+          "step": "analyze_tracking",
+          "status": "running",
+          "message": "Tracking-Tags werden identifiziert...",
+          "timestamp": 1768661730460
+        },
+        {
+          "step": "analyze_tracking",
+          "status": "completed",
+          "message": "5 Tracking-Dienst(e) erkannt",
+          "timestamp": 1768661730493
+        },
+        {
+          "step": "analyze_datalayer",
+          "status": "running",
+          "message": "DataLayer und E-Commerce Events werden analysiert...",
+          "timestamp": 1768661730493
+        },
+        {
+          "step": "analyze_datalayer",
+          "status": "completed",
+          "message": "1 DataLayer Events",
+          "timestamp": 1768661730506
+        },
+        {
+          "step": "consent_test",
+          "status": "running",
+          "message": "Cookie-Consent wird getestet...",
+          "details": "Cookies vor und nach Banner-Interaktion werden verglichen",
+          "timestamp": 1768661730506
+        },
+        {
+          "step": "consent_test",
+          "status": "completed",
+          "message": "Consent-Test abgeschlossen",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_cookies",
+          "status": "running",
+          "message": "Cookies werden kategorisiert...",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_cookies",
+          "status": "completed",
+          "message": "0 Cookies kategorisiert",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_third_party",
+          "status": "running",
+          "message": "Drittanbieter-Domains werden analysiert...",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_third_party",
+          "status": "completed",
+          "message": "3 Third-Party Domains",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_gdpr",
+          "status": "running",
+          "message": "DSGVO-Compliance wird geprüft...",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_gdpr",
+          "status": "completed",
+          "message": "DSGVO Score: 71%",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_dma",
+          "status": "running",
+          "message": "DMA-Compliance wird geprüft...",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_dma",
+          "status": "completed",
+          "message": "3 Gatekeeper erkannt",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_performance",
+          "status": "running",
+          "message": "Performance Marketing Analyse läuft...",
+          "timestamp": 1768661761474
+        },
+        {
+          "step": "analyze_performance",
+          "status": "completed",
+          "message": "Event Quality: 50% | Conversion Audit: 52%",
+          "timestamp": 1768661761478
+        },
+        {
+          "step": "generate_issues",
+          "status": "running",
+          "message": "Probleme und Empfehlungen werden generiert...",
+          "timestamp": 1768661761478
+        },
+        {
+          "step": "generate_issues",
+          "status": "completed",
+          "message": "14 Hinweise generiert",
+          "timestamp": 1768661761478
+        }
+      ],
+      "eventQualityScore": {
+        "overallScore": 50,
+        "platforms": {
+          "meta": {
+            "platform": "Meta",
+            "score": 50,
+            "parameters": [
+              {
+                "name": "em",
+                "displayName": "Email (gehasht)",
+                "status": "missing",
+                "importance": "critical",
+                "impact": "+25% Match Rate"
+              },
+              {
+                "name": "ph",
+                "displayName": "Telefon (gehasht)",
+                "status": "missing",
+                "importance": "high",
+                "impact": "+15% Match Rate"
+              },
+              {
+                "name": "external_id",
+                "displayName": "External ID",
+                "status": "missing",
+                "importance": "high",
+                "impact": "+10% Match Rate"
+              },
+              {
+                "name": "fbc",
+                "displayName": "Click ID Cookie (_fbc)",
+                "status": "missing",
+                "importance": "critical",
+                "impact": "Wichtig für Attribution"
+              },
+              {
+                "name": "fbp",
+                "displayName": "Browser ID Cookie (_fbp)",
+                "status": "missing",
+                "importance": "high",
+                "impact": "Wichtig für Remarketing"
+              }
+            ],
+            "hasServerSide": false,
+            "hasDedupe": false,
+            "estimatedMatchRate": 40
+          },
+          "google": {
+            "platform": "Google",
+            "score": 50,
+            "parameters": [
+              {
+                "name": "enhanced_conversions",
+                "displayName": "Enhanced Conversions",
+                "status": "missing",
+                "importance": "critical",
+                "impact": "+15% Conversion Attribution"
+              },
+              {
+                "name": "gclid",
+                "displayName": "Google Click ID",
+                "status": "missing",
+                "importance": "critical",
+                "impact": "Wichtig für Attribution"
+              },
+              {
+                "name": "user_id",
+                "displayName": "User ID",
+                "status": "missing",
+                "importance": "medium",
+                "impact": "Cross-Device Tracking"
+              }
+            ],
+            "hasServerSide": false,
+            "hasDedupe": true,
+            "estimatedMatchRate": 60
+          }
+        },
+        "recommendations": [
+          {
+            "platform": "Meta",
+            "priority": "high",
+            "title": "Conversions API implementieren",
+            "description": "Server-Side Tracking verbessert die Match-Rate erheblich und ist robuster gegen Browser-Einschränkungen.",
+            "estimatedImpact": "+20-30% Event Match Quality"
+          },
+          {
+            "platform": "Meta",
+            "priority": "medium",
+            "title": "Event-Deduplizierung einrichten",
+            "description": "Ohne event_id werden Events möglicherweise doppelt gezählt.",
+            "estimatedImpact": "Genauere Conversion-Zahlen"
+          },
+          {
+            "platform": "Google",
+            "priority": "medium",
+            "title": "Server-Side GTM einrichten",
+            "description": "Verlängert Cookie-Lifetime und verbessert Datenqualität.",
+            "estimatedImpact": "+15-25% mehr Attribution"
+          }
+        ]
+      },
+      "funnelValidation": {
+        "isEcommerce": false,
+        "platform": "unknown",
+        "funnelSteps": [
+          {
+            "name": "Produktliste",
+            "event": "view_item_list",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Produktansicht",
+            "event": "view_item",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "In den Warenkorb",
+            "event": "add_to_cart",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Warenkorb",
+            "event": "view_cart",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Checkout Start",
+            "event": "begin_checkout",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Versand-Info",
+            "event": "add_shipping_info",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Zahlungs-Info",
+            "event": "add_payment_info",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          },
+          {
+            "name": "Kauf",
+            "event": "purchase",
+            "detected": false,
+            "hasRequiredParams": false,
+            "missingParams": [],
+            "issues": []
+          }
+        ],
+        "overallScore": 0,
+        "criticalGaps": [
+          "add_to_cart",
+          "purchase"
+        ],
+        "recommendations": [
+          "⚠️ KRITISCH: Purchase-Event fehlt! Kein Conversion-Tracking möglich.",
+          "Add-to-Cart Event implementieren für bessere Funnel-Analyse.",
+          "View-Item Event für Dynamic Remarketing aktivieren."
+        ],
+        "conversionRateKillers": [
+          {
+            "severity": "high",
+            "title": "Purchase-Event fehlt",
+            "description": "Ohne Purchase-Event können Conversions nicht gemessen werden.",
+            "impact": "Kein ROAS/Conversion-Tracking",
+            "fix": "Purchase-Event mit value, currency und transaction_id implementieren."
+          },
+          {
+            "severity": "high",
+            "title": "Add-to-Cart fehlt",
+            "description": "Warenkorb-Hinzugefügt Event fehlt im Funnel.",
+            "impact": "Optimierung auf Warenkorb-Events nicht möglich",
+            "fix": "add_to_cart Event mit items, value und currency implementieren."
+          },
+          {
+            "severity": "medium",
+            "title": "Checkout-Start fehlt",
+            "description": "Kein begin_checkout Event erkannt.",
+            "impact": "Checkout-Abbruch nicht messbar",
+            "fix": "begin_checkout Event im Checkout-Start auslösen."
+          }
+        ],
+        "optimizations": [
+          {
+            "title": "Warenkorb-Event ergänzen",
+            "description": "view_cart erleichtert Abbruchanalysen und Remarketing.",
+            "estimatedImpact": "+5-10% bessere Funnel-Insights",
+            "effort": "low"
+          },
+          {
+            "title": "Versand-Info tracken",
+            "description": "add_shipping_info identifiziert Reibung im Checkout.",
+            "estimatedImpact": "Höhere Checkout-Conversion",
+            "effort": "medium"
+          },
+          {
+            "title": "Zahlungs-Info tracken",
+            "description": "add_payment_info hilft Payment-Methoden zu optimieren.",
+            "estimatedImpact": "Bessere Payment-Optimierung",
+            "effort": "medium"
+          }
+        ]
+      },
+      "cookieLifetimeAudit": {
+        "totalCookies": 0,
+        "impactedCookies": [],
+        "safariUserPercentage": 30,
+        "estimatedDataLoss": 0,
+        "recommendations": [],
+        "serverSideWouldHelp": false
+      },
+      "unusedPotential": {
+        "totalPotential": [
+          {
+            "type": "incomplete_setup",
+            "platform": "Meta",
+            "title": "Meta Conversions API fehlt",
+            "description": "Der Meta Pixel ist installiert, aber ohne Server-Side Integration.",
+            "currentState": "Nur Browser-Pixel aktiv",
+            "recommendation": "Meta CAPI implementieren für bessere Event-Qualität",
+            "estimatedImpact": "+20-30% Event Match Quality",
+            "difficulty": "medium"
+          },
+          {
+            "type": "incomplete_setup",
+            "platform": "Alle",
+            "title": "Kein Server-Side Tracking",
+            "description": "Alle Tracking-Daten werden nur browser-seitig erfasst.",
+            "currentState": "Nur Client-Side Tracking",
+            "recommendation": "Server-Side GTM für robusteres Tracking implementieren",
+            "estimatedImpact": "+15-25% Datenqualität",
+            "difficulty": "hard"
+          }
+        ],
+        "estimatedMonthlyValue": 1600,
+        "quickWins": [],
+        "missingPlatforms": [
+          {
+            "platform": "TikTok",
+            "reason": "Nicht installiert",
+            "audienceReach": "~25% der 18-34 Jährigen",
+            "recommendedFor": [
+              "E-Commerce",
+              "D2C Brands",
+              "Junge Zielgruppen"
+            ]
+          },
+          {
+            "platform": "LinkedIn",
+            "reason": "Nicht installiert",
+            "audienceReach": "~20% B2B Entscheider",
+            "recommendedFor": [
+              "B2B",
+              "SaaS",
+              "Recruiting",
+              "High-Value Products"
+            ]
+          }
+        ]
+      },
+      "conversionTrackingAudit": {
+        "overallScore": 52,
+        "platforms": [
+          {
+            "platform": "google",
+            "detected": true,
+            "hasServerSide": false,
+            "hasDedupe": true,
+            "hasValue": true,
+            "hasCurrency": false,
+            "hasEventId": false,
+            "coverageScore": 55,
+            "notes": [
+              "GA4 erkannt"
+            ]
+          },
+          {
+            "platform": "meta",
+            "detected": true,
+            "hasServerSide": false,
+            "hasDedupe": false,
+            "hasValue": true,
+            "hasCurrency": false,
+            "hasEventId": false,
+            "coverageScore": 48,
+            "notes": [
+              "Meta Pixel erkannt"
+            ]
+          }
+        ],
+        "issues": [
+          {
+            "severity": "medium",
+            "title": "GOOGLE: Server-Side fehlt",
+            "description": "Nur Client-Side Tracking erkannt.",
+            "impact": "Geringere Datenqualität & Attribution"
+          },
+          {
+            "severity": "medium",
+            "title": "META: Server-Side fehlt",
+            "description": "Nur Client-Side Tracking erkannt.",
+            "impact": "Geringere Datenqualität & Attribution"
+          }
+        ],
+        "recommendations": [
+          {
+            "priority": "medium",
+            "title": "GOOGLE Server-Side Tracking",
+            "description": "Server-Side Implementierung erhöht Stabilität und Match-Rate.",
+            "estimatedImpact": "+15-25% mehr gemessene Conversions"
+          },
+          {
+            "priority": "medium",
+            "title": "META Server-Side Tracking",
+            "description": "Server-Side Implementierung erhöht Stabilität und Match-Rate.",
+            "estimatedImpact": "+15-25% mehr gemessene Conversions"
+          }
+        ]
+      },
+      "campaignAttribution": {
+        "overallScore": 70,
+        "clickIdStatus": [
+          {
+            "signal": "gclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "dclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "wbraid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "pbraid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "fbclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "msclkid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "ttclid",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          },
+          {
+            "signal": "li_fat_id",
+            "detected": false,
+            "source": "unknown",
+            "notes": "Nicht nachweisbar"
+          }
+        ],
+        "utmStatus": [
+          {
+            "signal": "utm_source",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_medium",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_campaign",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_term",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          },
+          {
+            "signal": "utm_content",
+            "detected": false,
+            "source": "unknown",
+            "notes": "UTM im URL nicht sichtbar"
+          }
+        ],
+        "crossDomain": {
+          "detected": false,
+          "methods": [],
+          "warnings": [
+            "Keine Cross-Domain Konfiguration erkannt"
+          ]
+        },
+        "issues": [
+          {
+            "severity": "medium",
+            "title": "Meta Click ID fehlt",
+            "description": "fbclid/_fbc nicht erkannt.",
+            "impact": "Schwächere Meta Attribution"
+          },
+          {
+            "severity": "low",
+            "title": "UTM Parameter nicht sichtbar",
+            "description": "UTM Parameter konnten nicht gefunden werden.",
+            "impact": "Kampagnen-Reporting unvollständig"
+          }
+        ],
+        "recommendations": [
+          {
+            "priority": "medium",
+            "title": "UTM Standards definieren",
+            "description": "UTM Parameter auf allen Kampagnen-URLs verwenden.",
+            "estimatedImpact": "Besseres Kampagnen-Reporting"
+          },
+          {
+            "priority": "low",
+            "title": "Cross-Domain Tracking prüfen",
+            "description": "Linker-Konfiguration für Checkout/Payment Domains prüfen.",
+            "estimatedImpact": "Stabilere Session-Zuordnung"
+          }
+        ]
+      },
+      "gtmAudit": {
+        "detected": true,
+        "containerIds": [
+          "GTM-TDQ8HH3D"
+        ],
+        "hasMultipleContainers": false,
+        "hasNoScriptTag": true,
+        "snippetInHead": false,
+        "consentDefaultBeforeGtm": false,
+        "issues": [
+          {
+            "severity": "medium",
+            "title": "GTM nicht im Head",
+            "description": "GTM-Snippet sollte im <head> platziert werden.",
+            "impact": "Später Tag-Load"
+          },
+          {
+            "severity": "medium",
+            "title": "Consent Default nach GTM",
+            "description": "Consent Default sollte vor GTM gesetzt werden.",
+            "impact": "Tags können vor Consent feuern"
+          }
+        ],
+        "recommendations": [
+          {
+            "priority": "medium",
+            "title": "Consent Default vorziehen",
+            "description": "gtag(\"consent\", \"default\") vor GTM ausführen.",
+            "estimatedImpact": "Saubere Consent-Steuerung"
+          }
+        ],
+        "score": 80
+      },
+      "privacySandbox": {
+        "topicsApi": {
+          "detected": false,
+          "evidence": []
+        },
+        "protectedAudience": {
+          "detected": false,
+          "evidence": []
+        },
+        "attributionReporting": {
+          "detected": false,
+          "evidence": []
+        },
+        "privateAggregation": {
+          "detected": false,
+          "evidence": []
+        },
+        "chips": {
+          "detected": false,
+          "evidence": []
+        },
+        "firstPartySets": {
+          "detected": false,
+          "evidence": []
+        },
+        "summary": {
+          "detectedSignals": 0,
+          "readinessScore": 0,
+          "warnings": [
+            "Keine Privacy Sandbox Signale erkannt."
+          ]
+        }
+      }
+    }
+  ]
+}
