@@ -208,22 +208,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 export function useOnboarding() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  useEffect(() => {
-    // Prüfe ob Onboarding bereits gezeigt wurde
-    const hasCompletedOnboarding = localStorage.getItem(ONBOARDING_STORAGE_KEY) === 'true';
-    
-    if (!hasCompletedOnboarding) {
-      // Zeige Onboarding nach kurzer Verzögerung
-      const timer = setTimeout(() => {
-        setShowOnboarding(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, []);
+  // KEIN automatisches Anzeigen mehr - nur manuell über openOnboarding()
 
   const completeOnboarding = () => {
     setShowOnboarding(false);
+    // Speichere den Abschluss in LocalStorage
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, 'true');
+  };
+
+  const openOnboarding = () => {
+    setShowOnboarding(true);
   };
 
   const resetOnboarding = () => {
@@ -234,6 +228,7 @@ export function useOnboarding() {
   return {
     showOnboarding,
     completeOnboarding,
+    openOnboarding,
     resetOnboarding,
   };
 }

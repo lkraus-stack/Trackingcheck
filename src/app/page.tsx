@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { ChatInterface } from '@/components/ChatInterface';
 import { HeroSection } from '@/components/HeroSection';
 import { ProblemSection } from '@/components/ProblemSection';
@@ -18,12 +19,14 @@ import {
   Mail, 
   MapPin,
   ChevronUp,
-  Star
+  Star,
+  HelpCircle
 } from 'lucide-react';
 
 export default function Home() {
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const { showOnboarding, completeOnboarding } = useOnboarding();
+  const { data: session } = useSession();
+  const { showOnboarding, completeOnboarding, openOnboarding } = useOnboarding();
 
   // Hash aus URL entfernen falls vorhanden, aber KEIN automatisches Scrollen
   useEffect(() => {
@@ -40,6 +43,24 @@ export default function Home() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Zeige Onboarding nur beim ersten Login (nicht bei jedem Seitenaufruf)
+  useEffect(() => {
+    // Nur wenn User eingeloggt ist
+    if (session?.user) {
+      const hasCompletedOnboarding = localStorage.getItem('tracking-checker-onboarding-completed') === 'true';
+      
+      // Zeige Onboarding nur beim ersten Login (wenn noch nicht abgeschlossen)
+      if (!hasCompletedOnboarding) {
+        // Warte kurz, damit die Seite geladen ist
+        const timer = setTimeout(() => {
+          openOnboarding();
+        }, 1500);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [session?.user, openOnboarding]);
 
   return (
     <div className="min-h-screen bg-grid-pattern hero-pattern">
@@ -77,6 +98,15 @@ export default function Home() {
 
             {/* Right Side */}
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Help/Onboarding Button */}
+              <button
+                onClick={openOnboarding}
+                className="flex items-center justify-center w-8 h-8 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 rounded-lg transition-colors"
+                title="Quick Start Guide"
+                aria-label="Quick Start Guide öffnen"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
               {/* Usage Indicator - nur für eingeloggte User */}
               <UsageIndicator />
               {/* Auth Button - enthält Dashboard-Button für eingeloggte User */}
