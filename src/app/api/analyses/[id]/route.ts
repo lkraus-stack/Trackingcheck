@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db/prisma';
 // DELETE: Analyse löschen
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -17,10 +17,12 @@ export async function DELETE(
       );
     }
 
+    const { id } = await params;
+
     // Prüfe ob Analyse dem User gehört
     const existingAnalysis = await prisma.analysis.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -33,7 +35,7 @@ export async function DELETE(
     }
 
     await prisma.analysis.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });

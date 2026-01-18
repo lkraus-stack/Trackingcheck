@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db/prisma';
 // GET: Einzelnes Projekt
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -17,9 +17,10 @@ export async function GET(
       );
     }
 
+    const { id } = await params;
     const project = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
       include: {
@@ -65,7 +66,7 @@ export async function GET(
 // PATCH: Projekt aktualisieren
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -77,12 +78,13 @@ export async function PATCH(
       );
     }
 
+    const { id } = await params;
     const body = await request.json();
 
     // Prüfe ob Projekt dem User gehört
     const existingProject = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -95,7 +97,7 @@ export async function PATCH(
     }
 
     const project = await prisma.project.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: body.name,
         description: body.description !== undefined ? body.description : null,
@@ -135,7 +137,7 @@ export async function PATCH(
 // DELETE: Projekt löschen
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -147,10 +149,12 @@ export async function DELETE(
       );
     }
 
+    const { id } = await params;
+
     // Prüfe ob Projekt dem User gehört
     const existingProject = await prisma.project.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -164,7 +168,7 @@ export async function DELETE(
 
     // Lösche Projekt (Analysen werden durch onDelete: Cascade automatisch gelöscht)
     await prisma.project.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
