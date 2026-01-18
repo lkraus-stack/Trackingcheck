@@ -7,7 +7,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession({ required: true });
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -18,13 +18,13 @@ export default function DashboardPage() {
     }
     
     // If not authenticated, redirect to sign in
-    if (status === 'unauthenticated') {
+    if (!session) {
       router.push('/auth/signin?callbackUrl=/dashboard');
       return;
     }
     
     // If authenticated, show dashboard
-    if (status === 'authenticated' && session) {
+    if (session) {
       setIsLoading(false);
     }
   }, [session, status, router]);
