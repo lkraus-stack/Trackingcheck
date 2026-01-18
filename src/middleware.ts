@@ -2,8 +2,19 @@ import { auth } from "@/lib/auth/config"
 import { NextResponse } from "next/server"
 
 export default auth((req) => {
-  const isLoggedIn = !!req.auth
+  const session = req.auth
+  const isLoggedIn = !!session
   const { pathname } = req.nextUrl
+
+  // Auth routes sollten immer zugänglich sein
+  if (pathname.startsWith('/auth/')) {
+    return NextResponse.next()
+  }
+
+  // API auth routes sollten immer zugänglich sein
+  if (pathname.startsWith('/api/auth/')) {
+    return NextResponse.next()
+  }
 
   // Protected routes - nur für eingeloggte User
   const protectedPaths = ['/dashboard', '/settings', '/profile']

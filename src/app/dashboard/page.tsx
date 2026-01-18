@@ -17,25 +17,38 @@ export default function DashboardPage() {
       return;
     }
     
-    // If not authenticated, redirect to sign in
-    if (!session) {
-      router.push('/auth/signin?callbackUrl=/');
+    // If authenticated, show dashboard
+    if (status === 'authenticated' && session) {
+      setIsLoading(false);
       return;
     }
     
-    // If authenticated, show dashboard
-    if (session) {
+    // If not authenticated after loading, redirect will be handled by middleware
+    // Don't redirect here to avoid double redirects
+    if (status === 'unauthenticated') {
       setIsLoading(false);
     }
   }, [session, status, router]);
 
   // Show loading state while checking session
-  if (status === 'loading' || isLoading || !session) {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
           <p className="text-slate-400">Lade Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not authenticated, middleware should have redirected, but show loading just in case
+  if (status !== 'authenticated' || !session) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+          <p className="text-slate-400">Warte auf Anmeldung...</p>
         </div>
       </div>
     );
