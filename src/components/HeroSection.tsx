@@ -2,16 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { Shield, ChevronDown, CheckCircle2, Sparkles, Zap, TrendingUp, Lock, LayoutDashboard, Save, History, FolderOpen, ArrowRight } from 'lucide-react';
+import { Shield, ChevronDown, CheckCircle2, Sparkles, Zap, TrendingUp, Lock, LayoutDashboard, Save, History, FolderOpen, ArrowRight, LogIn, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 export function HeroSection() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const isLoggedIn = !!session?.user;
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  const handleSignIn = async () => {
+    await signIn('google', { callbackUrl: '/' });
+  };
 
   return (
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 py-16 overflow-hidden">
@@ -66,13 +73,104 @@ export function HeroSection() {
         </button>
       </div>
 
-      {/* Trust Badges */}
+      {/* Trust Badges - Different für eingeloggte User */}
       <div className={`mt-12 flex flex-wrap justify-center gap-6 sm:gap-8 transition-all duration-700 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <TrustBadge icon={<CheckCircle2 className="w-4 h-4" />} text="100% Kostenlos" />
-        <TrustBadge icon={<Lock className="w-4 h-4" />} text="Keine Daten gespeichert" />
-        <TrustBadge icon={<Zap className="w-4 h-4" />} text="Ergebnis in 60 Sek." />
-        <TrustBadge icon={<TrendingUp className="w-4 h-4" />} text="KI-Analyse" />
+        {isLoggedIn ? (
+          <>
+            <TrustBadge icon={<Save className="w-4 h-4" />} text="Analysen speichern" />
+            <TrustBadge icon={<LayoutDashboard className="w-4 h-4" />} text="Dashboard & Projekte" />
+            <TrustBadge icon={<History className="w-4 h-4" />} text="Vollständige Historie" />
+            <TrustBadge icon={<FolderOpen className="w-4 h-4" />} text="Projekte verwalten" />
+          </>
+        ) : (
+          <>
+            <TrustBadge icon={<CheckCircle2 className="w-4 h-4" />} text="100% Kostenlos" />
+            <TrustBadge icon={<Lock className="w-4 h-4" />} text="Keine Daten gespeichert" />
+            <TrustBadge icon={<Zap className="w-4 h-4" />} text="Ergebnis in 60 Sek." />
+            <TrustBadge icon={<TrendingUp className="w-4 h-4" />} text="KI-Analyse" />
+          </>
+        )}
       </div>
+
+      {/* Benefits Box für nicht-eingeloggte User */}
+      {!isLoggedIn && (
+        <div className={`mt-8 max-w-2xl mx-auto transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className="p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl backdrop-blur-sm shadow-lg shadow-indigo-500/10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-200">Mehr Vorteile mit Konto</h3>
+                <p className="text-xs text-slate-400">Melde dich kostenlos an und nutze alle Features</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Alle Analysen speichern</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Projekte für mehrere URLs verwalten</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Vergleich von Analysen über Zeit</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Zugriff von allen Geräten</span>
+              </div>
+            </div>
+            <button
+              onClick={handleSignIn}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Jetzt kostenlos mit Google anmelden</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Benefits für eingeloggte User */}
+      {isLoggedIn && (
+        <div className={`mt-8 max-w-2xl mx-auto transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className="p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl backdrop-blur-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <Sparkles className="w-5 h-5 text-indigo-400" />
+              <h3 className="text-lg font-semibold text-slate-200">Deine Vorteile mit Konto</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-300 mb-4">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Alle Analysen werden gespeichert</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Projekte für mehrere URLs verwalten</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Vergleich von Analysen über Zeit</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <span>Zugriff von allen Geräten</span>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors font-medium"
+            >
+              Zum Dashboard
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Feature Grid */}
       <div className={`mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
