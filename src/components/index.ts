@@ -11,3 +11,4 @@ export { HeroSection } from './HeroSection';
 export { ProblemSection } from './ProblemSection';
 export { AgencySection } from './AgencySection';
 export { ExpertRecommendation } from './ExpertRecommendation';
+export { AnalysisOverview } from './AnalysisOverview';

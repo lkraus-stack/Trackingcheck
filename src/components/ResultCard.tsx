@@ -28,6 +28,7 @@ import { SectionInfoPopup } from './SectionInfoPopup';
 import { QuickActions } from './QuickActions';
 import { AnalysisComparison } from './AnalysisComparison';
 import { PerformanceMarketingSection } from './PerformanceMarketing';
+import { AnalysisOverview } from './AnalysisOverview';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -84,25 +85,8 @@ export function ResultCard({ result }: ResultCardProps) {
 
   return (
     <div className="mt-2 space-y-3">
-      {/* Score Card - Compact */}
-      <div className={`bg-gradient-to-r ${getScoreBackground(result.score)} rounded-lg p-3 border border-slate-700`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <p className={`text-3xl font-bold ${getScoreColor(result.score)}`}>{result.score}</p>
-            <div>
-              <p className="text-slate-300 text-sm font-medium">Compliance Score</p>
-              <p className="text-slate-500 text-xs">
-                {new Date(result.timestamp).toLocaleDateString('de-DE')} • {result.gdprChecklist ? `DSGVO ${result.gdprChecklist.score}%` : ''}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {result.cookieBanner.detected && <MiniStatus good label="Banner" />}
-            {result.googleConsentMode.version === 'v2' && <MiniStatus good label="CM v2" />}
-            {result.trackingTags.serverSideTracking?.detected && <MiniStatus good label="sGTM" />}
-          </div>
-        </div>
-      </div>
+      {/* New Visual Overview Dashboard */}
+      <AnalysisOverview result={result} />
 
       {/* Cookie Consent Test */}
       {result.cookieConsentTest && (
