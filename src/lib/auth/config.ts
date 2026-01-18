@@ -3,28 +3,22 @@ import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
 
-// Validate required environment variables
-if (!process.env.GOOGLE_CLIENT_ID) {
-  throw new Error('GOOGLE_CLIENT_ID is not set in environment variables')
-}
-if (!process.env.GOOGLE_CLIENT_SECRET) {
-  throw new Error('GOOGLE_CLIENT_SECRET is not set in environment variables')
-}
-if (!process.env.NEXTAUTH_SECRET) {
-  throw new Error('NEXTAUTH_SECRET is not set in environment variables')
-}
-if (!process.env.NEXTAUTH_URL) {
-  console.warn('NEXTAUTH_URL is not set - this may cause issues in production')
+// Build providers array - only add Google if credentials are available
+// This allows the build to succeed even if env vars are not set
+const providers = [];
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })
+  );
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
-  ],
+  secret: process.env.NEXTAUTH_SECRET,
+  providers: providers,
   callbacks: {
     async session({ session, user }) {
       // User-ID zur Session hinzufügen (für API Routes)
