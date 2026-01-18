@@ -3,22 +3,40 @@ import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
 
+// Validate required environment variables at runtime
+const requiredEnvVars = {
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+};
+
+const missingVars = Object.entries(requiredEnvVars)
+  .filter(([_, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVars.length > 0 && process.env.NODE_ENV !== 'test') {
+  console.error('❌ Missing required environment variables:', missingVars.join(', '));
+  console.error('Please set these in Vercel Dashboard → Settings → Environment Variables');
+}
+
 // Build providers array - only add Google if credentials are available
-// This allows the build to succeed even if env vars are not set
 const providers = [];
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+if (requiredEnvVars.GOOGLE_CLIENT_ID && requiredEnvVars.GOOGLE_CLIENT_SECRET) {
   providers.push(
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: requiredEnvVars.GOOGLE_CLIENT_ID,
+      clientSecret: requiredEnvVars.GOOGLE_CLIENT_SECRET,
     })
   );
+} else {
+  console.warn('⚠️ Google OAuth provider not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
-  secret: process.env.NEXTAUTH_SECRET,
-  providers: providers,
+  secret: requiredEnvVars.NEXTAUTH_SECRET,
+  providers: providers.length > 0 ? providers : [],
   callbacks: {
     async session({ session, user }) {
       // User-ID zur Session hinzufügen (für API Routes)
