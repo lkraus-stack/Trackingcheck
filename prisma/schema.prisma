@@ -22,15 +22,18 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // NextAuth Relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
   // App-specific Relations
-  subscription  Subscription?
-  usageLimits   UsageLimits?
-  usageStats    UsageStats[]
-  projects      Project[]
-  analyses      Analysis[]
+  subscription Subscription?
+  usageLimits  UsageLimits?
+  usageStats   UsageStats[]
+  projects     Project[]
+  analyses     Analysis[]
+
+  // Newsletter & Marketing
+  newsletterSubscription NewsletterSubscription?
 
   @@index([email])
   @@index([googleId])
@@ -77,19 +80,19 @@ model VerificationToken {
 
 // Subscription Model
 model Subscription {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  plan               String   @default("free") // "free" | "pro" | "enterprise"
-  status             String   @default("active") // "active" | "canceled" | "expired"
-  stripeId           String?  @unique
-  stripeCustomerId   String?
-  stripePriceId      String?
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  plan                 String    @default("free") // "free" | "pro" | "enterprise"
+  status               String    @default("active") // "active" | "canceled" | "expired"
+  stripeId             String?   @unique
+  stripeCustomerId     String?
+  stripePriceId        String?
   stripeSubscriptionId String?
-  currentPeriodStart DateTime?
-  currentPeriodEnd   DateTime?
-  cancelAtPeriodEnd  Boolean  @default(false)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -99,19 +102,19 @@ model Subscription {
 
 // Usage Limits Model
 model UsageLimits {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  plan              String   @default("free")
+  id     String @id @default(cuid())
+  userId String @unique
+  plan   String @default("free")
 
   // Limits je nach Plan
-  maxAnalysesPerMonth Int    @default(10)  // Free: 10, Pro: 100, Enterprise: unlimited (0 = unlimited)
-  maxProjects          Int    @default(3)   // Free: 3, Pro: 50, Enterprise: unlimited (0 = unlimited)
-  maxAnalysesPerDay    Int    @default(5)   // Free: 5, Pro: 30, Enterprise: unlimited (0 = unlimited)
-  aiAnalysisEnabled    Boolean @default(true)  // Free: true, Pro: true, Enterprise: true
-  aiChatEnabled        Boolean @default(false) // Free: false, Pro: true, Enterprise: true
-  exportPdfEnabled     Boolean @default(false) // Free: false, Pro: true, Enterprise: true
-  deepScanEnabled      Boolean @default(false) // Free: false, Pro: true, Enterprise: true
-  apiAccessEnabled     Boolean @default(false) // Free: false, Pro: false, Enterprise: true
+  maxAnalysesPerMonth Int     @default(10) // Free: 10, Pro: 100, Enterprise: unlimited (0 = unlimited)
+  maxProjects         Int     @default(3) // Free: 3, Pro: 50, Enterprise: unlimited (0 = unlimited)
+  maxAnalysesPerDay   Int     @default(5) // Free: 5, Pro: 30, Enterprise: unlimited (0 = unlimited)
+  aiAnalysisEnabled   Boolean @default(true) // Free: true, Pro: true, Enterprise: true
+  aiChatEnabled       Boolean @default(false) // Free: false, Pro: true, Enterprise: true
+  exportPdfEnabled    Boolean @default(false) // Free: false, Pro: true, Enterprise: true
+  deepScanEnabled     Boolean @default(false) // Free: false, Pro: true, Enterprise: true
+  apiAccessEnabled    Boolean @default(false) // Free: false, Pro: false, Enterprise: true
 
   updatedAt DateTime @updatedAt
 
@@ -131,25 +134,25 @@ model UsageStats {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, date])
   @@unique([userId, date])
+  @@index([userId, date])
 }
 
 // Project Model (migration von IndexedDB)
 model Project {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  description String?
-  urls        String[] // Array von URLs
-  color       String
-  isFavorite  Boolean  @default(false)
-  notes       String?
-  tags        String[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  urls         String[] // Array von URLs
+  color        String
+  isFavorite   Boolean   @default(false)
+  notes        String?
+  tags         String[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   lastAnalysis DateTime?
-  avgScore    Int?
+  avgScore     Int?
 
   user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   analyses Analysis[]
@@ -165,7 +168,7 @@ model Analysis {
   userId    String
   projectId String?
   url       String
-  result    Json     // AnalysisResult als JSON
+  result    Json // AnalysisResult als JSON
   notes     String?
   tags      String[]
   createdAt DateTime @default(now())
@@ -177,4 +180,22 @@ model Analysis {
   @@index([userId, url])
   @@index([projectId])
   @@index([userId, createdAt])
+}
+
+// Newsletter Subscription Model
+model NewsletterSubscription {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  email          String
+  status         String    @default("active") // "active" | "unsubscribed" | "bounced"
+  source         String?   @default("signup") // "signup" | "manual" | "import"
+  tags           String[] // Für Segmentierung: ["new-user", "pro", "enterprise"]
+  subscribedAt   DateTime  @default(now())
+  unsubscribedAt DateTime?
+  lastEmailSent  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([status])
 }

@@ -15,10 +15,20 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(true);
 
   useEffect(() => {
     // Prüfe ob User bereits eingeloggt ist
     if (status === 'authenticated' && session) {
+      // Newsletter-Subscription beim Login speichern (wenn Checkbox aktiviert)
+      if (newsletterSubscribed && session.user) {
+        fetch('/api/newsletter/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscribe: true, tags: ['new-user'] }),
+        }).catch(err => console.error('Newsletter subscription error:', err));
+      }
+      
       const callbackUrl = searchParams.get('callbackUrl') || '/';
       router.push(callbackUrl);
       return;
@@ -32,7 +42,7 @@ function SignInContent() {
     } else if (errorParam) {
       setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
     }
-  }, [session, status, router, searchParams]);
+  }, [session, status, router, searchParams, newsletterSubscribed]);
 
   const handleSignIn = async () => {
     setIsLoading(true);
@@ -77,6 +87,21 @@ function SignInContent() {
               {error}
             </div>
           )}
+
+          {/* Newsletter Checkbox */}
+          <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={newsletterSubscribed}
+                onChange={(e) => setNewsletterSubscribed(e.target.checked)}
+                className="rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+              />
+              <span className="text-sm text-slate-300">
+                Newsletter abonnieren (Neuigkeiten, Updates, Tipps)
+              </span>
+            </label>
+          </div>
 
           <button
             onClick={handleSignIn}

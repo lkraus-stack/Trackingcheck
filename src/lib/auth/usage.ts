@@ -12,32 +12,55 @@ export interface UsageCheckResult {
 
 /**
  * Prüft ob User ein bestimmtes Limit erreicht hat
+ * WICHTIG: Für eingeloggte User KEINE Limits - unbegrenzte Analysen
  */
 export async function checkUsageLimits(
   userId: string,
   type: UsageType
 ): Promise<UsageCheckResult> {
   try {
+    // WICHTIG: Für eingeloggte User KEINE Limits für Analysen - unbegrenzte Nutzung
+    // Nur Feature-Flags werden geprüft (aiChat, exportPdf, etc.)
+    if (type === 'analyses') {
+      const now = new Date()
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      
+      // Hole aktuelle Usage Stats nur für Info (keine Limit-Prüfung)
+      const monthlyStats = await prisma.usageStats.findMany({
+        where: {
+          userId,
+          date: { gte: firstDayOfMonth },
+        },
+      })
+      
+      const currentMonthUsage = monthlyStats.reduce((sum, stat) => sum + stat.analysesCount, 0);
+      
+      // Keine Limits - immer erlaubt für eingeloggte User
+      return {
+        allowed: true,
+        currentUsage: currentMonthUsage,
+        limit: 0, // 0 = unlimited
+      }
+    }
+
+    // Für andere Usage-Types (aiRequests, apiCalls) prüfe Feature-Flags
     const limits = await prisma.usageLimits.findUnique({
       where: { userId },
     })
 
     if (!limits) {
-      // Default free limits wenn nicht vorhanden
+      // Default: Keine Limits für eingeloggte User
       return {
         allowed: true,
         currentUsage: 0,
-        limit: getDefaultLimit(type, 'free'),
+        limit: 0, // 0 = unlimited
       }
     }
 
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(0, 0, 0, 0)
 
-    // Hole aktuelle Usage Stats für diesen Monat
+    // Für aiRequests und apiCalls berechne Usage
     const monthlyStats = await prisma.usageStats.findMany({
       where: {
         userId,
@@ -45,15 +68,13 @@ export async function checkUsageLimits(
       },
     })
 
-    // Berechne aktuelle Usage
     const currentMonthUsage = monthlyStats.reduce((sum, stat) => {
-      if (type === 'analyses') return sum + stat.analysesCount
       if (type === 'aiRequests') return sum + stat.aiRequests
       if (type === 'apiCalls') return sum + stat.apiCalls
       return sum
     }, 0)
 
-    // Hole heutige Usage (für tägliche Limits)
+    // Hole heutige Usage (für Info)
     const todayStats = await prisma.usageStats.findFirst({
       where: {
         userId,
@@ -62,41 +83,12 @@ export async function checkUsageLimits(
     })
 
     const todayUsage = todayStats
-      ? type === 'analyses'
-        ? todayStats.analysesCount
-        : type === 'aiRequests'
-          ? todayStats.aiRequests
-          : todayStats.apiCalls
+      ? type === 'aiRequests'
+        ? todayStats.aiRequests
+        : todayStats.apiCalls
       : 0
 
-    // Prüfe monatliche Limits
-    if (type === 'analyses') {
-      const monthlyLimit = limits.maxAnalysesPerMonth
-      if (monthlyLimit > 0 && currentMonthUsage >= monthlyLimit) {
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-        return {
-          allowed: false,
-          message: `Monatliches Analyse-Limit erreicht (${monthlyLimit}/${monthlyLimit}). Upgrade auf Pro für mehr Analysen.`,
-          currentUsage: currentMonthUsage,
-          limit: monthlyLimit,
-          resetDate: nextMonth,
-        }
-      }
-
-      // Prüfe tägliche Limits
-      const dailyLimit = limits.maxAnalysesPerDay
-      if (dailyLimit > 0 && todayUsage >= dailyLimit) {
-        return {
-          allowed: false,
-          message: `Tägliches Analyse-Limit erreicht (${dailyLimit}/${dailyLimit}). Versuche es morgen erneut oder upgrade auf Pro.`,
-          currentUsage: todayUsage,
-          limit: dailyLimit,
-          resetDate: tomorrow,
-        }
-      }
-    }
-
-    // Feature-Flags prüfen
+    // Feature-Flags prüfen (nur für aiRequests und apiCalls)
     if (type === 'aiRequests' && !limits.aiChatEnabled) {
       return {
         allowed: false,
@@ -115,10 +107,11 @@ export async function checkUsageLimits(
       }
     }
 
+    // Für eingeloggte User: KEINE Limits - immer erlaubt
     return {
       allowed: true,
-      currentUsage: type === 'analyses' ? currentMonthUsage : todayUsage,
-      limit: type === 'analyses' ? limits.maxAnalysesPerMonth : limits.maxAnalysesPerDay,
+      currentUsage: todayUsage,
+      limit: 0, // 0 = unlimited
     }
   } catch (error) {
     console.error('Error checking usage limits:', error)
@@ -176,27 +169,11 @@ export async function incrementUsage(
 
 /**
  * Holt Default Limits für einen Plan
+ * WICHTIG: Für eingeloggte User werden KEINE Limits verwendet (0 = unlimited)
  */
 function getDefaultLimit(type: UsageType, plan: string): number {
-  const limits: Record<string, Record<UsageType, number>> = {
-    free: {
-      analyses: 10,
-      aiRequests: 0,
-      apiCalls: 0,
-    },
-    pro: {
-      analyses: 100,
-      aiRequests: 1000,
-      apiCalls: 0,
-    },
-    enterprise: {
-      analyses: 0, // unlimited
-      aiRequests: 0, // unlimited
-      apiCalls: 10000,
-    },
-  }
-
-  return limits[plan]?.[type] ?? 0
+  // Für alle eingeloggten User: 0 = unlimited
+  return 0
 }
 
 /**

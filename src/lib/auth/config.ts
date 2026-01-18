@@ -74,20 +74,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!existingLimits) {
             // Erstelle Default Free Plan Limits
             try {
-              await prisma.usageLimits.create({
-                data: {
-                  userId: user.id,
-                  plan: 'free',
-                  maxAnalysesPerMonth: 10,
-                  maxProjects: 3,
-                  maxAnalysesPerDay: 5,
-                  aiAnalysisEnabled: true,
-                  aiChatEnabled: false,
-                  exportPdfEnabled: false,
-                  deepScanEnabled: false,
-                  apiAccessEnabled: false,
-                },
-              })
+                // WICHTIG: Keine Limits für eingeloggte User - unbegrenzte Analysen
+                await prisma.usageLimits.create({
+                  data: {
+                    userId: user.id,
+                    plan: 'free',
+                    maxAnalysesPerMonth: 0, // 0 = unlimited
+                    maxProjects: 0, // 0 = unlimited
+                    maxAnalysesPerDay: 0, // 0 = unlimited
+                    aiAnalysisEnabled: true,
+                    aiChatEnabled: false,
+                    exportPdfEnabled: false,
+                    deepScanEnabled: false,
+                    apiAccessEnabled: false,
+                  },
+                })
             } catch (limitsError) {
               console.error('Error creating usage limits:', limitsError)
               // Don't block login if limits creation fails - they can be created later
