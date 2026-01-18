@@ -63,6 +63,8 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showAssignToProject, setShowAssignToProject] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrationComplete, setMigrationComplete] = useState(false);
 
   const isLoggedIn = !!session?.user;
 
@@ -81,9 +83,57 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
           fetch('/api/dashboard/stats').then(r => r.ok ? r.json() : null),
         ]);
 
-        setProjects(projectsRes.projects || []);
-        setAnalyses(analysesRes.analyses || []);
-        setStats(statsRes || null);
+        const dbProjects = projectsRes.projects || [];
+        const dbAnalyses = analysesRes.analyses || [];
+
+        // Auto-Migration: Prüfe ob IndexedDB Daten vorhanden sind und Datenbank leer ist
+        if (dbProjects.length === 0 && dbAnalyses.length === 0 && !migrationComplete) {
+          try {
+            const [indexedDBProjects, indexedDBAnalyses] = await Promise.all([
+              getAllProjects(),
+              getAllAnalyses(),
+            ]);
+
+            // Wenn IndexedDB Daten vorhanden sind, migriere automatisch
+            if (indexedDBProjects.length > 0 || indexedDBAnalyses.length > 0) {
+              setMigrating(true);
+              const migrationResponse = await fetch('/api/migrate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  projects: indexedDBProjects,
+                  analyses: indexedDBAnalyses,
+                }),
+              });
+
+              if (migrationResponse.ok) {
+                const migrationResult = await migrationResponse.json();
+                setMigrationComplete(true);
+                
+                // Lade Daten nach Migration neu
+                const [newProjectsRes, newAnalysesRes, newStatsRes] = await Promise.all([
+                  fetch('/api/projects').then(r => r.ok ? r.json() : { projects: [] }),
+                  fetch('/api/analyses').then(r => r.ok ? r.json() : { analyses: [] }),
+                  fetch('/api/dashboard/stats').then(r => r.ok ? r.json() : null),
+                ]);
+
+                setProjects(newProjectsRes.projects || []);
+                setAnalyses(newAnalysesRes.analyses || []);
+                setStats(newStatsRes || null);
+              } else {
+                console.error('Migration fehlgeschlagen');
+              }
+            }
+          } catch (migrationError) {
+            console.error('Error during migration:', migrationError);
+          } finally {
+            setMigrating(false);
+          }
+        } else {
+          setProjects(dbProjects);
+          setAnalyses(dbAnalyses);
+          setStats(statsRes || null);
+        }
       } else {
         // Für nicht eingeloggte User: Daten aus IndexedDB laden
         const [projectsData, analysesData, statsData] = await Promise.all([
@@ -422,12 +472,23 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
                   </div>
 
                   {filteredProjects.length === 0 ? (
-                    <div className="text-center py-8 sm:py-12">
-                      <FolderOpen className="w-10 h-10 sm:w-12 sm:h-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm sm:text-base">Keine Projekte gefunden</p>
-                      <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                        Erstelle ein Projekt, um deine Analysen zu organisieren.
+                    <div className="text-center py-12 sm:py-16">
+                      <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-4 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                        <FolderOpen className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-400" />
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-slate-200 mb-2">
+                        Keine Projekte vorhanden
+                      </h3>
+                      <p className="text-sm sm:text-base text-slate-400 mb-6 max-w-md mx-auto">
+                        Erstelle dein erstes Projekt, um deine Analysen zu organisieren und den Überblick zu behalten.
                       </p>
+                      <button
+                        onClick={() => setShowCreateProject(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <FolderPlus className="w-4 h-4" />
+                        Erstes Projekt erstellen
+                      </button>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -455,9 +516,23 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
               {activeTab === 'history' && (
                 <div className="space-y-3">
                   {filteredAnalyses.length === 0 ? (
-                    <div className="text-center py-12">
-                      <History className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                      <p className="text-slate-400">Keine Analysen gefunden</p>
+                    <div className="text-center py-12 sm:py-16">
+                      <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-4 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                        <History className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-400" />
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-slate-200 mb-2">
+                        Noch keine Analysen
+                      </h3>
+                      <p className="text-sm sm:text-base text-slate-400 mb-6 max-w-md mx-auto">
+                        Führe deine erste Analyse durch, um die Tracking-Konfiguration einer Website zu prüfen.
+                      </p>
+                      <button
+                        onClick={() => onClose()}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Globe className="w-4 h-4" />
+                        Erste Analyse starten
+                      </button>
                     </div>
                   ) : (
                     filteredAnalyses.map((analysis) => (
