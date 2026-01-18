@@ -871,26 +871,41 @@ function generateIssues(
   }
 
   // Cookie Banner Issues
-  // Prüfen ob überhaupt Tracking-relevant (Client-Side)
-  const hasAnyClientSideTracking = trackingTags.googleAnalytics.detected || 
+  // Unterscheide zwischen "Major" Tracking (GA, GTM, Meta, etc.) und "Other" Tracking (PostHog, Hotjar, etc.)
+  const hasMajorTracking = trackingTags.googleAnalytics.detected || 
     trackingTags.metaPixel.detected ||
     trackingTags.googleTagManager.detected ||
     trackingTags.linkedInInsight.detected ||
-    trackingTags.tiktokPixel.detected ||
-    trackingTags.other.length > 0 ||
-    cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
-
+    trackingTags.tiktokPixel.detected;
+  
+  const hasOnlyOtherTracking = !hasMajorTracking && trackingTags.other.length > 0;
+  const hasTrackingCookies = cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+  
+  // Kombinierte Variable für Abwärtskompatibilität
+  const hasAnyClientSideTracking = hasMajorTracking || hasOnlyOtherTracking || hasTrackingCookies;
+  
   // WICHTIG: Prüfen ob Server-Side Tracking Indikatoren vorhanden sind
   const hasServerSideIndicators = trackingTags.serverSideTracking.detected;
 
   if (!cookieBanner.detected) {
-    if (hasAnyClientSideTracking) {
+    if (hasMajorTracking || hasTrackingCookies) {
+      // Major Tracking-Dienste ohne Cookie-Banner = Error
       issues.push({
         severity: 'error',
         category: 'cookie-banner',
         title: 'Kein Cookie-Banner erkannt',
         description: 'Tracking-Tags erkannt, aber kein Cookie-Banner/Consent-Management gefunden.',
         recommendation: 'Implementieren Sie einen DSGVO-konformen Cookie-Banner mit Consent-Management.',
+      });
+    } else if (hasOnlyOtherTracking) {
+      // Nur "Other" Tracking (z.B. PostHog, Hotjar) ohne Cookie-Banner = Warning (weniger kritisch)
+      const otherNames = trackingTags.other.map(o => o.name).join(', ');
+      issues.push({
+        severity: 'warning',
+        category: 'cookie-banner',
+        title: 'Tracking-Tool ohne Cookie-Banner',
+        description: `${otherNames} erkannt, aber kein Cookie-Banner gefunden. Je nach Konfiguration könnte ein Consent erforderlich sein.`,
+        recommendation: 'Prüfen Sie, ob das Tool personenbezogene Daten sammelt und implementieren Sie ggf. ein Consent-Management.',
       });
     } else if (hasServerSideIndicators) {
       // Server-Side Tracking erkannt, aber kein Banner - neutral bewerten
@@ -901,12 +916,12 @@ function generateIssues(
         description: 'Es wurden Server-Side Tracking Indikatoren gefunden, aber kein Cookie-Banner erkannt. Das Consent-Management könnte serverseitig erfolgen oder der Banner wurde nicht erkannt.',
       });
     } else {
-      // Weder Client-Side noch Server-Side Tracking erkannt - neutral bewerten
+      // Kein Tracking erkannt - Website ist datenschutzfreundlich
       issues.push({
         severity: 'info',
         category: 'cookie-banner',
-        title: 'Kein Client-Side Tracking erkannt',
-        description: 'Es wurden keine clientseitigen Tracking-Tags oder Marketing-Cookies erkannt. Mögliche Gründe: (1) Tracking ist tatsächlich nicht vorhanden, (2) Server-Side Tracking wird verwendet, oder (3) Tracking ist durch Consent-Management blockiert. Ein Cookie-Banner ist möglicherweise nicht erforderlich.',
+        title: 'Kein Tracking erkannt',
+        description: 'Es wurden keine Tracking-Tags oder Marketing-Cookies erkannt. Die Website scheint datenschutzfreundlich zu sein. Ein Cookie-Banner ist möglicherweise nicht erforderlich.',
       });
     }
   } else {
@@ -1241,25 +1256,29 @@ function calculateScore(
   trackingTags: AnalysisResult['trackingTags'],
   cookies: CookieResult[]
 ): number {
-  // Prüfen ob Client-Side Tracking vorhanden ist
-  const hasAnyClientSideTracking = trackingTags.googleAnalytics.detected || 
+  // Unterscheide zwischen Major Tracking und Other Tracking
+  const hasMajorTracking = trackingTags.googleAnalytics.detected || 
     trackingTags.metaPixel.detected ||
     trackingTags.googleTagManager.detected ||
     trackingTags.linkedInInsight.detected ||
-    trackingTags.tiktokPixel.detected ||
-    trackingTags.other.length > 0 ||
-    cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
-
+    trackingTags.tiktokPixel.detected;
+  
+  const hasOnlyOtherTracking = !hasMajorTracking && trackingTags.other.length > 0;
+  const hasTrackingCookies = cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+  
   // WICHTIG: Prüfen ob Server-Side Tracking Indikatoren vorhanden sind
   const hasServerSideIndicators = trackingTags.serverSideTracking.detected;
 
-  // Wenn weder Client-Side noch Server-Side Tracking erkannt wurde
-  // Website ist entweder datenschutzfreundlich ODER verwendet nicht-erkennbares Server-Side Tracking
-  // In beiden Fällen: NEUTRAL bewerten (nicht als gut oder schlecht)
-  if (!hasAnyClientSideTracking) {
-    if (hasServerSideIndicators) {
+  // FALL 1: Kein Major Tracking, nur "Other" Tracking (z.B. PostHog, Hotjar)
+  // Diese Websites sollten nicht hart bestraft werden
+  if (!hasMajorTracking && !hasTrackingCookies) {
+    if (hasOnlyOtherTracking) {
+      // Nur Other Tracking (z.B. PostHog) - Score 80-90
+      // Warning für fehlendes Cookie-Banner, aber kein schwerer Abzug
+      const warnings = issues.filter(i => i.severity === 'warning').length;
+      return Math.max(80, 92 - (warnings * 3));
+    } else if (hasServerSideIndicators) {
       // Server-Side Tracking erkannt - Score 75-85 (neutral-positiv)
-      // Wir können die Qualität nicht vollständig bewerten
       const nonCriticalWarnings = issues.filter(i => 
         i.severity === 'warning' && 
         i.category !== 'tracking' &&
@@ -1269,19 +1288,13 @@ function calculateScore(
       
       return Math.max(70, 85 - (nonCriticalWarnings * 2));
     } else {
-      // Weder Client-Side noch Server-Side erkannt
-      // Könnte datenschutzfreundlich sein ODER nicht-erkennbares Tracking
-      // Score 80-90 (neutral-positiv, nicht bestrafen)
-      const nonTrackingWarnings = issues.filter(i => 
-        i.severity === 'warning' && 
-        i.category !== 'cookie-banner' && 
-        i.category !== 'consent-mode' &&
-        i.category !== 'tracking' &&
-        i.category !== 'conversion' &&
-        i.category !== 'gtm'
+      // KEIN Tracking erkannt = Datenschutzfreundlich!
+      // Score 90-100 (sehr gut!)
+      const minorIssues = issues.filter(i => 
+        i.severity === 'warning' || i.severity === 'info'
       ).length;
       
-      return Math.max(75, 90 - (nonTrackingWarnings * 2));
+      return Math.max(85, 100 - (minorIssues * 2));
     }
   }
 

@@ -1,0 +1,121 @@
+[
+  {
+    "url": "https://www.apple.com/de/",
+    "name": "Apple Deutschland",
+    "score": 81,
+    "passed": true,
+    "failures": [],
+    "details": {
+      "cookieBanner": {
+        "detected": false
+      },
+      "tracking": {
+        "clientSide": false,
+        "serverSide": true,
+        "gtm": false,
+        "ga4": false,
+        "meta": false
+      },
+      "criticalIssues": [
+        {
+          "severity": "warning",
+          "title": "Keine Währung angegeben",
+          "category": "ecommerce"
+        },
+        {
+          "severity": "warning",
+          "title": "Conversion Tracking Qualität niedrig",
+          "category": "conversion"
+        },
+        {
+          "severity": "warning",
+          "title": "E-Commerce Events unvollständig",
+          "category": "ecommerce"
+        }
+      ]
+    }
+  },
+  {
+    "url": "https://www.rhoen-park-hotel.de/",
+    "name": "Rhön Park Hotel",
+    "score": 86,
+    "passed": true,
+    "failures": [],
+    "details": {
+      "cookieBanner": {
+        "detected": true,
+        "provider": "Real Cookie Banner"
+      },
+      "tracking": {
+        "clientSide": true,
+        "serverSide": true,
+        "gtm": false,
+        "ga4": true,
+        "meta": true
+      },
+      "criticalIssues": [
+        {
+          "severity": "warning",
+          "title": "Akzeptieren-Button nicht gefunden",
+          "category": "cookies"
+        },
+        {
+          "severity": "warning",
+          "title": "Ablehnen-Button nicht gefunden",
+          "category": "cookies"
+        },
+        {
+          "severity": "warning",
+          "title": "Kein gültiger TC String",
+          "category": "tcf"
+        },
+        {
+          "severity": "warning",
+          "title": "GOOGLE: Server-Side fehlt",
+          "category": "conversion"
+        },
+        {
+          "severity": "warning",
+          "title": "META: Deduplizierung fehlt",
+          "category": "conversion"
+        },
+        {
+          "severity": "warning",
+          "title": "Google Click IDs fehlen",
+          "category": "attribution"
+        }
+      ]
+    }
+  },
+  {
+    "url": "https://vantero.chat",
+    "name": "Vantero Chat",
+    "score": 75,
+    "passed": true,
+    "failures": [],
+    "details": {
+      "cookieBanner": {
+        "detected": false
+      },
+      "tracking": {
+        "clientSide": false,
+        "serverSide": false,
+        "gtm": false,
+        "ga4": false,
+        "meta": false
+      },
+      "criticalIssues": [
+        {
+          "severity": "error",
+          "title": "Kein Cookie-Banner erkannt",
+          "category": "cookie-banner"
+        },
+        {
+          "severity": "warning",
+          "title": "Conversion Tracking Qualität niedrig",
+          "category": "conversion"
+        }
+      ]
+    }
+  }
+]
