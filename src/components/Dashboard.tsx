@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -51,6 +52,7 @@ interface DashboardProps {
 type Tab = 'overview' | 'projects' | 'history';
 
 export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardProps) {
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [projects, setProjects] = useState<Project[]>([]);
   const [analyses, setAnalyses] = useState<StoredAnalysis[]>([]);
@@ -61,21 +63,37 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showAssignToProject, setShowAssignToProject] = useState(false);
 
+  const isLoggedIn = !!session?.user;
+
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isLoggedIn]);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [projectsData, analysesData, statsData] = await Promise.all([
-        getAllProjects(),
-        getAllAnalyses(),
-        getStorageStats(),
-      ]);
-      setProjects(projectsData);
-      setAnalyses(analysesData);
-      setStats(statsData);
+      if (isLoggedIn) {
+        // Für eingeloggte User: Daten aus Datenbank laden
+        const [projectsRes, analysesRes, statsRes] = await Promise.all([
+          fetch('/api/projects').then(r => r.ok ? r.json() : { projects: [] }),
+          fetch('/api/analyses').then(r => r.ok ? r.json() : { analyses: [] }),
+          fetch('/api/dashboard/stats').then(r => r.ok ? r.json() : null),
+        ]);
+
+        setProjects(projectsRes.projects || []);
+        setAnalyses(analysesRes.analyses || []);
+        setStats(statsRes || null);
+      } else {
+        // Für nicht eingeloggte User: Daten aus IndexedDB laden
+        const [projectsData, analysesData, statsData] = await Promise.all([
+          getAllProjects(),
+          getAllAnalyses(),
+          getStorageStats(),
+        ]);
+        setProjects(projectsData);
+        setAnalyses(analysesData);
+        setStats(statsData);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -85,26 +103,77 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
 
   const handleDeleteProject = async (projectId: string) => {
     if (confirm('Projekt und alle zugehörigen Analysen wirklich löschen?')) {
-      await deleteProject(projectId);
+      if (isLoggedIn) {
+        const response = await fetch(`/api/projects/${projectId}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          alert('Fehler beim Löschen des Projekts');
+          return;
+        }
+      } else {
+        await deleteProject(projectId);
+      }
       await loadData();
     }
   };
 
   const handleToggleFavorite = async (projectId: string) => {
-    await toggleProjectFavorite(projectId);
+    if (isLoggedIn) {
+      const project = projects.find(p => p.id === projectId);
+      if (project) {
+        const response = await fetch(`/api/projects/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...project, isFavorite: !project.isFavorite }),
+        });
+        if (!response.ok) {
+          alert('Fehler beim Aktualisieren des Projekts');
+          return;
+        }
+      }
+    } else {
+      await toggleProjectFavorite(projectId);
+    }
     await loadData();
   };
 
   const handleDeleteAnalysis = async (analysisId: string) => {
     if (confirm('Analyse wirklich löschen?')) {
-      await deleteAnalysis(analysisId);
+      if (isLoggedIn) {
+        const response = await fetch(`/api/analyses/${analysisId}`, {
+          method: 'DELETE',
+        });
+        if (!response.ok) {
+          alert('Fehler beim Löschen der Analyse');
+          return;
+        }
+      } else {
+        await deleteAnalysis(analysisId);
+      }
       await loadData();
     }
   };
 
   const handleSaveCurrentAnalysis = async (projectId?: string) => {
     if (currentAnalysis) {
-      await saveAnalysis(currentAnalysis, projectId);
+      if (isLoggedIn) {
+        const response = await fetch('/api/analyses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: currentAnalysis.url,
+            result: currentAnalysis,
+            projectId,
+          }),
+        });
+        if (!response.ok) {
+          alert('Fehler beim Speichern der Analyse');
+          return;
+        }
+      } else {
+        await saveAnalysis(currentAnalysis, projectId);
+      }
       await loadData();
       setShowAssignToProject(false);
     }
@@ -408,10 +477,44 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
               setEditingProject(null);
             }}
             onSave={async (projectData) => {
-              if (editingProject) {
-                await updateProject({ ...editingProject, ...projectData });
+              if (isLoggedIn) {
+                if (editingProject) {
+                  const response = await fetch(`/api/projects/${editingProject.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...editingProject, ...projectData }),
+                  });
+                  if (!response.ok) {
+                    const error = await response.json();
+                    if (error.upgradeRequired) {
+                      alert(error.message || 'Projekt-Limit erreicht. Upgrade auf Pro für mehr Projekte.');
+                    } else {
+                      alert('Fehler beim Aktualisieren des Projekts');
+                    }
+                    return;
+                  }
+                } else {
+                  const response = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(projectData),
+                  });
+                  if (!response.ok) {
+                    const error = await response.json();
+                    if (error.upgradeRequired) {
+                      alert(error.message || 'Projekt-Limit erreicht. Upgrade auf Pro für mehr Projekte.');
+                    } else {
+                      alert('Fehler beim Erstellen des Projekts');
+                    }
+                    return;
+                  }
+                }
               } else {
-                await createProject(projectData);
+                if (editingProject) {
+                  await updateProject({ ...editingProject, ...projectData });
+                } else {
+                  await createProject(projectData);
+                }
               }
               await loadData();
               setShowCreateProject(false);
