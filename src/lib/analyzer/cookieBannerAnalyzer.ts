@@ -159,93 +159,98 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
 }
 
 function detectBannerPresence(htmlLower: string, combinedLower: string): boolean {
-  // Prüfe auf typische Cookie-Banner Elemente
-  const bannerPatterns = [
-    'cookie-banner',
-    'cookie-consent',
-    'consent-banner',
-    'privacy-banner',
-    'gdpr-banner',
-    'cookie-notice',
-    'cookie-popup',
-    'consent-popup',
-    'cookie-modal',
-    'consent-modal',
-    'cookie-overlay',
-    'consent-overlay',
-    'cookieconsent',
-    'cookie_banner',
-    'consent_banner',
+  // Prüfe auf typische Cookie-Banner Elemente (CSS-Klassen und IDs)
+  // Diese sind sehr spezifisch und zeigen definitiv einen CMP/Banner an
+  const definitiveBannerPatterns = [
+    // CMP-spezifische Patterns (definitiv Banner)
     'cybotcookiebot',
-    'onetrust',
+    'onetrust-consent',
+    'onetrust-banner',
     'ot-sdk-container',
-    'usercentrics',
-    'uc-banner',
+    'ot-sdk-show-settings',
+    'usercentrics-root',
     'uc-center-container',
+    'uc-banner',
+    '#uc-',
     'real-cookie-banner',
     'rcb-consent',
     'rcb-banner',
-    'borlabs',
-    'cmplz',
+    'data-rcb-',
+    'borlabscookie',
+    'borlabs-cookie',
+    'cmplz-cookiebanner',
     'didomi-notice',
     'didomi-popup',
+    'didomi-consent',
     'qc-cmp',
-    'klaro',
-    'iubenda',
-    'termly',
-    'cookieyes',
-    'cky-consent',
+    'klaro-cookie',
+    'iubenda-cs',
+    'termly-styles',
+    'cookieyes-container',
+    'cky-consent-container',
+    'cky-consent-bar',
   ];
 
-  for (const pattern of bannerPatterns) {
-    if (htmlLower.includes(pattern) || combinedLower.includes(pattern)) {
+  // Exakte Matches für definitive CMP-Patterns
+  for (const pattern of definitiveBannerPatterns) {
+    if (htmlLower.includes(pattern)) {
+      return true;
+    }
+  }
+  
+  // Prüfe auf CMP-spezifische HTML-Attribute (id oder class mit diesen Patterns)
+  // Diese müssen als HTML-Attribut vorkommen, nicht als Text-Content
+  const attributePatterns = [
+    /id=["'][^"']*cookie-?banner[^"']*["']/i,
+    /id=["'][^"']*cookie-?consent[^"']*["']/i,
+    /id=["'][^"']*consent-?banner[^"']*["']/i,
+    /id=["'][^"']*gdpr-?banner[^"']*["']/i,
+    /id=["'][^"']*privacy-?banner[^"']*["']/i,
+    /class=["'][^"']*cookie-?banner[^"']*["']/i,
+    /class=["'][^"']*cookie-?consent[^"']*["']/i,
+    /class=["'][^"']*consent-?banner[^"']*["']/i,
+    /class=["'][^"']*consent-?modal[^"']*["']/i,
+    /class=["'][^"']*consent-?overlay[^"']*["']/i,
+    /class=["'][^"']*cookie-?modal[^"']*["']/i,
+    /class=["'][^"']*cookie-?popup[^"']*["']/i,
+    /class=["'][^"']*cookie-?notice[^"']*["']/i,
+  ];
+  
+  for (const pattern of attributePatterns) {
+    if (pattern.test(htmlLower)) {
       return true;
     }
   }
 
-  // DSGVO-konform: Prüfe auf role="dialog" und aria-modal="true" (Standard-Attribute für Consent-Banner)
-  const dialogPatterns = [
-    'role="dialog"',
-    "role='dialog'",
-    'role="alertdialog"',
-    "role='alertdialog'",
-    'aria-modal="true"',
-    "aria-modal='true'",
-    'data-consent',
-    'data-cookie',
-    'data-gdpr',
-    'data-privacy',
-    'data-cmp',
+  // Prüfe auf CMP data-Attribute (sehr spezifisch für Cookie-Banner)
+  const dataAttributePatterns = [
+    'data-consent=',
+    'data-cookie-consent',
+    'data-gdpr=',
+    'data-cmp=',
+    'data-cookieconsent',
+    'data-privacy-manager',
   ];
   
-  let hasDialogElement = false;
-  for (const pattern of dialogPatterns) {
+  for (const pattern of dataAttributePatterns) {
     if (htmlLower.includes(pattern)) {
-      hasDialogElement = true;
-      break;
+      return true;
     }
   }
+
+  // STRENGER: Prüfe auf role="dialog" NUR wenn es auch cookie/consent im GLEICHEN Element oder nahen Kontext gibt
+  // Dies verhindert False Positives bei normalen Modal-Dialogen
+  const dialogWithConsentRegex = /<[^>]+role=["'](?:dialog|alertdialog)["'][^>]*>[\s\S]{0,500}(?:cookie|consent|datenschutz|einwilligung|gdpr|dsgvo)/i;
+  const consentWithDialogRegex = /(?:cookie|consent|datenschutz|einwilligung|gdpr|dsgvo)[\s\S]{0,500}<[^>]+role=["'](?:dialog|alertdialog)["']/i;
   
-  // Wenn ein Dialog-Element gefunden wurde UND Cookie/Consent Keywords vorhanden sind
-  if (hasDialogElement) {
-    const cookieKeywords = ['cookie', 'consent', 'datenschutz', 'privacy', 'dsgvo', 'gdpr'];
-    for (const keyword of cookieKeywords) {
-      if (htmlLower.includes(keyword)) {
-        return true;
-      }
-    }
+  if (dialogWithConsentRegex.test(htmlLower) || consentWithDialogRegex.test(htmlLower)) {
+    return true;
   }
 
-  // Prüfe auf Kombination von Keywords die auf einen Banner hindeuten
-  let keywordCount = 0;
-  for (const keyword of BANNER_KEYWORDS) {
-    if (htmlLower.includes(keyword) || combinedLower.includes(keyword)) {
-      keywordCount++;
-    }
-  }
-
-  // Wenn mehrere Keywords gefunden wurden, ist wahrscheinlich ein Banner vorhanden
-  return keywordCount >= 3;
+  // NICHT mehr allgemeine Keyword-Zählung verwenden!
+  // Das führte zu False Positives auf Websites die einfach nur "Datenschutz" erwähnen
+  
+  return false;
 }
 
 function detectAcceptButton(htmlLower: string): boolean {

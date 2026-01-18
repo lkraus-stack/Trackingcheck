@@ -195,7 +195,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     addStep('generate_issues', 'completed', `${issues.length} Hinweise generiert`);
     
     // Score berechnen
-    const score = calculateScore(cookieBanner, tcf, googleConsentMode, issues, cookieConsentTest, gdprChecklist);
+    const score = calculateScore(cookieBanner, tcf, googleConsentMode, issues, cookieConsentTest, gdprChecklist, trackingTags, cookies);
     
     return {
       url: normalizedUrl,
@@ -871,15 +871,31 @@ function generateIssues(
   }
 
   // Cookie Banner Issues
+  // Prüfen ob überhaupt Tracking-relevant
+  const hasAnyTracking = trackingTags.googleAnalytics.detected || 
+    trackingTags.metaPixel.detected ||
+    trackingTags.googleTagManager.detected ||
+    trackingTags.linkedInInsight.detected ||
+    trackingTags.tiktokPixel.detected ||
+    trackingTags.other.length > 0 ||
+    cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+
   if (!cookieBanner.detected) {
-    const hasTracking = trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected;
-    if (hasTracking) {
+    if (hasAnyTracking) {
       issues.push({
         severity: 'error',
         category: 'cookie-banner',
         title: 'Kein Cookie-Banner erkannt',
         description: 'Tracking-Tags erkannt, aber kein Cookie-Banner/Consent-Management gefunden.',
         recommendation: 'Implementieren Sie einen DSGVO-konformen Cookie-Banner mit Consent-Management.',
+      });
+    } else {
+      // Kein Tracking und kein Banner = OK
+      issues.push({
+        severity: 'info',
+        category: 'cookie-banner',
+        title: 'Kein Tracking erkannt',
+        description: 'Es wurden keine Tracking-Tags oder Marketing-Cookies erkannt. Ein Cookie-Banner ist möglicherweise nicht erforderlich.',
       });
     }
   } else {
@@ -924,7 +940,7 @@ function generateIssues(
     }
   }
 
-  // Google Consent Mode Issues
+  // Google Consent Mode Issues - NUR wenn auch Google Tracking vorhanden ist
   if (trackingTags.googleAnalytics.detected || trackingTags.googleTagManager.detected) {
     const consentModeCheck = checkConsentModeCompleteness(googleConsentMode);
     
@@ -946,7 +962,7 @@ function generateIssues(
       });
     }
 
-    // NEU: Consent Mode Update Check
+    // NEU: Consent Mode Update Check - nur wenn Consent Mode erkannt wurde
     if (googleConsentMode.detected && !googleConsentMode.updateConsent?.detected) {
       issues.push({
         severity: 'warning',
@@ -974,6 +990,14 @@ function generateIssues(
         recommendation: 'Fügen Sie die fehlenden Parameter für volle Google Ads Funktionalität hinzu.',
       });
     }
+  } else if (!hasAnyTracking) {
+    // Kein Tracking = kein Consent Mode nötig, das ist gut
+    issues.push({
+      severity: 'info',
+      category: 'consent-mode',
+      title: 'Kein Google Tracking erkannt',
+      description: 'Es wurden keine Google Tracking-Tags erkannt. Consent Mode ist nicht erforderlich.',
+    });
   }
 
   // E-Commerce Issues
@@ -1194,8 +1218,35 @@ function calculateScore(
   googleConsentMode: AnalysisResult['googleConsentMode'],
   issues: Issue[],
   cookieConsentTest: CookieConsentTestResult | undefined,
-  gdprChecklist: GDPRChecklistResult
+  gdprChecklist: GDPRChecklistResult,
+  trackingTags: AnalysisResult['trackingTags'],
+  cookies: CookieResult[]
 ): number {
+  // Prüfen ob überhaupt Tracking vorhanden ist
+  const hasAnyTracking = trackingTags.googleAnalytics.detected || 
+    trackingTags.metaPixel.detected ||
+    trackingTags.googleTagManager.detected ||
+    trackingTags.linkedInInsight.detected ||
+    trackingTags.tiktokPixel.detected ||
+    trackingTags.other.length > 0 ||
+    cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+
+  // Wenn KEIN Tracking vorhanden ist, ist die Website datenschutzfreundlich
+  // Score sollte hoch sein
+  if (!hasAnyTracking) {
+    // Basis-Score für Websites ohne Tracking: 95 (sehr gut)
+    // Kleine Abzüge für Warnings die andere Themen betreffen
+    const nonTrackingWarnings = issues.filter(i => 
+      i.severity === 'warning' && 
+      i.category !== 'cookie-banner' && 
+      i.category !== 'consent-mode' &&
+      i.category !== 'tracking'
+    ).length;
+    
+    return Math.max(85, 100 - (nonTrackingWarnings * 2));
+  }
+
+  // Wenn Tracking vorhanden ist: Standard-Scoring
   let score = 100;
 
   const errors = issues.filter(i => i.severity === 'error').length;
@@ -1359,12 +1410,27 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
       `Event Quality: ${eventQualityScore.overallScore}%${funnelValidation.isEcommerce ? ` | Funnel: ${funnelValidation.overallScore}%` : ''} | Conversion Audit: ${conversionTrackingAudit.overallScore}%`
     );
     
-    // Schneller Score
+    // Schneller Score - Prüfen ob Tracking vorhanden
+    const hasAnyTrackingQuick = trackingTags.googleAnalytics.detected || 
+      trackingTags.metaPixel.detected ||
+      trackingTags.googleTagManager.detected ||
+      trackingTags.linkedInInsight.detected ||
+      trackingTags.tiktokPixel.detected ||
+      trackingTags.other.length > 0 ||
+      cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+    
     let score = 100;
-    if (!cookieBanner.detected && (trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected)) score -= 20;
-    if (!googleConsentMode.detected && trackingTags.googleAnalytics.detected) score -= 20;
-    if (googleConsentMode.version === 'v1') score -= 15;
-    if (cookieBanner.detected && !cookieBanner.hasRejectButton && !cookieBanner.hasEssentialSaveButton) score -= 10;
+    
+    // Wenn kein Tracking vorhanden ist, hoher Score
+    if (!hasAnyTrackingQuick) {
+      score = 95; // Sehr gut, da datenschutzfreundlich
+    } else {
+      // Tracking vorhanden - prüfe Compliance
+      if (!cookieBanner.detected) score -= 20;
+      if (!googleConsentMode.detected && trackingTags.googleAnalytics.detected) score -= 20;
+      if (googleConsentMode.version === 'v1') score -= 15;
+      if (cookieBanner.detected && !cookieBanner.hasRejectButton && !cookieBanner.hasEssentialSaveButton) score -= 10;
+    }
     
     return {
       url: normalizedUrl,

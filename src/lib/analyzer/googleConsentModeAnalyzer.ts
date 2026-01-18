@@ -38,33 +38,45 @@ export function analyzeGoogleConsentMode(crawlResult: CrawlResult): GoogleConsen
 }
 
 function detectConsentMode(content: string, windowObjects: WindowObjectData): boolean {
-  // Prüfe auf gtag consent Aufrufe
-  const consentPatterns = [
-    'gtag.*consent',
-    "gtag\\s*\\(\\s*['\"]consent['\"]",
-    'consent.*default',
-    'consent.*update',
-    'ad_storage',
-    'analytics_storage',
-    'google.*consent.*mode',
-    'consent_mode',
+  // Prüfe auf EXPLIZITE gtag consent Aufrufe - NICHT allgemeine Keywords
+  // Das Pattern muss im JavaScript-Code sein, nicht im Text-Content
+  
+  // Sehr spezifische Patterns die NUR im Consent Mode Code vorkommen
+  const strictConsentPatterns = [
+    // gtag('consent', 'default', {...}) oder gtag('consent', 'update', {...})
+    /gtag\s*\(\s*['"]consent['"]\s*,\s*['"](default|update)['"]/i,
+    // dataLayer.push mit consent
+    /dataLayer\.push\s*\(\s*\{[^}]*consent/i,
+    // Spezifische Consent Mode Parameter im Code-Kontext (nicht als Text)
+    /['"]ad_storage['"]\s*:\s*['"](granted|denied)['"]/i,
+    /['"]analytics_storage['"]\s*:\s*['"](granted|denied)['"]/i,
+    /['"]ad_user_data['"]\s*:\s*['"](granted|denied)['"]/i,
+    /['"]ad_personalization['"]\s*:\s*['"](granted|denied)['"]/i,
+    // wait_for_update Pattern
+    /wait_for_update\s*:\s*\d+/i,
   ];
 
-  const contentLower = content.toLowerCase();
-
-  for (const pattern of consentPatterns) {
-    const regex = new RegExp(pattern, 'i');
-    if (regex.test(contentLower)) {
+  for (const pattern of strictConsentPatterns) {
+    if (pattern.test(content)) {
       return true;
     }
   }
 
-  // Prüfe auf gtag und dataLayer
+  // Prüfe auf gtag und dataLayer mit spezifischen Consent-Events
   if (windowObjects.hasGtag || windowObjects.hasDataLayer) {
-    // Prüfe dataLayer Inhalt auf Consent-bezogene Events
+    // Prüfe dataLayer Inhalt auf echte Consent-bezogene Events
     if (windowObjects.dataLayerContent) {
       const dataLayerStr = JSON.stringify(windowObjects.dataLayerContent);
-      if (dataLayerStr.includes('consent') || dataLayerStr.includes('ad_storage')) {
+      // Nur erkennen wenn es wirklich consent default/update Events gibt
+      // NICHT wenn einfach nur "consent" als Text vorkommt
+      const hasConsentEvent = 
+        dataLayerStr.includes('"consent"') && 
+        (dataLayerStr.includes('"default"') || dataLayerStr.includes('"update"'));
+      const hasConsentStorage = 
+        dataLayerStr.includes('ad_storage') || 
+        dataLayerStr.includes('analytics_storage');
+      
+      if (hasConsentEvent || hasConsentStorage) {
         return true;
       }
     }
@@ -74,22 +86,35 @@ function detectConsentMode(content: string, windowObjects: WindowObjectData): bo
 }
 
 function detectVersion(content: string): 'v1' | 'v2' | undefined {
-  // v2 spezifische Parameter (ab März 2024 erforderlich)
-  const v2Parameters = ['ad_user_data', 'ad_personalization'];
+  // Prüfe erst ob überhaupt Consent Mode vorhanden ist (strikte Erkennung)
+  // Parameter müssen im JavaScript-Code-Kontext stehen, nicht als Text
   
-  const hasV2Parameters = v2Parameters.some(param => 
-    content.toLowerCase().includes(param)
-  );
+  // v2 spezifische Parameter (ab März 2024 erforderlich)
+  // Müssen in einem consent-relevanten Kontext stehen
+  const v2ContextPatterns = [
+    /['"]ad_user_data['"]\s*:\s*['"](granted|denied)['"]/i,
+    /['"]ad_personalization['"]\s*:\s*['"](granted|denied)['"]/i,
+    /ad_user_data\s*:\s*['"](granted|denied)['"]/i,
+    /ad_personalization\s*:\s*['"](granted|denied)['"]/i,
+  ];
+  
+  const hasV2Parameters = v2ContextPatterns.some(pattern => pattern.test(content));
 
   if (hasV2Parameters) {
     return 'v2';
   }
 
-  // Prüfe auf v1 Parameter
-  const v1Parameters = ['ad_storage', 'analytics_storage'];
-  const hasV1Parameters = v1Parameters.some(param => 
-    content.toLowerCase().includes(param)
-  );
+  // Prüfe auf v1 Parameter im Code-Kontext (nicht als Text)
+  const v1ContextPatterns = [
+    /['"]ad_storage['"]\s*:\s*['"](granted|denied)['"]/i,
+    /['"]analytics_storage['"]\s*:\s*['"](granted|denied)['"]/i,
+    /ad_storage\s*:\s*['"](granted|denied)['"]/i,
+    /analytics_storage\s*:\s*['"](granted|denied)['"]/i,
+    // Auch in gtag consent Aufrufen
+    /gtag\s*\(\s*['"]consent['"]/i,
+  ];
+  
+  const hasV1Parameters = v1ContextPatterns.some(pattern => pattern.test(content));
 
   if (hasV1Parameters) {
     return 'v1';

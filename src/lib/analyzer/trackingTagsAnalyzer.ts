@@ -246,6 +246,7 @@ const OTHER_TRACKING_SERVICES = [
   { name: 'Adobe Analytics', patterns: ['omtrdc.net', 'adobedtm.com', '2o7.net'] },
   { name: 'Matomo/Piwik', patterns: ['matomo', 'piwik', '_paq.push'] },
   { name: 'Plausible', patterns: ['plausible.io'] },
+  { name: 'PostHog', patterns: ['posthog.com', 'i.posthog.com', 'eu.posthog.com', 'us.posthog.com', 'eu.i.posthog.com', 'posthog-js', 'posthog.init'] },
   { name: 'Hubspot', patterns: ['js.hs-scripts.com', 'js.hsforms.net', 'hubspot.com'] },
   { name: 'Segment', patterns: ['cdn.segment.com', 'api.segment.io'] },
   { name: 'Mixpanel', patterns: ['cdn.mxpnl.com', 'mixpanel.com', 'mixpanel.track'] },
