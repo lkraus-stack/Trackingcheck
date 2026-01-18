@@ -7,6 +7,7 @@ import { ProblemSection } from '@/components/ProblemSection';
 import { AgencySection } from '@/components/AgencySection';
 import { AuthButton } from '@/components/AuthButton';
 import { UsageIndicator } from '@/components/UsageIndicator';
+import { Onboarding, useOnboarding } from '@/components/Onboarding';
 import { 
   Shield, 
   Cookie, 
@@ -22,6 +23,7 @@ import {
 
 export default function Home() {
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const { showOnboarding, completeOnboarding } = useOnboarding();
 
   // Hash aus URL entfernen falls vorhanden, aber KEIN automatisches Scrollen
   useEffect(() => {
@@ -41,6 +43,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-grid-pattern hero-pattern">
+      {/* Onboarding */}
+      {showOnboarding && <Onboarding onComplete={completeOnboarding} />}
+
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
