@@ -7,22 +7,30 @@ import { Dashboard } from '@/components/Dashboard';
 import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status } = useSession({ required: true });
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (status === 'loading') return;
+    // Wait for session to load
+    if (status === 'loading') {
+      return;
+    }
     
-    if (!session) {
+    // If not authenticated, redirect to sign in
+    if (status === 'unauthenticated') {
       router.push('/auth/signin?callbackUrl=/dashboard');
       return;
     }
     
-    setIsLoading(false);
+    // If authenticated, show dashboard
+    if (status === 'authenticated' && session) {
+      setIsLoading(false);
+    }
   }, [session, status, router]);
 
-  if (status === 'loading' || isLoading) {
+  // Show loading state while checking session
+  if (status === 'loading' || isLoading || !session) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -31,10 +39,6 @@ export default function DashboardPage() {
         </div>
       </div>
     );
-  }
-
-  if (!session) {
-    return null; // Will be redirected
   }
 
   return (
