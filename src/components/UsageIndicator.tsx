@@ -63,7 +63,8 @@ export function UsageIndicator() {
     return null;
   }
 
-  const { analyses, projects, plan } = usageData.usage;
+  const { analyses, projects } = usageData.usage;
+  const { plan } = usageData;
   const analysesRemaining = analyses.limit > 0 ? analyses.limit - analyses.current : Infinity;
   const isNearLimit = analyses.percentage >= 80;
   const isAtLimit = analyses.percentage >= 100;
