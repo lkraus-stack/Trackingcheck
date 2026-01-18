@@ -1,10 +1,13 @@
 'use client';
 
 import { signIn, useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, LogIn, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 function SignInContent() {
   const { data: session, status } = useSession();
@@ -143,5 +146,17 @@ function SignInContent() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">Lade...</div>
+      </div>
+    }>
+      <SignInContent />
+    </Suspense>
   );
 }
