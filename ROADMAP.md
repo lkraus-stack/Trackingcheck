@@ -8,56 +8,34 @@
 - ✅ Projekt-Management (CRUD)
 - ✅ Analyse-Historie
 - ✅ Hybrid Storage (IndexedDB für nicht eingeloggte, DB für eingeloggte User)
+- ✅ **IndexedDB → Database Migration** (Auto-Migration beim Login)
+- ✅ **Toast Notification System** (ersetzt alert/confirm)
+- ✅ **Bessere Empty States** (Icons, CTAs, Beschreibungen)
 
 ---
 
-## 🚀 Priorität: Hoch
+## 💎 Priorität: Mittel (Nächste Schritte)
 
-### 1. IndexedDB → Database Migration
-**Problem**: User mit lokalen Daten sehen nach Login ein leeres Dashboard.
-
-**Lösung**:
-- API Route `/api/migrate` erstellen
-- Automatische Migration beim ersten Login
-- Konflikt-Resolution (Duplikate vermeiden)
-- Fortschritts-Anzeige während Migration
-
-**Vorteile**:
-- User verlieren keine Daten beim Login
-- Nahtloser Übergang von lokal zu cloud
-
----
-
-## 💎 Priorität: Mittel
-
-### 2. Toast Notification System
-**Problem**: Aktuell werden `alert()` und `confirm()` verwendet - nicht ideal für UX.
+### 1. Onboarding-Flow (Noch offen)
+**Problem**: Neue User wissen nicht, wo sie starten sollen.
 
 **Lösung**:
-- Toast-Component erstellen (`src/components/Toast.tsx`)
-- Success/Error/Info/Warning Toasts
-- Auto-dismiss nach 3-5 Sekunden
-- Animationen für besseres Feedback
+- Willkommens-Dialog beim ersten Besuch
+- Quick Start Guide
+- Tooltips für wichtige Features
+- Optional: Schritt-für-Schritt Tour
 
 **Vorteile**:
-- Professionellere UX
-- Nicht-blockierend
-- Besseres visuelles Feedback
+- Schnellere Adoption
+- Weniger Support-Anfragen
 
-### 3. Bessere Empty States
-**Problem**: Leeres Dashboard sieht nicht einladend aus.
+### 2. Migration Feedback verbessern (Optional)
+**Problem**: User sehen keine Bestätigung, wenn Migration abgeschlossen ist.
 
 **Lösung**:
-- Empty State Components für:
-  - Keine Projekte
-  - Keine Analysen
-  - Erste Analyse erstellen
-- Call-to-Action Buttons
-- Illustrationen/Icons
-
-**Vorteile**:
-- User wissen, was zu tun ist
-- Einladenderes Interface
+- Toast-Notification bei erfolgreicher Migration
+- Zeige Anzahl migrierter Projekte/Analysen
+- Optional: Fortschritts-Anzeige während Migration
 
 ### 4. Onboarding-Flow
 **Problem**: Neue User wissen nicht, wo sie starten sollen.
