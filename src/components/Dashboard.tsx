@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useToast } from '@/contexts/ToastContext';
+import { ConfirmDialog } from './ConfirmDialog';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -54,6 +56,7 @@ type Tab = 'overview' | 'projects' | 'history';
 
 export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = false }: DashboardProps) {
   const { data: session } = useSession();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [projects, setProjects] = useState<Project[]>([]);
   const [analyses, setAnalyses] = useState<StoredAnalysis[]>([]);
@@ -65,6 +68,21 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
   const [showAssignToProject, setShowAssignToProject] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [migrationComplete, setMigrationComplete] = useState(false);
+  
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: () => {},
+  });
 
   const isLoggedIn = !!session?.user;
 
@@ -153,20 +171,28 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
   }
 
   const handleDeleteProject = async (projectId: string) => {
-    if (confirm('Projekt und alle zugehörigen Analysen wirklich löschen?')) {
-      if (isLoggedIn) {
-        const response = await fetch(`/api/projects/${projectId}`, {
-          method: 'DELETE',
-        });
-        if (!response.ok) {
-          alert('Fehler beim Löschen des Projekts');
-          return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Projekt löschen',
+      message: 'Möchtest du dieses Projekt und alle zugehörigen Analysen wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        if (isLoggedIn) {
+          const response = await fetch(`/api/projects/${projectId}`, {
+            method: 'DELETE',
+          });
+          if (!response.ok) {
+            toast.showError('Fehler beim Löschen des Projekts');
+            return;
+          }
+        } else {
+          await deleteProject(projectId);
         }
-      } else {
-        await deleteProject(projectId);
-      }
-      await loadData();
-    }
+        await loadData();
+        toast.showSuccess('Projekt erfolgreich gelöscht');
+      },
+    });
   };
 
   const handleToggleFavorite = async (projectId: string) => {
@@ -179,7 +205,7 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
           body: JSON.stringify({ ...project, isFavorite: !project.isFavorite }),
         });
         if (!response.ok) {
-          alert('Fehler beim Aktualisieren des Projekts');
+          toast.showError('Fehler beim Aktualisieren des Projekts');
           return;
         }
       }
@@ -190,20 +216,28 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
   };
 
   const handleDeleteAnalysis = async (analysisId: string) => {
-    if (confirm('Analyse wirklich löschen?')) {
-      if (isLoggedIn) {
-        const response = await fetch(`/api/analyses/${analysisId}`, {
-          method: 'DELETE',
-        });
-        if (!response.ok) {
-          alert('Fehler beim Löschen der Analyse');
-          return;
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Analyse löschen',
+      message: 'Möchtest du diese Analyse wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.',
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        if (isLoggedIn) {
+          const response = await fetch(`/api/analyses/${analysisId}`, {
+            method: 'DELETE',
+          });
+          if (!response.ok) {
+            toast.showError('Fehler beim Löschen der Analyse');
+            return;
+          }
+        } else {
+          await deleteAnalysis(analysisId);
         }
-      } else {
-        await deleteAnalysis(analysisId);
-      }
-      await loadData();
-    }
+        await loadData();
+        toast.showSuccess('Analyse erfolgreich gelöscht');
+      },
+    });
   };
 
   const handleSaveCurrentAnalysis = async (projectId?: string) => {
@@ -219,11 +253,13 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
           }),
         });
         if (!response.ok) {
-          alert('Fehler beim Speichern der Analyse');
+          toast.showError('Fehler beim Speichern der Analyse');
           return;
         }
+        toast.showSuccess('Analyse erfolgreich gespeichert');
       } else {
         await saveAnalysis(currentAnalysis, projectId);
+        toast.showSuccess('Analyse erfolgreich gespeichert');
       }
       await loadData();
       setShowAssignToProject(false);
@@ -572,9 +608,9 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
                   if (!response.ok) {
                     const error = await response.json();
                     if (error.upgradeRequired) {
-                      alert(error.message || 'Projekt-Limit erreicht. Upgrade auf Pro für mehr Projekte.');
+                      toast.showWarning(error.message || 'Projekt-Limit erreicht. Upgrade auf Pro für mehr Projekte.');
                     } else {
-                      alert('Fehler beim Aktualisieren des Projekts');
+                      toast.showError('Fehler beim Aktualisieren des Projekts');
                     }
                     return;
                   }
@@ -587,12 +623,13 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
                   if (!response.ok) {
                     const error = await response.json();
                     if (error.upgradeRequired) {
-                      alert(error.message || 'Projekt-Limit erreicht. Upgrade auf Pro für mehr Projekte.');
+                      toast.showWarning(error.message || 'Projekt-Limit erreicht. Upgrade auf Pro für mehr Projekte.');
                     } else {
-                      alert('Fehler beim Erstellen des Projekts');
+                      toast.showError('Fehler beim Erstellen des Projekts');
                     }
                     return;
                   }
+                  toast.showSuccess(editingProject ? 'Projekt erfolgreich aktualisiert' : 'Projekt erfolgreich erstellt');
                 }
               } else {
                 if (editingProject) {
@@ -620,6 +657,18 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
             }}
           />
         )}
+
+        {/* Confirm Dialog */}
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type || 'warning'}
+          confirmText="Bestätigen"
+          cancelText="Abbrechen"
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        />
       </div>
     </div>
   );
