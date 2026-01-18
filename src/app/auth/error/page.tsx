@@ -3,8 +3,12 @@
 import Link from 'next/link';
 import { AlertCircle, ArrowLeft, Shield } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function AuthErrorPage() {
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+
+function ErrorContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
 
@@ -55,5 +59,17 @@ export default function AuthErrorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthErrorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">Lade...</div>
+      </div>
+    }>
+      <ErrorContent />
+    </Suspense>
   );
 }
