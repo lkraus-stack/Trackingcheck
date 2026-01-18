@@ -27,6 +27,7 @@ import {
   Globe,
   StickyNote,
   ChevronRight,
+  Settings,
 } from 'lucide-react';
 import {
   Project,
@@ -44,6 +45,7 @@ import {
   PROJECT_COLORS,
 } from '@/lib/storage/projectStorage';
 import { AnalysisResult } from '@/types';
+import { useRouter } from 'next/navigation';
 
 interface DashboardProps {
   onSelectUrl: (url: string) => void;
@@ -56,6 +58,7 @@ type Tab = 'overview' | 'projects' | 'history';
 
 export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = false }: DashboardProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -306,6 +309,15 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Analyse speichern</span>
                 <span className="sm:hidden">Speichern</span>
+              </button>
+            )}
+            {embedded && isLoggedIn && (
+              <button
+                onClick={() => router.push('/settings')}
+                className="text-slate-400 hover:text-slate-200 transition-colors p-2 hover:bg-slate-700/50 rounded-lg"
+                title="Einstellungen"
+              >
+                <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             )}
             <button
