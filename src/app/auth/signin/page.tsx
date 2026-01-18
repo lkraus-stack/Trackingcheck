@@ -19,7 +19,7 @@ function SignInContent() {
   useEffect(() => {
     // Prüfe ob User bereits eingeloggt ist
     if (status === 'authenticated' && session) {
-      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      const callbackUrl = searchParams.get('callbackUrl') || '/';
       router.push(callbackUrl);
       return;
     }
@@ -40,7 +40,7 @@ function SignInContent() {
     
     try {
       // Hole callbackUrl aus URL params
-      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      const callbackUrl = searchParams.get('callbackUrl') || '/';
       
       // NextAuth leitet automatisch weiter nach dem Login
       await signIn('google', { callbackUrl, redirect: true });

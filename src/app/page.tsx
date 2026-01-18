@@ -71,22 +71,20 @@ export default function Home() {
             </nav>
 
             {/* Right Side */}
-            <div className="flex items-center gap-3 lg:gap-4">
-              <div className="hidden lg:flex items-center gap-3">
-                <FeatureBadge icon={<Cookie className="w-4 h-4" />} text="Cookie Banner" />
-                <FeatureBadge icon={<Shield className="w-4 h-4" />} text="Consent Mode" />
-                <FeatureBadge icon={<BarChart3 className="w-4 h-4" />} text="Tracking Tags" />
-              </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Usage Indicator - nur für eingeloggte User */}
               <UsageIndicator />
+              {/* Auth Button - enthält Dashboard-Button für eingeloggte User */}
               <AuthButton />
+              {/* Franco Consulting Link - nur wenn genug Platz */}
               <a
                 href="https://www.franco-consulting.com/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors"
+                className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors border border-slate-700"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                Franco Consulting
+                <span>Franco Consulting</span>
               </a>
             </div>
           </div>

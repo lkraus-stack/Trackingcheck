@@ -19,7 +19,7 @@ export default function DashboardPage() {
     
     // If not authenticated, redirect to sign in
     if (!session) {
-      router.push('/auth/signin?callbackUrl=/dashboard');
+      router.push('/auth/signin?callbackUrl=/');
       return;
     }
     
