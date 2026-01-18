@@ -640,20 +640,84 @@ export class WebCrawler {
   }
 
   private async waitForCmpApi(page: Page): Promise<void> {
-    await page.waitForFunction(() => {
+    // Erweiterte CMP-API Erkennung mit mehreren Versuchen
+    const maxAttempts = 3;
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const apiReady = await page.evaluate(() => {
       const win = window as unknown as Record<string, any>;
+        
+        // Usercentrics prüfen
       const uc = win.UC_UI;
-      if (uc && typeof uc.isInitialized === 'function') {
-        if (uc.isInitialized()) return true;
-      }
-      if (win.__ucCmp) return true;
-      if (win.consentApi) return true;
+        if (uc) {
+          if (typeof uc.isInitialized === 'function') {
+            if (uc.isInitialized()) return { ready: true, cmp: 'usercentrics' };
+          } else if (typeof uc.acceptAllConsents === 'function') {
+            // UC_UI existiert und hat Methoden - wahrscheinlich ready
+            return { ready: true, cmp: 'usercentrics' };
+          }
+        }
+        if (win.__ucCmp) return { ready: true, cmp: 'usercentrics_alt' };
+        
+        // Real Cookie Banner prüfen
+        if (win.consentApi && typeof win.consentApi.consent === 'function') {
+          return { ready: true, cmp: 'real_cookie_banner' };
+        }
       if (win.rcbConsentManager && typeof win.rcbConsentManager.getOptions === 'function') {
         const groups = win.rcbConsentManager.getOptions?.()?.groups;
-        if (Array.isArray(groups) && groups.length > 0) return true;
+          if (Array.isArray(groups) && groups.length > 0) {
+            return { ready: true, cmp: 'real_cookie_banner' };
+          }
+        }
+        
+        // Cookiebot prüfen
+        if (win.Cookiebot && typeof win.Cookiebot.show === 'function') {
+          return { ready: true, cmp: 'cookiebot' };
+        }
+        
+        // OneTrust prüfen
+        if (win.OneTrust && typeof win.OneTrust.AllowAll === 'function') {
+          return { ready: true, cmp: 'onetrust' };
+        }
+        
+        // Borlabs prüfen
+        if (win.BorlabsCookie && typeof win.BorlabsCookie.acceptAll === 'function') {
+          return { ready: true, cmp: 'borlabs' };
+        }
+        
+        // Generisches CookieConsent prüfen
+        if (win.CookieConsent && typeof win.CookieConsent.accept === 'function') {
+          return { ready: true, cmp: 'generic' };
+        }
+        
+        return { ready: false, cmp: null };
+      });
+      
+      if (apiReady.ready) {
+        // Zusätzliche kurze Wartezeit für vollständige Initialisierung
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return;
       }
-      return false;
-    }, { timeout: 6000 }).catch(() => null);
+      
+      // Kurz warten und erneut versuchen
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Fallback: Warten auf irgendein CMP-Zeichen
+    await page.waitForFunction(() => {
+      const win = window as unknown as Record<string, any>;
+      return Boolean(
+        win.UC_UI ||
+        win.__ucCmp ||
+        win.CookieConsent ||
+        win.Cookiebot ||
+        win.OneTrust ||
+        win.consentApi ||
+        win.rcbConsentManager ||
+        win.BorlabsCookie ||
+        win.cmplz_banner
+      );
+    }, { timeout: 4000 }).catch(() => null);
   }
 
   private async tryClickSelectors(
@@ -746,8 +810,8 @@ export class WebCrawler {
         const selectors = 'button, a, div, span, a[role="button"], [role="button"], input[type="button"], input[type="submit"], label';
         const lowered = patternsLower.map(p => p.toLowerCase());
 
-        // Rekursive Shadow DOM Suche mit maximaler Tiefe
-        const collectElements = (root: Document | ShadowRoot, depth = 0, maxDepth = 5): Element[] => {
+        // Rekursive Shadow DOM Suche mit erhöhter maximaler Tiefe für komplexe CMPs
+        const collectElements = (root: Document | ShadowRoot, depth = 0, maxDepth = 10): Element[] => {
           if (depth > maxDepth) return [];
           
           const elements = Array.from(root.querySelectorAll(selectors));
@@ -861,244 +925,185 @@ export class WebCrawler {
     action: 'accept' | 'reject' | 'essential'
   ): Promise<{ applied: boolean; method?: string }> {
     try {
-      const result = await page.evaluate((action) => {
-        const win = window as unknown as Record<string, any>;
-        
-        const callFirst = (obj: any, methods: string[], args?: any[]) => {
-          for (const method of methods) {
-            const fn = obj?.[method];
+      // WICHTIG: Verwende String-basierte Evaluation um __name Kompilierungsproblem zu vermeiden
+      const jsCode = `
+        (function(action) {
+          var win = window;
+          var method;
+          
+          // Helper function
+          function tryCallMethod(obj, methodNames) {
+            for (var i = 0; i < methodNames.length; i++) {
+              var methodName = methodNames[i];
+              var fn = obj && obj[methodName];
             if (typeof fn === 'function') {
               try {
-                if (Array.isArray(args) && args.length > 0) {
-                  fn.call(obj, ...args);
-                } else {
                   fn.call(obj);
-                }
-                return method;
-              } catch {
+                  return methodName;
+                } catch (e) {
                 // ignore
               }
             }
           }
           return undefined;
-        };
-        
-        const callWithSource = (obj: any, methods: string[], source: string, args?: any[]) => {
-          const method = callFirst(obj, methods, args);
-          return method ? `${source}.${method}` : undefined;
-        };
-
-        let method: string | undefined;
-
-        // =========================================
-        // USERCENTRICS API - verbessert
-        // =========================================
-        if (win.UC_UI) {
-          // Warten bis initialisiert
-          const isReady = typeof win.UC_UI.isInitialized === 'function' 
-            ? win.UC_UI.isInitialized() 
-            : true;
-          
-          if (!isReady && typeof win.UC_UI.showFirstLayer === 'function') {
-            try {
-                win.UC_UI.showFirstLayer();
-            } catch {
-              // ignore
-            }
           }
           
-          if (action === 'accept') {
-            // Versuche verschiedene Methoden
-            if (typeof win.UC_UI.acceptAllConsents === 'function') {
-              win.UC_UI.acceptAllConsents();
-              method = 'UC_UI.acceptAllConsents';
-            } else if (typeof win.UC_UI.acceptAll === 'function') {
-              win.UC_UI.acceptAll();
-              method = 'UC_UI.acceptAll';
-            }
-          } else {
-            // Reject/Essential
-            if (typeof win.UC_UI.denyAllConsents === 'function') {
-              win.UC_UI.denyAllConsents();
-              method = 'UC_UI.denyAllConsents';
-            } else if (typeof win.UC_UI.rejectAll === 'function') {
-              win.UC_UI.rejectAll();
-              method = 'UC_UI.rejectAll';
-            } else if (typeof win.UC_UI.denyAll === 'function') {
-              win.UC_UI.denyAll();
-              method = 'UC_UI.denyAll';
-            }
-          }
-          
-          // Consent speichern wenn verfügbar
-          if (method) {
-            try {
-              if (typeof win.UC_UI.saveConsents === 'function') {
-              win.UC_UI.saveConsents();
-              }
-              if (typeof win.UC_UI.closeCMP === 'function') {
-                win.UC_UI.closeCMP();
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
-
-        // Usercentrics alternative API (__ucCmp)
-        if (!method && win.__ucCmp) {
-          if (action === 'accept') {
-            method = callWithSource(win.__ucCmp, ['acceptAllConsents', 'acceptAll'], '__ucCmp');
-          } else {
-            method = callWithSource(win.__ucCmp, ['denyAllConsents', 'denyAll', 'rejectAllConsents', 'rejectAll'], '__ucCmp');
-          }
-        }
-
-        // =========================================
-        // REAL COOKIE BANNER API - komplett überarbeitet
-        // =========================================
-        if (!method && win.consentApi) {
-          const rcbManager = win.rcbConsentManager;
-          
-          if (action === 'accept' && typeof win.consentApi.consentAll === 'function') {
-            try {
-              // Hole alle Gruppen und Items für consentAll
-              const options = rcbManager?.getOptions?.();
-              const groups = Array.isArray(options?.groups) ? options.groups : [];
-              
-              // consentAll erwartet: ...args wobei jedes arg [groupId, [itemIds]] ist
-              const consentArgs = groups
-                .filter((g: any) => g && g.id !== undefined && Array.isArray(g.items))
-                .map((g: any) => [g.id, g.items.map((i: any) => i.id).filter(Boolean)]);
-              
-              if (consentArgs.length > 0) {
-                win.consentApi.consentAll(...consentArgs);
-                method = 'consentApi.consentAll';
-              } else {
-                // Fallback ohne Argumente
-                win.consentApi.consentAll();
-                method = 'consentApi.consentAll';
-              }
-            } catch {
-              // Versuche ohne Argumente
-              try {
-                win.consentApi.consentAll();
-                method = 'consentApi.consentAll';
-              } catch {
-                // ignore
-              }
-            }
-          } else if (action !== 'accept' && typeof win.consentApi.consent === 'function') {
-            try {
-              // Nur essentielle Gruppen akzeptieren
-              const options = rcbManager?.getOptions?.();
-              const groups = Array.isArray(options?.groups) ? options.groups : [];
-              
-              const essentialArgs = groups
-                .filter((g: any) => g && g.id !== undefined && Array.isArray(g.items) && g.isEssential)
-                .map((g: any) => [g.id, g.items.map((i: any) => i.id).filter(Boolean)]);
-              
-              if (essentialArgs.length > 0) {
-                win.consentApi.consent(...essentialArgs);
-                method = 'consentApi.consent (essential only)';
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
-
-        // Real Cookie Banner persistConsent als Fallback
-        if (!method && win.rcbConsentManager && typeof win.rcbConsentManager.persistConsent === 'function') {
-          try {
-            const options = win.rcbConsentManager.getOptions?.();
-            const groups = Array.isArray(options?.groups) ? options.groups : [];
-            const decision: Record<string, number[]> = {};
+          // USERCENTRICS API
+          if (win.UC_UI) {
+            var isReady = typeof win.UC_UI.isInitialized === 'function' ? win.UC_UI.isInitialized() : true;
             
-            for (const group of groups) {
-              if (!group || typeof group.id === 'undefined' || !Array.isArray(group.items)) continue;
-              const isEssential = Boolean(group.isEssential);
-              
-              if (action === 'accept') {
-                // Alle Gruppen akzeptieren
-                decision[group.id] = group.items.map((item: any) => item.id).filter(Boolean);
-              } else if (isEssential) {
-                // Nur essentielle Gruppen
-                decision[group.id] = group.items.map((item: any) => item.id).filter(Boolean);
-              }
-              // Bei nicht-essentiellen Gruppen und reject: nichts hinzufügen
+            if (!isReady && typeof win.UC_UI.showFirstLayer === 'function') {
+              try { win.UC_UI.showFirstLayer(); } catch(e) {}
             }
             
-            if (Object.keys(decision).length > 0) {
-              win.rcbConsentManager.persistConsent(decision);
-              method = 'rcbConsentManager.persistConsent';
-              
-              // Cookies anwenden
-              if (typeof win.rcbConsentManager.applyCookies === 'function') {
-                win.rcbConsentManager.applyCookies();
+            if (action === 'accept') {
+              if (typeof win.UC_UI.acceptAllConsents === 'function') {
+                win.UC_UI.acceptAllConsents();
+                method = 'UC_UI.acceptAllConsents';
+              } else if (typeof win.UC_UI.acceptAll === 'function') {
+                win.UC_UI.acceptAll();
+                method = 'UC_UI.acceptAll';
               }
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        // =========================================
-        // COOKIEBOT API
-        // =========================================
-        if (!method && win.Cookiebot) {
-          if (action === 'accept') {
-            if (typeof win.Cookiebot.submitCustomConsent === 'function') {
-              win.Cookiebot.submitCustomConsent(true, true, true);
-              method = 'Cookiebot.submitCustomConsent';
-          } else {
-              method = callWithSource(win.Cookiebot, ['acceptAll', 'accept'], 'Cookiebot');
-            }
-          } else {
-            if (typeof win.Cookiebot.submitCustomConsent === 'function') {
-              win.Cookiebot.submitCustomConsent(false, false, false);
-              method = 'Cookiebot.submitCustomConsent (deny)';
             } else {
-              method = callWithSource(win.Cookiebot, ['decline', 'reject', 'denyAll'], 'Cookiebot');
+              if (typeof win.UC_UI.denyAllConsents === 'function') {
+                win.UC_UI.denyAllConsents();
+                method = 'UC_UI.denyAllConsents';
+              } else if (typeof win.UC_UI.rejectAll === 'function') {
+                win.UC_UI.rejectAll();
+                method = 'UC_UI.rejectAll';
+              } else if (typeof win.UC_UI.denyAll === 'function') {
+                win.UC_UI.denyAll();
+                method = 'UC_UI.denyAll';
+              }
+            }
+            
+            if (method) {
+              try {
+                if (typeof win.UC_UI.saveConsents === 'function') win.UC_UI.saveConsents();
+                if (typeof win.UC_UI.closeCMP === 'function') win.UC_UI.closeCMP();
+              } catch(e) {}
             }
           }
-        }
-
-        // =========================================
-        // ONETRUST API
-        // =========================================
-        if (!method && win.OneTrust) {
-          if (action === 'accept') {
-            method = callWithSource(win.OneTrust, ['AllowAll', 'acceptAll'], 'OneTrust');
-          } else {
-            method = callWithSource(win.OneTrust, ['RejectAll', 'rejectAll'], 'OneTrust');
+          
+          // Usercentrics alternative API (__ucCmp)
+          if (!method && win.__ucCmp) {
+            if (action === 'accept') {
+              var m = tryCallMethod(win.__ucCmp, ['acceptAllConsents', 'acceptAll']);
+              if (m) method = '__ucCmp.' + m;
+            } else {
+              var m = tryCallMethod(win.__ucCmp, ['denyAllConsents', 'denyAll', 'rejectAllConsents', 'rejectAll']);
+              if (m) method = '__ucCmp.' + m;
+            }
           }
-        }
-
-        // =========================================
-        // BORLABS COOKIE API
-        // =========================================
-        if (!method && win.BorlabsCookie) {
-          if (action === 'accept') {
-            method = callWithSource(win.BorlabsCookie, ['acceptAll', 'allowAll'], 'BorlabsCookie');
-          } else {
-            method = callWithSource(win.BorlabsCookie, ['denyAll', 'declineAll', 'rejectAll'], 'BorlabsCookie');
+          
+          // REAL COOKIE BANNER API
+          if (!method && win.consentApi) {
+            var rcbManager = win.rcbConsentManager;
+            var options = rcbManager && rcbManager.getOptions ? rcbManager.getOptions() : null;
+            var groups = (options && options.groups) || [];
+            
+            var allItemIds = [];
+            var essentialItemIds = [];
+            
+            for (var i = 0; i < groups.length; i++) {
+              var g = groups[i];
+              if (g && g.items) {
+                for (var j = 0; j < g.items.length; j++) {
+                  var item = g.items[j];
+                  if (item && item.id !== undefined) {
+                    allItemIds.push(item.id);
+                    if (g.isEssential) {
+                      essentialItemIds.push(item.id);
+                    }
+                  }
+                }
+              }
+            }
+            
+            if (action === 'accept') {
+              if (typeof win.consentApi.consent === 'function' && allItemIds.length > 0) {
+                var successCount = 0;
+                for (var k = 0; k < allItemIds.length; k++) {
+                  try {
+                    win.consentApi.consent(allItemIds[k]);
+                    successCount++;
+                  } catch(e) {}
+                }
+                if (successCount > 0) {
+                  method = 'consentApi.consent (' + successCount + ' items)';
+                }
+              }
+            } else {
+              if (typeof win.consentApi.consent === 'function' && essentialItemIds.length > 0) {
+                for (var k = 0; k < essentialItemIds.length; k++) {
+                  try {
+                    win.consentApi.consent(essentialItemIds[k]);
+                  } catch(e) {}
+                }
+                method = 'consentApi.consent (essential only, ' + essentialItemIds.length + ' items)';
+              }
+            }
           }
-        }
-
-        // =========================================
-        // GENERIC CookieConsent API
-        // =========================================
-        if (!method && win.CookieConsent) {
-          if (action === 'accept') {
-            method = callWithSource(win.CookieConsent, ['acceptAll', 'accept', 'allowAll'], 'CookieConsent');
-          } else {
-            method = callWithSource(win.CookieConsent, ['rejectAll', 'denyAll', 'reject', 'decline'], 'CookieConsent');
+          
+          // COOKIEBOT API
+          if (!method && win.Cookiebot) {
+            if (action === 'accept') {
+              if (typeof win.Cookiebot.submitCustomConsent === 'function') {
+                win.Cookiebot.submitCustomConsent(true, true, true);
+                method = 'Cookiebot.submitCustomConsent';
+              } else {
+                var m = tryCallMethod(win.Cookiebot, ['acceptAll', 'accept']);
+                if (m) method = 'Cookiebot.' + m;
+              }
+            } else {
+              if (typeof win.Cookiebot.submitCustomConsent === 'function') {
+                win.Cookiebot.submitCustomConsent(false, false, false);
+                method = 'Cookiebot.submitCustomConsent (deny)';
+              } else {
+                var m = tryCallMethod(win.Cookiebot, ['decline', 'reject', 'denyAll']);
+                if (m) method = 'Cookiebot.' + m;
+              }
+            }
           }
-        }
-
-        return { applied: Boolean(method), method };
-      }, action);
+          
+          // ONETRUST API
+          if (!method && win.OneTrust) {
+            if (action === 'accept') {
+              var m = tryCallMethod(win.OneTrust, ['AllowAll', 'acceptAll']);
+              if (m) method = 'OneTrust.' + m;
+            } else {
+              var m = tryCallMethod(win.OneTrust, ['RejectAll', 'rejectAll']);
+              if (m) method = 'OneTrust.' + m;
+            }
+          }
+          
+          // BORLABS COOKIE API
+          if (!method && win.BorlabsCookie) {
+            if (action === 'accept') {
+              var m = tryCallMethod(win.BorlabsCookie, ['acceptAll', 'allowAll']);
+              if (m) method = 'BorlabsCookie.' + m;
+            } else {
+              var m = tryCallMethod(win.BorlabsCookie, ['denyAll', 'declineAll', 'rejectAll']);
+              if (m) method = 'BorlabsCookie.' + m;
+            }
+          }
+          
+          // GENERIC CookieConsent API
+          if (!method && win.CookieConsent) {
+            if (action === 'accept') {
+              var m = tryCallMethod(win.CookieConsent, ['acceptAll', 'accept', 'allowAll']);
+              if (m) method = 'CookieConsent.' + m;
+            } else {
+              var m = tryCallMethod(win.CookieConsent, ['rejectAll', 'denyAll', 'reject', 'decline']);
+              if (m) method = 'CookieConsent.' + m;
+            }
+          }
+          
+          return { applied: !!method, method: method };
+        })('${action}')
+      `;
+      
+      const result = await page.evaluate(jsCode) as { applied: boolean; method?: string };
 
       // Warten nach API-Aufruf
       if (result.applied) {
@@ -1662,16 +1667,35 @@ export class WebCrawler {
 
       // Akzeptieren-Button finden und klicken
       let acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+      
+      // Wenn DOM-Klick fehlschlägt, versuche API-Aufruf
       if (!acceptResult.found) {
         await this.waitForCmpApi(pageAccept);
         const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
         if (apiResult.applied) {
           acceptResult = { found: true, clicked: true, buttonText: apiResult.method };
-        } else {
+        }
+      }
+      
+      // Fallback: Settings-Button öffnen und dann Accept suchen
+      if (!acceptResult.found) {
           const settingsResult = await this.findAndClickSettingsButton(pageAccept);
           if (settingsResult.clicked) {
             await new Promise(resolve => setTimeout(resolve, 1200));
             acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+        }
+      }
+      
+      // Letzter Fallback: Wenn API vorhanden aber Banner nicht sichtbar, trotzdem API nutzen
+      if (!acceptResult.found) {
+        const hasApi = await pageAccept.evaluate(() => {
+          const win = window as any;
+          return !!(win.consentApi || win.UC_UI || win.Cookiebot || win.OneTrust);
+        });
+        if (hasApi) {
+          const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
+          if (apiResult.applied) {
+            acceptResult = { found: true, clicked: true, buttonText: apiResult.method + ' (no banner)' };
           }
         }
       }
@@ -1708,12 +1732,18 @@ export class WebCrawler {
       await this.waitForConsentBanner(pageReject);
 
       let rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
+      
+      // Wenn DOM-Klick fehlschlägt, versuche API-Aufruf
       if (!rejectResult.found) {
         await this.waitForCmpApi(pageReject);
         const apiResult = await this.applyCmpConsentViaApi(pageReject, 'reject');
         if (apiResult.applied) {
           rejectResult = { found: true, clicked: true, buttonText: apiResult.method };
-        } else {
+        }
+      }
+      
+      // Fallback: Settings-Button öffnen und dann Essential/Save suchen
+      if (!rejectResult.found) {
           const settingsResult = await this.findAndClickSettingsButton(pageReject);
           if (settingsResult.clicked) {
             await new Promise(resolve => setTimeout(resolve, 1200));
@@ -1727,6 +1757,19 @@ export class WebCrawler {
               }
               rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
             }
+        }
+      }
+      
+      // Letzter Fallback: Wenn API vorhanden aber Banner nicht sichtbar, trotzdem API nutzen
+      if (!rejectResult.found) {
+        const hasApi = await pageReject.evaluate(() => {
+          const win = window as any;
+          return !!(win.consentApi || win.UC_UI || win.Cookiebot || win.OneTrust);
+        });
+        if (hasApi) {
+          const apiResult = await this.applyCmpConsentViaApi(pageReject, 'reject');
+          if (apiResult.applied) {
+            rejectResult = { found: true, clicked: true, buttonText: apiResult.method + ' (no banner)' };
           }
         }
       }

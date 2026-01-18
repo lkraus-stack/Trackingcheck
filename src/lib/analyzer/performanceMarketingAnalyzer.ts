@@ -1112,16 +1112,18 @@ export function analyzeConversionTrackingAudit(
     : 0;
 
   if (platforms.length === 0) {
+    // WICHTIG: Neutral bewerten - Server-Side Tracking ist nicht erkennbar
+    // aber könnte vorhanden sein (z.B. Apple, große Enterprise-Websites)
     issues.push({
-      severity: 'high',
-      title: 'Kein Conversion Tracking erkannt',
-      description: 'Keine Conversion-Tags gefunden.',
-      impact: 'Keine messbaren Conversions',
+      severity: 'low', // Von 'high' auf 'low' geändert - nicht als Fehler werten
+      title: 'Kein Client-Side Conversion Tracking erkannt',
+      description: 'Keine clientseitigen Conversion-Tags gefunden. Dies kann bedeuten: (1) Tracking fehlt tatsächlich, (2) Server-Side Tracking ist implementiert (nicht messbar), oder (3) Tracking ist durch Consent-Management blockiert.',
+      impact: 'Prüfung manuell erforderlich',
     });
     recommendations.push({
-      priority: 'high',
-      title: 'Conversion Tracking aktivieren',
-      description: 'Mindestens Google Ads oder Meta Conversion Tracking einrichten.',
+      priority: 'medium', // Von 'high' auf 'medium' geändert
+      title: 'Tracking-Setup verifizieren',
+      description: 'Prüfen Sie, ob Server-Side Tracking implementiert ist (z.B. über GTM Server-Side, Meta CAPI). Falls nicht, richten Sie Conversion Tracking ein.',
       estimatedImpact: 'Grundlage für Performance-Optimierung',
     });
   }
@@ -1285,19 +1287,21 @@ export function analyzeGTMAudit(
   const issues: GTMAuditIssue[] = [];
   const recommendations: GTMAuditRecommendation[] = [];
 
-  let score = detected ? 100 : 0;
+  // WICHTIG: Kein GTM ist nicht automatisch ein Fehler
+  // Viele Enterprise-Websites nutzen andere Tag-Management-Lösungen oder Server-Side-Only
+  let score = detected ? 100 : 50; // Von 0 auf 50 - neutral statt negativ
   if (!detected) {
     issues.push({
-      severity: 'high',
+      severity: 'low', // Von 'high' auf 'low' geändert - nicht als Fehler werten
       title: 'Kein GTM erkannt',
-      description: 'Google Tag Manager wurde nicht gefunden.',
-      impact: 'Kein zentrales Tag-Management',
+      description: 'Google Tag Manager wurde nicht gefunden. Dies kann bedeuten: (1) GTM ist nicht implementiert, (2) Ein anderes Tag-Management-System wird verwendet (z.B. Tealium, Adobe Launch), oder (3) Server-Side-Only Tracking ist aktiv.',
+      impact: 'Manuelle Prüfung empfohlen',
     });
     recommendations.push({
-      priority: 'high',
-      title: 'GTM installieren',
-      description: 'GTM ermöglicht konsistentes Tracking und Consent-Management.',
-      estimatedImpact: 'Schnellere Tracking-Iterationen',
+      priority: 'low', // Von 'high' auf 'low' geändert
+      title: 'Tag-Management prüfen',
+      description: 'GTM ist eine Empfehlung, aber nicht zwingend erforderlich. Prüfen Sie, welches Tag-Management-System verwendet wird.',
+      estimatedImpact: 'Konsistenteres Tracking',
     });
   }
 
