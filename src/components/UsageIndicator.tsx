@@ -69,42 +69,76 @@ export function UsageIndicator() {
   const isNearLimit = analyses.percentage >= 80;
   const isAtLimit = analyses.percentage >= 100;
 
+  // Progress Bar Farben
+  const progressColor = isAtLimit 
+    ? 'bg-red-500' 
+    : isNearLimit 
+      ? 'bg-yellow-500' 
+      : 'bg-indigo-500';
+
+  const progressBgColor = isAtLimit
+    ? 'bg-red-500/20'
+    : isNearLimit
+      ? 'bg-yellow-500/20'
+      : 'bg-indigo-500/20';
+
   return (
     <div className="flex items-center gap-3">
-      {/* Analysen Usage */}
-      <div
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer hover:bg-slate-800/70 ${
-          isAtLimit
-            ? 'bg-red-500/20 border border-red-500/30 text-red-400'
-            : isNearLimit
-              ? 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400'
-              : 'bg-slate-800/50 border border-slate-700 text-slate-300'
-        }`}
+      {/* Analysen Usage mit Progress Bar */}
+      <button
         onClick={() => router.push('/dashboard')}
+        className={`group flex flex-col gap-1 px-3 py-2 rounded-lg text-xs transition-colors hover:bg-slate-800/70 min-w-[120px] ${
+          isAtLimit
+            ? 'bg-red-500/10 border border-red-500/30'
+            : isNearLimit
+              ? 'bg-yellow-500/10 border border-yellow-500/30'
+              : 'bg-slate-800/50 border border-slate-700'
+        }`}
         title={`${analyses.current}/${analyses.limit} Analysen verbraucht (${analysesRemaining} verbleibend)`}
       >
-        {isAtLimit ? (
-          <AlertTriangle className="h-3.5 w-3.5" />
-        ) : isNearLimit ? (
-          <TrendingUp className="h-3.5 w-3.5" />
-        ) : (
-          <BarChart3 className="h-3.5 w-3.5" />
+        {/* Text und Icon */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            {isAtLimit ? (
+              <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+            ) : isNearLimit ? (
+              <TrendingUp className="h-3.5 w-3.5 text-yellow-400" />
+            ) : (
+              <BarChart3 className="h-3.5 w-3.5 text-indigo-400" />
+            )}
+            <span className={`font-medium ${
+              isAtLimit ? 'text-red-400' : isNearLimit ? 'text-yellow-400' : 'text-slate-300'
+            }`}>
+              {analyses.limit > 0 ? `${analysesRemaining} verbleibend` : '∞ verfügbar'}
+            </span>
+          </div>
+          {analyses.limit > 0 && (
+            <span className={`text-[10px] ${
+              isAtLimit ? 'text-red-400' : isNearLimit ? 'text-yellow-400' : 'text-slate-400'
+            }`}>
+              {analyses.current}/{analyses.limit}
+            </span>
+          )}
+        </div>
+
+        {/* Progress Bar */}
+        {analyses.limit > 0 && (
+          <div className={`w-full h-1.5 rounded-full overflow-hidden ${progressBgColor}`}>
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${progressColor}`}
+              style={{ width: `${Math.min(analyses.percentage, 100)}%` }}
+            />
+          </div>
         )}
-        <span className="hidden sm:inline">
-          {analyses.limit > 0 ? `${analysesRemaining}/${analyses.limit}` : '∞'} Analysen
-        </span>
-        <span className="sm:hidden">
-          {analyses.limit > 0 ? `${analysesRemaining}` : '∞'}
-        </span>
-      </div>
+      </button>
 
       {/* Plan Badge */}
       {plan !== 'enterprise' && (
         <button
           onClick={() => router.push('/dashboard')}
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs rounded-lg hover:bg-indigo-600/30 transition-colors"
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs rounded-lg hover:bg-indigo-600/30 transition-colors font-medium capitalize"
         >
-          <span className="font-medium capitalize">{plan}</span>
+          {plan === 'free' ? 'Free' : plan === 'pro' ? 'Pro' : plan}
         </button>
       )}
     </div>

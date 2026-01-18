@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, ChevronDown, CheckCircle2, Sparkles, Zap, TrendingUp, Lock } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { Shield, ChevronDown, CheckCircle2, Sparkles, Zap, TrendingUp, Lock, LayoutDashboard, Save, History, FolderOpen, ArrowRight } from 'lucide-react';
 
 export function HeroSection() {
+  const { data: session } = useSession();
   const [isVisible, setIsVisible] = useState(false);
+  const isLoggedIn = !!session?.user;
 
   useEffect(() => {
     setIsVisible(true);
