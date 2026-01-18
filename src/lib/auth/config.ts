@@ -66,38 +66,54 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async signIn({ user, account, profile }) {
       // Erstelle UsageLimits wenn User zum ersten Mal einloggt
       if (user.id) {
-        const existingLimits = await prisma.usageLimits.findUnique({
-          where: { userId: user.id },
-        })
-        
-        if (!existingLimits) {
-          // Erstelle Default Free Plan Limits
-          await prisma.usageLimits.create({
-            data: {
-              userId: user.id,
-              plan: 'free',
-              maxAnalysesPerMonth: 10,
-              maxProjects: 3,
-              maxAnalysesPerDay: 5,
-              aiAnalysisEnabled: true,
-              aiChatEnabled: false,
-              exportPdfEnabled: false,
-              deepScanEnabled: false,
-              apiAccessEnabled: false,
-            },
+        try {
+          const existingLimits = await prisma.usageLimits.findUnique({
+            where: { userId: user.id },
           })
           
-          // Erstelle Default Subscription
-          await prisma.subscription.create({
-            data: {
-              userId: user.id,
-              plan: 'free',
-              status: 'active',
-            },
-          })
+          if (!existingLimits) {
+            // Erstelle Default Free Plan Limits
+            try {
+              await prisma.usageLimits.create({
+                data: {
+                  userId: user.id,
+                  plan: 'free',
+                  maxAnalysesPerMonth: 10,
+                  maxProjects: 3,
+                  maxAnalysesPerDay: 5,
+                  aiAnalysisEnabled: true,
+                  aiChatEnabled: false,
+                  exportPdfEnabled: false,
+                  deepScanEnabled: false,
+                  apiAccessEnabled: false,
+                },
+              })
+            } catch (limitsError) {
+              console.error('Error creating usage limits:', limitsError)
+              // Don't block login if limits creation fails - they can be created later
+            }
+            
+            // Erstelle Default Subscription
+            try {
+              await prisma.subscription.create({
+                data: {
+                  userId: user.id,
+                  plan: 'free',
+                  status: 'active',
+                },
+              })
+            } catch (subscriptionError) {
+              console.error('Error creating subscription:', subscriptionError)
+              // Don't block login if subscription creation fails - it can be created later
+            }
+          }
+        } catch (error) {
+          console.error('Error in signIn callback:', error)
+          // Don't block login if there's an error - allow user to sign in
         }
       }
       
+      // Always return true to allow login
       return true
     },
   },
