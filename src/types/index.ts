@@ -850,3 +850,45 @@ export interface EcommerceDeepDiveRecommendation {
   description: string;
   estimatedImpact: string;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// User & Subscription Types
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  image?: string;
+  subscription?: Subscription;
+  usageLimits?: UsageLimits;
+}
+
+export interface Subscription {
+  id?: string;
+  plan: 'free' | 'pro' | 'enterprise';
+  status: 'active' | 'canceled' | 'expired';
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+}
+
+export interface UsageLimits {
+  id?: string;
+  plan: 'free' | 'pro' | 'enterprise';
+  maxAnalysesPerMonth: number; // 0 = unlimited
+  maxProjects: number; // 0 = unlimited
+  maxAnalysesPerDay: number; // 0 = unlimited
+  aiAnalysisEnabled: boolean;
+  aiChatEnabled: boolean;
+  exportPdfEnabled: boolean;
+  deepScanEnabled: boolean;
+  apiAccessEnabled: boolean;
+}
+
+export interface UsageStats {
+  analysesCount: number;
+  aiRequests: number;
+  apiCalls: number;
+  date: string;
+}

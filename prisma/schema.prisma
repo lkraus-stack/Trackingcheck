@@ -1,0 +1,180 @@
+// Prisma Schema für Tracking Checker
+// Supports Vercel Postgres, PostgreSQL und SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model - NextAuth Standard
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  googleId      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // NextAuth Relations
+  accounts      Account[]
+  sessions      Session[]
+
+  // App-specific Relations
+  subscription  Subscription?
+  usageLimits   UsageLimits?
+  usageStats    UsageStats[]
+  projects      Project[]
+  analyses      Analysis[]
+
+  @@index([email])
+  @@index([googleId])
+}
+
+// NextAuth Required Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Subscription Model
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  plan               String   @default("free") // "free" | "pro" | "enterprise"
+  status             String   @default("active") // "active" | "canceled" | "expired"
+  stripeId           String?  @unique
+  stripeCustomerId   String?
+  stripePriceId      String?
+  stripeSubscriptionId String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripeId])
+}
+
+// Usage Limits Model
+model UsageLimits {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  plan              String   @default("free")
+
+  // Limits je nach Plan
+  maxAnalysesPerMonth Int    @default(10)  // Free: 10, Pro: 100, Enterprise: unlimited (0 = unlimited)
+  maxProjects          Int    @default(3)   // Free: 3, Pro: 50, Enterprise: unlimited (0 = unlimited)
+  maxAnalysesPerDay    Int    @default(5)   // Free: 5, Pro: 30, Enterprise: unlimited (0 = unlimited)
+  aiAnalysisEnabled    Boolean @default(true)  // Free: true, Pro: true, Enterprise: true
+  aiChatEnabled        Boolean @default(false) // Free: false, Pro: true, Enterprise: true
+  exportPdfEnabled     Boolean @default(false) // Free: false, Pro: true, Enterprise: true
+  deepScanEnabled      Boolean @default(false) // Free: false, Pro: true, Enterprise: true
+  apiAccessEnabled     Boolean @default(false) // Free: false, Pro: false, Enterprise: true
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Usage Stats Model (monatliche Statistiken)
+model UsageStats {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime @default(now())
+  analysesCount Int      @default(0)
+  aiRequests    Int      @default(0)
+  apiCalls      Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@unique([userId, date])
+}
+
+// Project Model (migration von IndexedDB)
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  urls        String[] // Array von URLs
+  color       String
+  isFavorite  Boolean  @default(false)
+  notes       String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastAnalysis DateTime?
+  avgScore    Int?
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses Analysis[]
+
+  @@index([userId])
+  @@index([userId, isFavorite])
+  @@index([userId, updatedAt])
+}
+
+// Analysis Model (migration von IndexedDB)
+model Analysis {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  url       String
+  result    Json     // AnalysisResult als JSON
+  notes     String?
+  tags      String[]
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userId, url])
+  @@index([projectId])
+  @@index([userId, createdAt])
+}

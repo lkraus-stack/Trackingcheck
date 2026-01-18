@@ -5,6 +5,7 @@ import { ChatInterface } from '@/components/ChatInterface';
 import { HeroSection } from '@/components/HeroSection';
 import { ProblemSection } from '@/components/ProblemSection';
 import { AgencySection } from '@/components/AgencySection';
+import { AuthButton } from '@/components/AuthButton';
 import { 
   Shield, 
   Cookie, 
@@ -75,6 +76,7 @@ export default function Home() {
                 <FeatureBadge icon={<Shield className="w-4 h-4" />} text="Consent Mode" />
                 <FeatureBadge icon={<BarChart3 className="w-4 h-4" />} text="Tracking Tags" />
               </div>
+              <AuthButton />
               <a
                 href="https://www.franco-consulting.com/"
                 target="_blank"

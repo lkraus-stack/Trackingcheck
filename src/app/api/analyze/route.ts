@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyzeWebsite, analyzeWebsiteQuick } from '@/lib/analyzer';
 import { AnalysisRequest } from '@/types';
 import { getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
+import { auth } from '@/lib/auth/config';
+import { checkUsageLimits, incrementUsage } from '@/lib/auth/usage';
 
 // Vercel Serverless Konfiguration
 // Vercel Pro: max 300 Sekunden, Hobby: max 60 Sekunden
@@ -12,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
     const body: AnalysisRequest = await request.json();
     
     if (!body.url) {
@@ -19,6 +22,25 @@ export async function POST(request: NextRequest) {
         { error: 'URL ist erforderlich' },
         { status: 400 }
       );
+    }
+
+    // Usage Check für eingeloggte User (optional - kann auch ohne Login genutzt werden)
+    if (session?.user?.id) {
+      const usageCheck = await checkUsageLimits(session.user.id, 'analyses');
+      
+      if (!usageCheck.allowed) {
+        return NextResponse.json(
+          { 
+            error: 'Analyse-Limit erreicht', 
+            details: usageCheck.message,
+            upgradeRequired: true,
+            currentUsage: usageCheck.currentUsage,
+            limit: usageCheck.limit,
+            resetDate: usageCheck.resetDate?.toISOString(),
+          },
+          { status: 429 }
+        );
+      }
     }
 
     // URL validieren
@@ -88,6 +110,14 @@ export async function POST(request: NextRequest) {
     // Ergebnis cachen (nur bei Full-Scan)
     if (!quickScan) {
       setCachedAnalysis(url, result);
+    }
+
+    // Usage Stats für eingeloggte User inkrementieren
+    if (session?.user?.id) {
+      await incrementUsage(session.user.id, 'analyses').catch((error) => {
+        // Usage-Tracking ist nicht kritisch - nur loggen, nicht fehlschlagen lassen
+        console.error('Error incrementing usage:', error);
+      });
     }
 
     return NextResponse.json({
