@@ -1,25 +1,35 @@
 'use client';
 
-import { signIn, getProviders } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, LogIn, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export default function SignInPage() {
+function SignInContent() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Prüfe ob User bereits eingeloggt ist
+    if (status === 'authenticated' && session) {
+      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+      router.push(callbackUrl);
+      return;
+    }
+
     // Prüfe ob es einen Fehler in der URL gibt
-    const params = new URLSearchParams(window.location.search);
-    const errorParam = params.get('error');
+    const errorParam = searchParams.get('error');
     
     if (errorParam === 'AccessDenied') {
       setError('Zugriff verweigert. Bitte versuche es erneut.');
     } else if (errorParam) {
       setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
     }
-  }, []);
+  }, [session, status, router, searchParams]);
 
   const handleSignIn = async () => {
     setIsLoading(true);
@@ -27,10 +37,10 @@ export default function SignInPage() {
     
     try {
       // Hole callbackUrl aus URL params
-      const params = new URLSearchParams(window.location.search);
-      const callbackUrl = params.get('callbackUrl') || '/';
+      const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
       
-      await signIn('google', { callbackUrl });
+      // NextAuth leitet automatisch weiter nach dem Login
+      await signIn('google', { callbackUrl, redirect: true });
     } catch (err) {
       console.error('Sign in error:', err);
       setError('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
