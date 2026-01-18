@@ -27,8 +27,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         })
         
         if (userData) {
-          (session.user as any).subscription = userData.subscription || null
-          (session.user as any).usageLimits = userData.usageLimits || null
+          if (userData.subscription) {
+            (session.user as any).subscription = userData.subscription
+          }
+          if (userData.usageLimits) {
+            (session.user as any).usageLimits = userData.usageLimits
+          }
         }
       }
       return session
