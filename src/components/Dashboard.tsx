@@ -47,11 +47,12 @@ interface DashboardProps {
   onSelectUrl: (url: string) => void;
   onClose: () => void;
   currentAnalysis?: AnalysisResult | null;
+  embedded?: boolean; // Wenn true, wird es als normale Seite angezeigt, nicht als Modal
 }
 
 type Tab = 'overview' | 'projects' | 'history';
 
-export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardProps) {
+export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = false }: DashboardProps) {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -192,9 +193,18 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis }: DashboardPr
   const favoriteProjects = projects.filter(p => p.isFavorite);
   const recentAnalyses = analyses.slice(0, 5);
 
+  // Wenn embedded, zeige als normale Seite ohne Overlay
+  const containerClass = embedded
+    ? "min-h-screen bg-slate-950 w-full"
+    : "fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4";
+  
+  const contentClass = embedded
+    ? "w-full min-h-screen bg-slate-950 flex flex-col"
+    : "w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden";
+
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-700 shadow-2xl flex flex-col overflow-hidden">
+    <div className={containerClass}>
+      <div className={contentClass}>
         {/* Header */}
         <div className="flex items-center justify-between px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-700 bg-slate-800/50 shrink-0">
           <div className="flex items-center gap-2 sm:gap-3">

@@ -42,8 +42,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <Dashboard onSelectUrl={() => {}} onClose={() => router.push('/')} />
-    </div>
+    <Dashboard 
+      embedded={true}
+      onSelectUrl={(url) => {
+        router.push(`/?url=${encodeURIComponent(url)}`);
+      }} 
+      onClose={() => router.push('/')} 
+    />
   );
 }
