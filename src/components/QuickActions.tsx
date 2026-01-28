@@ -865,6 +865,8 @@ function ChecklistModal({
   onClose: () => void;
 }) {
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const overallScore = result.scoreBreakdown?.overall ?? result.score;
+  const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
 
   const toggleItem = (id: string) => {
     const newChecked = new Set(checkedItems);
