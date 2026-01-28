@@ -28,29 +28,42 @@ interface AnalysisOverviewProps {
 }
 
 export function AnalysisOverview({ result }: AnalysisOverviewProps) {
-  const [animatedScore, setAnimatedScore] = useState(0);
+  const [animatedGdprScore, setAnimatedGdprScore] = useState(0);
+  const [animatedTrackingScore, setAnimatedTrackingScore] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
 
-  // Animate score on mount
+  const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
+  const trackingScore = result.scoreBreakdown?.tracking ?? calculateTrackingScore(result);
+  const overallScore = result.scoreBreakdown?.overall ?? result.score;
+  const trackingDetected = result.scoreBreakdown?.trackingDetected ?? hasAnyTracking(result);
+
+  // Animate scores on mount
   useEffect(() => {
+    setShowDetails(false);
     const duration = 1500;
     const steps = 60;
-    const increment = result.score / steps;
-    let current = 0;
+    const gdprIncrement = gdprScore / steps;
+    const trackingIncrement = trackingScore / steps;
+    let currentGdpr = 0;
+    let currentTracking = 0;
 
     const timer = setInterval(() => {
-      current += increment;
-      if (current >= result.score) {
-        setAnimatedScore(result.score);
+      currentGdpr += gdprIncrement;
+      currentTracking += trackingIncrement;
+      const gdprDone = currentGdpr >= gdprScore;
+      const trackingDone = currentTracking >= trackingScore;
+
+      setAnimatedGdprScore(gdprDone ? gdprScore : Math.round(currentGdpr));
+      setAnimatedTrackingScore(trackingDone ? trackingScore : Math.round(currentTracking));
+
+      if (gdprDone && trackingDone) {
         clearInterval(timer);
         setTimeout(() => setShowDetails(true), 200);
-      } else {
-        setAnimatedScore(Math.round(current));
       }
     }, duration / steps);
 
     return () => clearInterval(timer);
-  }, [result.score]);
+  }, [gdprScore, trackingScore]);
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return { main: '#22c55e', secondary: '#4ade80', bg: 'from-green-500/20 to-emerald-500/20' };
@@ -58,9 +71,12 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
     return { main: '#ef4444', secondary: '#f87171', bg: 'from-red-500/20 to-rose-500/20' };
   };
 
-  const scoreColors = getScoreColor(result.score);
-  const circumference = 2 * Math.PI * 90;
-  const strokeDashoffset = circumference - (animatedScore / 100) * circumference;
+  const heroColors = getScoreColor(overallScore);
+  const gdprColors = getScoreColor(gdprScore);
+  const trackingColors = getScoreColor(trackingScore);
+  const circumference = 2 * Math.PI * 80;
+  const gdprDashoffset = circumference - (animatedGdprScore / 100) * circumference;
+  const trackingDashoffset = circumference - (animatedTrackingScore / 100) * circumference;
 
   // Calculate category scores
   const categories = [
@@ -86,8 +102,10 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
       id: 'tracking',
       name: 'Tracking Tags',
       icon: Tag,
-      score: calculateTrackingScore(result),
-      status: result.trackingTags.googleAnalytics.detected || result.trackingTags.googleTagManager.detected ? 'good' : 'warning',
+      score: trackingScore,
+      status: trackingDetected
+        ? trackingScore >= 80 ? 'good' : trackingScore >= 50 ? 'warning' : 'bad'
+        : 'bad',
       details: getTrackingDetails(result),
       color: 'pink',
     },
@@ -95,8 +113,8 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
       id: 'gdpr',
       name: 'DSGVO',
       icon: Scale,
-      score: result.gdprChecklist?.score || 0,
-      status: (result.gdprChecklist?.score || 0) >= 80 ? 'good' : (result.gdprChecklist?.score || 0) >= 50 ? 'warning' : 'bad',
+      score: gdprScore,
+      status: gdprScore >= 80 ? 'good' : gdprScore >= 50 ? 'warning' : 'bad',
       details: getGdprDetails(result),
       color: 'amber',
     },
@@ -150,19 +168,19 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
   return (
     <div className="mb-6 space-y-4">
       {/* Hero Score Section */}
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${scoreColors.bg} border border-slate-700/50 p-6`}>
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${heroColors.bg} border border-slate-700/50 p-6`}>
         {/* Animated Background */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-1/2 -right-1/2 w-full h-full opacity-30">
             <div 
               className="w-96 h-96 rounded-full blur-3xl animate-pulse-slow"
-              style={{ background: `radial-gradient(circle, ${scoreColors.main}40, transparent)` }}
+              style={{ background: `radial-gradient(circle, ${heroColors.main}40, transparent)` }}
             />
           </div>
           <div className="absolute -bottom-1/2 -left-1/4 w-full h-full opacity-20">
             <div 
               className="w-80 h-80 rounded-full blur-3xl animate-pulse-slow animation-delay-2000"
-              style={{ background: `radial-gradient(circle, ${scoreColors.secondary}30, transparent)` }}
+              style={{ background: `radial-gradient(circle, ${heroColors.secondary}30, transparent)` }}
             />
           </div>
         </div>
@@ -170,50 +188,90 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
         <div className="relative z-10">
           {/* Top Row: Score + Quick Stats */}
           <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-10">
-            {/* Animated Score Ring */}
-            <div className="relative flex-shrink-0">
-              <svg width="200" height="200" className="transform -rotate-90">
-                {/* Background Ring */}
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="90"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="12"
-                  className="text-slate-700/50"
-                />
-                {/* Animated Progress Ring */}
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="90"
-                  fill="none"
-                  stroke="url(#scoreGradient)"
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  className="transition-all duration-1000 ease-out"
-                />
-                {/* Gradient Definition */}
-                <defs>
-                  <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor={scoreColors.main} />
-                    <stop offset="100%" stopColor={scoreColors.secondary} />
-                  </linearGradient>
-                </defs>
-              </svg>
-              {/* Score Number */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span 
-                  className="text-5xl font-bold tabular-nums"
-                  style={{ color: scoreColors.main }}
-                >
-                  {animatedScore}
-                </span>
-                <span className="text-sm text-slate-400 font-medium">von 100</span>
-                <span className="text-xs text-slate-500 mt-1">Compliance Score</span>
+            {/* DSGVO + Tracking Score Rings */}
+            <div className="flex flex-col sm:flex-row items-center gap-6 flex-shrink-0">
+              <div className="relative">
+                <svg width="180" height="180" className="transform -rotate-90">
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="12"
+                    className="text-slate-700/50"
+                  />
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    stroke="url(#gdprGradient)"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={gdprDashoffset}
+                    className="transition-all duration-1000 ease-out"
+                  />
+                  <defs>
+                    <linearGradient id="gdprGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor={gdprColors.main} />
+                      <stop offset="100%" stopColor={gdprColors.secondary} />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span 
+                    className="text-4xl font-bold tabular-nums"
+                    style={{ color: gdprColors.main }}
+                  >
+                    {animatedGdprScore}
+                  </span>
+                  <span className="text-sm text-slate-400 font-medium">von 100</span>
+                  <span className="text-xs text-slate-500 mt-1">DSGVO Score</span>
+                </div>
+              </div>
+
+              <div className="relative">
+                <svg width="180" height="180" className="transform -rotate-90">
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="12"
+                    className="text-slate-700/50"
+                  />
+                  <circle
+                    cx="90"
+                    cy="90"
+                    r="80"
+                    fill="none"
+                    stroke="url(#trackingGradient)"
+                    strokeWidth="12"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={trackingDashoffset}
+                    className="transition-all duration-1000 ease-out"
+                  />
+                  <defs>
+                    <linearGradient id="trackingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor={trackingColors.main} />
+                      <stop offset="100%" stopColor={trackingColors.secondary} />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span 
+                    className="text-4xl font-bold tabular-nums"
+                    style={{ color: trackingColors.main }}
+                  >
+                    {animatedTrackingScore}
+                  </span>
+                  <span className="text-sm text-slate-400 font-medium">von 100</span>
+                  <span className="text-xs text-slate-500 mt-1">Tracking Score</span>
+                </div>
               </div>
             </div>
 
@@ -222,12 +280,17 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
               {/* Status Message */}
               <div className="mb-4">
                 <h3 className="text-xl sm:text-2xl font-bold text-slate-100 mb-2">
-                  {result.score >= 80 ? (
+                  {!trackingDetected ? (
+                    <>
+                      <Minus className="inline w-6 h-6 mr-2 text-slate-400" />
+                      Kein Tracking erkannt
+                    </>
+                  ) : overallScore >= 80 ? (
                     <>
                       <Sparkles className="inline w-6 h-6 mr-2 text-green-400" />
                       Sehr gutes Setup!
                     </>
-                  ) : result.score >= 50 ? (
+                  ) : overallScore >= 50 ? (
                     <>
                       <AlertTriangle className="inline w-6 h-6 mr-2 text-yellow-400" />
                       Optimierungspotenzial vorhanden
@@ -240,9 +303,11 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
                   )}
                 </h3>
                 <p className="text-slate-400 text-sm max-w-md">
-                  {result.score >= 80 
-                    ? 'Dein Tracking-Setup erfüllt die meisten Compliance-Anforderungen. Nur kleine Optimierungen möglich.'
-                    : result.score >= 50
+                  {!trackingDetected 
+                    ? 'Es wurde kein messbares Tracking gefunden. Für den Tracking-Score ist das negativ, der DSGVO-Score bleibt davon getrennt.'
+                    : overallScore >= 80 
+                    ? 'Dein Setup erfüllt die wichtigsten DSGVO- und Tracking-Anforderungen. Nur kleine Optimierungen möglich.'
+                    : overallScore >= 50
                     ? 'Einige Bereiche benötigen Aufmerksamkeit. Schau dir die Details unten an.'
                     : 'Dringender Handlungsbedarf! Mehrere kritische Bereiche müssen optimiert werden.'}
                 </p>
@@ -451,6 +516,26 @@ function IssuesQuickView({ issues }: { issues: AnalysisResult['issues'] }) {
 }
 
 // Helper Functions
+function hasAnyTracking(result: AnalysisResult): boolean {
+  const hasTrackingCookies = result.cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+  const hasTagTracking = result.trackingTags.googleAnalytics.detected ||
+    result.trackingTags.googleTagManager.detected ||
+    result.trackingTags.googleAdsConversion?.detected ||
+    result.trackingTags.metaPixel.detected ||
+    result.trackingTags.linkedInInsight.detected ||
+    result.trackingTags.tiktokPixel.detected ||
+    result.trackingTags.pinterestTag.detected ||
+    result.trackingTags.snapchatPixel.detected ||
+    result.trackingTags.twitterPixel.detected ||
+    result.trackingTags.redditPixel.detected ||
+    result.trackingTags.bingAds.detected ||
+    result.trackingTags.criteo.detected ||
+    result.trackingTags.other.length > 0;
+  const hasServerSideIndicators = result.trackingTags.serverSideTracking?.detected || false;
+
+  return hasTrackingCookies || hasTagTracking || hasServerSideIndicators;
+}
+
 function calculateTrackingScore(result: AnalysisResult): number {
   let score = 0;
   if (result.trackingTags.googleAnalytics.detected) score += 30;

@@ -65,18 +65,25 @@ export async function exportAnalysisToPDF(
   checkPageBreak(30);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('Compliance Score', margin, yPos);
+  const overallScore = result.scoreBreakdown?.overall ?? result.score;
+  const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
+  const trackingScore = result.scoreBreakdown?.tracking;
+
+  doc.text('Gesamt-Score', margin, yPos);
   yPos += 8;
   doc.setFontSize(32);
-  const scoreColor = result.score >= 80 ? [46, 125, 50] : result.score >= 50 ? [237, 108, 2] : [211, 47, 47];
+  const scoreColor = overallScore >= 80 ? [46, 125, 50] : overallScore >= 50 ? [237, 108, 2] : [211, 47, 47];
   doc.setTextColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-  doc.text(`${result.score}/100`, margin, yPos);
+  doc.text(`${overallScore}/100`, margin, yPos);
   doc.setTextColor(0, 0, 0);
   
   // GDPR Score
   if (result.gdprChecklist) {
     doc.setFontSize(12);
-    doc.text(`DSGVO: ${result.gdprChecklist.score}%`, margin + 50, yPos);
+    doc.text(`DSGVO: ${gdprScore}%`, margin + 50, yPos);
+    if (typeof trackingScore === 'number') {
+      doc.text(`Tracking: ${trackingScore}%`, margin + 85, yPos);
+    }
   }
   yPos += 15;
 

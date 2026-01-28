@@ -29,6 +29,7 @@ import {
   ThirdPartyDomainsResult,
   GDPRChecklistResult,
   DMACheckResult,
+  ScoreBreakdown,
 } from '@/types';
 
 export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
@@ -195,7 +196,17 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     addStep('generate_issues', 'completed', `${issues.length} Hinweise generiert`);
     
     // Score berechnen
-    const score = calculateScore(cookieBanner, tcf, googleConsentMode, issues, cookieConsentTest, gdprChecklist, trackingTags, cookies);
+    const scoreBreakdown = calculateScoreBreakdown(
+      cookieBanner,
+      tcf,
+      googleConsentMode,
+      issues,
+      cookieConsentTest,
+      gdprChecklist,
+      trackingTags,
+      cookies
+    );
+    const score = scoreBreakdown.overall;
     
     return {
       url: normalizedUrl,
@@ -212,6 +223,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       gdprChecklist,
       dmaCheck,
       score,
+      scoreBreakdown,
       issues,
       analysisSteps,
       // NEU: Performance Marketing
@@ -1246,7 +1258,7 @@ function generateIssues(
   return issues;
 }
 
-function calculateScore(
+function calculateScoreBreakdown(
   cookieBanner: AnalysisResult['cookieBanner'],
   tcf: AnalysisResult['tcf'],
   googleConsentMode: AnalysisResult['googleConsentMode'],
@@ -1255,8 +1267,60 @@ function calculateScore(
   gdprChecklist: GDPRChecklistResult,
   trackingTags: AnalysisResult['trackingTags'],
   cookies: CookieResult[]
+): ScoreBreakdown {
+  const trackingScore = calculateTrackingSetupScore(
+    cookieBanner,
+    tcf,
+    googleConsentMode,
+    issues,
+    cookieConsentTest,
+    trackingTags,
+    cookies
+  );
+  const gdprScore = gdprChecklist.score;
+  const trackingDetected = hasAnyTracking(trackingTags, cookies);
+  const overall = Math.round((gdprScore * 0.4) + (trackingScore * 0.6));
+
+  return {
+    overall: Math.max(0, Math.min(100, overall)),
+    gdpr: Math.max(0, Math.min(100, gdprScore)),
+    tracking: Math.max(0, Math.min(100, trackingScore)),
+    trackingDetected,
+  };
+}
+
+function hasAnyTracking(
+  trackingTags: AnalysisResult['trackingTags'],
+  cookies: CookieResult[]
+): boolean {
+  const hasTrackingCookies = cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
+  const hasTagTracking = trackingTags.googleAnalytics.detected ||
+    trackingTags.googleTagManager.detected ||
+    trackingTags.googleAdsConversion.detected ||
+    trackingTags.metaPixel.detected ||
+    trackingTags.linkedInInsight.detected ||
+    trackingTags.tiktokPixel.detected ||
+    trackingTags.pinterestTag.detected ||
+    trackingTags.snapchatPixel.detected ||
+    trackingTags.twitterPixel.detected ||
+    trackingTags.redditPixel.detected ||
+    trackingTags.bingAds.detected ||
+    trackingTags.criteo.detected ||
+    trackingTags.other.length > 0;
+  const hasServerSideIndicators = trackingTags.serverSideTracking.detected;
+
+  return hasTrackingCookies || hasTagTracking || hasServerSideIndicators;
+}
+
+function calculateTrackingSetupScore(
+  cookieBanner: AnalysisResult['cookieBanner'],
+  tcf: AnalysisResult['tcf'],
+  googleConsentMode: AnalysisResult['googleConsentMode'],
+  issues: Issue[],
+  cookieConsentTest: CookieConsentTestResult | undefined,
+  trackingTags: AnalysisResult['trackingTags'],
+  cookies: CookieResult[]
 ): number {
-  // Unterscheide zwischen Major Tracking und Other Tracking
   const hasMajorTracking = trackingTags.googleAnalytics.detected || 
     trackingTags.metaPixel.detected ||
     trackingTags.googleTagManager.detected ||
@@ -1265,52 +1329,29 @@ function calculateScore(
   
   const hasOnlyOtherTracking = !hasMajorTracking && trackingTags.other.length > 0;
   const hasTrackingCookies = cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
-  
-  // WICHTIG: Prüfen ob Server-Side Tracking Indikatoren vorhanden sind
   const hasServerSideIndicators = trackingTags.serverSideTracking.detected;
+  const hasAnyTracking = hasAnyTrackingSignal(hasMajorTracking, hasOnlyOtherTracking, hasTrackingCookies, hasServerSideIndicators, trackingTags);
 
-  // FALL 1: Kein Major Tracking, nur "Other" Tracking (z.B. PostHog, Hotjar)
-  // Diese Websites sollten nicht hart bestraft werden
+  if (!hasAnyTracking) {
+    return 0;
+  }
+
+  let score = 100;
+
   if (!hasMajorTracking && !hasTrackingCookies) {
     if (hasOnlyOtherTracking) {
-      // Nur Other Tracking (z.B. PostHog) - Score 80-90
-      // Warning für fehlendes Cookie-Banner, aber kein schwerer Abzug
-      const warnings = issues.filter(i => i.severity === 'warning').length;
-      return Math.max(80, 92 - (warnings * 3));
+      score = 80;
     } else if (hasServerSideIndicators) {
-      // Server-Side Tracking erkannt - Score 75-85 (neutral-positiv)
-      const nonCriticalWarnings = issues.filter(i => 
-        i.severity === 'warning' && 
-        i.category !== 'tracking' &&
-        i.category !== 'conversion' &&
-        i.category !== 'gtm'
-      ).length;
-      
-      return Math.max(70, 85 - (nonCriticalWarnings * 2));
-    } else {
-      // KEIN Tracking erkannt = Datenschutzfreundlich!
-      // Score 90-100 (sehr gut!)
-      const minorIssues = issues.filter(i => 
-        i.severity === 'warning' || i.severity === 'info'
-      ).length;
-      
-      return Math.max(85, 100 - (minorIssues * 2));
+      score = 70;
     }
   }
 
-  // Wenn Client-Side Tracking vorhanden ist: Standard-Scoring
-  let score = 100;
-
-  // NUR Errors und Warnings zählen, die NICHT mit "nicht-erkannt" zusammenhängen
-  // wenn Server-Side Tracking vorhanden sein könnte
   const errors = issues.filter(i => i.severity === 'error').length;
   const warnings = issues.filter(i => i.severity === 'warning').length;
   
   score -= errors * 15;
   score -= warnings * 5;
 
-  // Bonus für gute Implementierung
-  // Auch "Essenziell speichern"-Button wird als Ablehnen-Option gewertet
   const hasRejectOption = cookieBanner.hasRejectButton || cookieBanner.hasEssentialSaveButton;
   if (cookieBanner.detected && cookieBanner.hasAcceptButton && hasRejectOption) {
     score += 5;
@@ -1322,18 +1363,15 @@ function calculateScore(
 
   if (googleConsentMode.detected && googleConsentMode.version === 'v2') {
     score += 5;
-    // Extra Bonus für Update-Funktion
     if (googleConsentMode.updateConsent?.detected) {
       score += 3;
     }
   }
 
-  // Bonus für Server-Side Tracking (verbessert Datenqualität)
   if (hasServerSideIndicators) {
     score += 5;
   }
 
-  // Cookie-Consent-Test Bonus/Abzug
   if (cookieConsentTest) {
     if (cookieConsentTest.analysis.consentWorksProperly && cookieConsentTest.analysis.rejectWorksProperly) {
       score += 10;
@@ -1344,11 +1382,27 @@ function calculateScore(
     }
   }
 
-  // GDPR Score einbeziehen
-  const gdprWeight = gdprChecklist.score * 0.2;
-  score = Math.round(score * 0.8 + gdprWeight);
-
   return Math.max(0, Math.min(100, score));
+}
+
+function hasAnyTrackingSignal(
+  hasMajorTracking: boolean,
+  hasOnlyOtherTracking: boolean,
+  hasTrackingCookies: boolean,
+  hasServerSideIndicators: boolean,
+  trackingTags: AnalysisResult['trackingTags']
+): boolean {
+  return hasMajorTracking ||
+    hasOnlyOtherTracking ||
+    hasTrackingCookies ||
+    hasServerSideIndicators ||
+    trackingTags.googleAdsConversion.detected ||
+    trackingTags.pinterestTag.detected ||
+    trackingTags.snapchatPixel.detected ||
+    trackingTags.twitterPixel.detected ||
+    trackingTags.redditPixel.detected ||
+    trackingTags.bingAds.detected ||
+    trackingTags.criteo.detected;
 }
 
 // Quick-Scan Funktion (schneller, weniger Details)
@@ -1403,11 +1457,15 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
       },
     };
 
-    const gdprChecklist: GDPRChecklistResult = {
-      score: 0,
-      checks: [],
-      summary: { passed: 0, failed: 0, warnings: 0, notApplicable: 0 },
-    };
+    const gdprChecklist = analyzeGDPRCompliance(
+      cookieBanner,
+      tcf,
+      googleConsentMode,
+      trackingTags,
+      cookies,
+      undefined,
+      thirdPartyDomains
+    );
 
     const dmaCheck: DMACheckResult = {
       applicable: false,
@@ -1469,27 +1527,17 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
       `Event Quality: ${eventQualityScore.overallScore}%${funnelValidation.isEcommerce ? ` | Funnel: ${funnelValidation.overallScore}%` : ''} | Conversion Audit: ${conversionTrackingAudit.overallScore}%`
     );
     
-    // Schneller Score - Prüfen ob Tracking vorhanden
-    const hasAnyTrackingQuick = trackingTags.googleAnalytics.detected || 
-      trackingTags.metaPixel.detected ||
-      trackingTags.googleTagManager.detected ||
-      trackingTags.linkedInInsight.detected ||
-      trackingTags.tiktokPixel.detected ||
-      trackingTags.other.length > 0 ||
-      cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
-    
-    let score = 100;
-    
-    // Wenn kein Tracking vorhanden ist, hoher Score
-    if (!hasAnyTrackingQuick) {
-      score = 95; // Sehr gut, da datenschutzfreundlich
-    } else {
-      // Tracking vorhanden - prüfe Compliance
-      if (!cookieBanner.detected) score -= 20;
-      if (!googleConsentMode.detected && trackingTags.googleAnalytics.detected) score -= 20;
-      if (googleConsentMode.version === 'v1') score -= 15;
-      if (cookieBanner.detected && !cookieBanner.hasRejectButton && !cookieBanner.hasEssentialSaveButton) score -= 10;
-    }
+    const scoreBreakdown = calculateScoreBreakdown(
+      cookieBanner,
+      tcf,
+      googleConsentMode,
+      issues,
+      undefined,
+      gdprChecklist,
+      trackingTags,
+      cookies
+    );
+    const score = scoreBreakdown.overall;
     
     return {
       url: normalizedUrl,
@@ -1505,6 +1553,7 @@ export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> 
       gdprChecklist,
       dmaCheck,
       score: Math.max(0, Math.min(100, score)),
+      scoreBreakdown,
       issues,
       analysisSteps,
       // Performance Marketing (auch im Quick Scan)

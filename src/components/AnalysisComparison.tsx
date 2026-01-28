@@ -80,6 +80,7 @@ export function AnalysisComparison({ currentResult }: AnalysisComparisonProps) {
   const improvements = changes.filter(c => c.changeType === 'improved').length;
   const degradations = changes.filter(c => c.changeType === 'degraded').length;
   const unchanged = changes.filter(c => c.changeType === 'unchanged').length;
+  const currentOverallScore = currentResult.scoreBreakdown?.overall ?? currentResult.score;
 
   return (
     <div className="mt-4">
@@ -148,7 +149,7 @@ export function AnalysisComparison({ currentResult }: AnalysisComparisonProps) {
                 >
                   {previousAnalyses.map((analysis) => (
                     <option key={analysis.id} value={analysis.id}>
-                      {new Date(analysis.createdAt).toLocaleString('de-DE')} - Score: {analysis.result.score}
+                      {new Date(analysis.createdAt).toLocaleString('de-DE')} - Score: {analysis.result.scoreBreakdown?.overall ?? analysis.result.score}
                     </option>
                   ))}
                 </select>
@@ -161,11 +162,11 @@ export function AnalysisComparison({ currentResult }: AnalysisComparisonProps) {
                     <div className="text-center p-3 bg-slate-800 rounded-lg">
                       <p className="text-xs text-slate-400 mb-1">Vorher</p>
                       <p className={`text-2xl font-bold ${
-                        selectedPrevious.result.score >= 80 ? 'text-green-400' :
-                        selectedPrevious.result.score >= 50 ? 'text-yellow-400' :
+                        (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score) >= 80 ? 'text-green-400' :
+                        (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score) >= 50 ? 'text-yellow-400' :
                         'text-red-400'
                       }`}>
-                        {selectedPrevious.result.score}
+                        {selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score}
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
                         <Calendar className="w-3 h-3 inline mr-1" />
@@ -180,11 +181,11 @@ export function AnalysisComparison({ currentResult }: AnalysisComparisonProps) {
                     <div className="text-center p-3 bg-slate-800 rounded-lg">
                       <p className="text-xs text-slate-400 mb-1">Jetzt</p>
                       <p className={`text-2xl font-bold ${
-                        currentResult.score >= 80 ? 'text-green-400' :
-                        currentResult.score >= 50 ? 'text-yellow-400' :
+                        currentOverallScore >= 80 ? 'text-green-400' :
+                        currentOverallScore >= 50 ? 'text-yellow-400' :
                         'text-red-400'
                       }`}>
-                        {currentResult.score}
+                        {currentOverallScore}
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
                         <Clock className="w-3 h-3 inline mr-1" />
@@ -195,25 +196,25 @@ export function AnalysisComparison({ currentResult }: AnalysisComparisonProps) {
 
                   {/* Score-Differenz */}
                   <div className={`text-center p-3 rounded-lg mb-4 ${
-                    currentResult.score > selectedPrevious.result.score
+                    currentOverallScore > (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score)
                       ? 'bg-green-500/10 border border-green-500/30'
-                      : currentResult.score < selectedPrevious.result.score
+                      : currentOverallScore < (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score)
                       ? 'bg-red-500/10 border border-red-500/30'
                       : 'bg-slate-700/50 border border-slate-600'
                   }`}>
                     <div className="flex items-center justify-center gap-2">
-                      {currentResult.score > selectedPrevious.result.score ? (
+                      {currentOverallScore > (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score) ? (
                         <>
                           <TrendingUp className="w-5 h-5 text-green-400" />
                           <span className="text-green-400 font-bold">
-                            +{currentResult.score - selectedPrevious.result.score} Punkte
+                            +{currentOverallScore - (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score)} Punkte
                           </span>
                         </>
-                      ) : currentResult.score < selectedPrevious.result.score ? (
+                      ) : currentOverallScore < (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score) ? (
                         <>
                           <TrendingDown className="w-5 h-5 text-red-400" />
                           <span className="text-red-400 font-bold">
-                            {currentResult.score - selectedPrevious.result.score} Punkte
+                            {currentOverallScore - (selectedPrevious.result.scoreBreakdown?.overall ?? selectedPrevious.result.score)} Punkte
                           </span>
                         </>
                       ) : (

@@ -38,6 +38,7 @@ export interface AnalysisResult {
   
   // Overall Score
   score: number;
+  scoreBreakdown?: ScoreBreakdown;
   issues: Issue[];
   
   // Analyse-Prozess Info (für UI)
@@ -54,6 +55,13 @@ export interface AnalysisResult {
   gtmAudit?: GTMAuditResult;
   privacySandbox?: PrivacySandboxResult;
   ecommerceDeepDive?: EcommerceDeepDiveResult;
+}
+
+export interface ScoreBreakdown {
+  overall: number;
+  gdpr: number;
+  tracking: number;
+  trackingDetected: boolean;
 }
 
 // Analyse-Schritte für KI-ähnliche Gedankengänge in der UI

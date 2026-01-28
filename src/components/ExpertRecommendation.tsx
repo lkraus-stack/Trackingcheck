@@ -25,7 +25,7 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
 
   if (dismissed) return null;
 
-  const score = result.score;
+  const score = result.scoreBreakdown?.overall ?? result.score;
   const criticalIssues = result.issues.filter(i => i.severity === 'error');
   const warnings = result.issues.filter(i => i.severity === 'warning');
   

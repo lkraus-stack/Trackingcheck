@@ -878,6 +878,7 @@ function AnalysisCard({
   onDelete?: () => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
+  const analysisScore = analysis.result.scoreBreakdown?.overall ?? analysis.result.score;
 
   if (compact) {
     return (
@@ -886,11 +887,11 @@ function AnalysisCard({
         className="w-full flex items-center gap-3 p-2 bg-slate-700/30 hover:bg-slate-700/50 rounded-lg transition-colors text-left"
       >
         <span className={`text-sm font-medium ${
-          analysis.result.score >= 70 ? 'text-green-400' :
-          analysis.result.score >= 50 ? 'text-yellow-400' :
+          analysisScore >= 70 ? 'text-green-400' :
+          analysisScore >= 50 ? 'text-yellow-400' :
           'text-red-400'
         }`}>
-          {analysis.result.score}
+          {analysisScore}
         </span>
         <span className="text-sm text-slate-200 truncate flex-1">
           {analysis.url.replace(/https?:\/\//, '')}
@@ -907,16 +908,16 @@ function AnalysisCard({
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-            analysis.result.score >= 70 ? 'bg-green-500/10' :
-            analysis.result.score >= 50 ? 'bg-yellow-500/10' :
+            analysisScore >= 70 ? 'bg-green-500/10' :
+            analysisScore >= 50 ? 'bg-yellow-500/10' :
             'bg-red-500/10'
           }`}>
             <span className={`text-lg font-bold ${
-              analysis.result.score >= 70 ? 'text-green-400' :
-              analysis.result.score >= 50 ? 'text-yellow-400' :
+              analysisScore >= 70 ? 'text-green-400' :
+              analysisScore >= 50 ? 'text-yellow-400' :
               'text-red-400'
             }`}>
-              {analysis.result.score}
+              {analysisScore}
             </span>
           </div>
           <div className="flex-1 min-w-0">

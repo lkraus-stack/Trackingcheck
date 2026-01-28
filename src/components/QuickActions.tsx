@@ -43,6 +43,8 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [showDataLayerModal, setShowDataLayerModal] = useState(false);
   const [showDataLayerViewerModal, setShowDataLayerViewerModal] = useState(false);
   const [showWhiteLabelModal, setShowWhiteLabelModal] = useState(false);
+  const overallScore = result.scoreBreakdown?.overall ?? result.score;
+  const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
 
   const copyToClipboard = async (text: string, actionId: string) => {
     await navigator.clipboard.writeText(text);
@@ -923,7 +925,7 @@ function ChecklistModal({
     {
       title: '5. DSGVO & DMA Compliance',
       items: [
-        { id: 'gdpr-1', text: `DSGVO Score: ${result.gdprChecklist?.score || 0}%`, done: (result.gdprChecklist?.score || 0) >= 70 },
+        { id: 'gdpr-1', text: `DSGVO Score: ${gdprScore}%`, done: gdprScore >= 70 },
         { id: 'gdpr-2', text: 'Einwilligung dokumentiert', done: false },
         { id: 'gdpr-3', text: 'Datenschutzerklärung aktualisiert', done: false },
         { id: 'gdpr-4', text: 'Auftragsverarbeitungsverträge (AVV) vorhanden', done: false },
@@ -971,7 +973,7 @@ function ChecklistModal({
         <div class="meta">
           <strong>Website:</strong> ${result.url}<br>
           <strong>Erstellt:</strong> ${new Date().toLocaleString('de-DE')}<br>
-          <strong>Score:</strong> ${result.score}/100
+          <strong>Score:</strong> ${overallScore}/100
         </div>
         <div class="progress">
           <div class="progress-bar" style="width: ${progress}%"></div>
