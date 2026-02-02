@@ -55,7 +55,11 @@ export class VanteroClient {
     
     // Timeout Controller für Serverless-Umgebungen
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 Sekunden
+    const configuredTimeoutMs = Number(process.env.VANTERO_TIMEOUT_MS ?? 120000);
+    const timeoutMs = Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
+      ? configuredTimeoutMs
+      : 120000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
     let response: Response;
     try {
@@ -83,7 +87,8 @@ export class VanteroClient {
       // Network-Error oder Timeout
       if (fetchError instanceof Error) {
         if (fetchError.name === 'AbortError' || fetchError.message.includes('timeout') || fetchError.message.includes('aborted')) {
-          throw new Error(`API-Timeout: Die Anfrage dauerte zu lange (30s). Modell: ${this.model}, URL: ${this.apiUrl}`);
+          const timeoutSeconds = Math.round(timeoutMs / 1000);
+          throw new Error(`API-Timeout: Die Anfrage dauerte zu lange (${timeoutSeconds}s). Modell: ${this.model}, URL: ${this.apiUrl}`);
         }
         if (fetchError.message.includes('fetch') || fetchError.message.includes('network') || fetchError.message.includes('ECONNREFUSED')) {
           throw new Error(`Netzwerk-Fehler: Kann die Vantero API nicht erreichen (${this.apiUrl}). Bitte prüfe:\n- Ist die API-URL korrekt?\n- Ist die API erreichbar?\n- Gibt es Firewall/CORS-Probleme?`);

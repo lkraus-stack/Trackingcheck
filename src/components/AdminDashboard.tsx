@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import {
   UserPlus,
   Users,
@@ -14,9 +15,11 @@ import {
   Loader2,
   Pencil,
   X,
+  Home,
 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { getPlanDefaults, PlanId } from '@/lib/auth/plans';
+import { UserDropdown } from '@/components/UserDropdown';
 
 type RoleId = 'user' | 'admin';
 
@@ -375,18 +378,36 @@ export function AdminDashboard() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <div className="mx-auto max-w-6xl px-4 py-6 space-y-6">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 text-sm text-slate-200 hover:text-white transition-colors"
+              aria-label="Zur Startseite"
+            >
+              <span className="inline-flex items-center justify-center h-9 w-9 rounded-lg bg-slate-900 border border-slate-800">
+                <Home className="h-4 w-4 text-indigo-400" />
+              </span>
+              <div className="leading-tight">
+                <div className="text-sm font-semibold">Tracking Checker</div>
+                <div className="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Admin Panel</div>
+              </div>
+            </Link>
+            <div className="flex items-center gap-3">
+              <UserDropdown />
+              <button
+                onClick={openCreate}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <UserPlus className="h-4 w-4" />
+                User hinzufügen
+              </button>
+            </div>
+          </div>
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Admin Panel</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Übersicht</p>
             <h1 className="text-2xl font-semibold text-slate-100">User & Usage Kontrolle</h1>
           </div>
-          <button
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            <UserPlus className="h-4 w-4" />
-            User hinzufügen
-          </button>
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -484,6 +505,7 @@ export function AdminDashboard() {
                   <th className="px-4 py-3 font-medium">Rolle</th>
                   <th className="px-4 py-3 font-medium">Analysen (30T)</th>
                   <th className="px-4 py-3 font-medium">KI-Requests (30T)</th>
+                  <th className="px-4 py-3 font-medium">Zuletzt aktiv</th>
                   <th className="px-4 py-3 font-medium">Aktiv</th>
                   <th className="px-4 py-3 font-medium text-right">Aktion</th>
                 </tr>
@@ -531,6 +553,17 @@ export function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-slate-300">
                           {user.usage.aiRequestsLast30Days}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400">
+                          {user.usage.lastActiveAt
+                            ? new Date(user.usage.lastActiveAt).toLocaleString('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <span

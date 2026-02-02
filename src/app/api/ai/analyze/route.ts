@@ -4,6 +4,11 @@ import { AnalysisResult } from '@/types';
 import { auth } from '@/lib/auth/config';
 import { checkFeatureAccess, incrementUsage } from '@/lib/auth/usage';
 
+// Vercel Serverless Konfiguration
+// Vercel Pro: max 300 Sekunden, Hobby: max 60 Sekunden
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
