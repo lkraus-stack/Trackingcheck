@@ -7,9 +7,8 @@ import { checkUsageLimits, incrementUsage } from '@/lib/auth/usage';
 
 // Vercel Serverless Konfiguration
 // Vercel Pro: max 300 Sekunden, Hobby: max 60 Sekunden
-// Verwende 60 Sekunden als sicheres Limit (funktioniert auf allen Plänen)
-// Bei Bedarf kann maxDuration auf 300 erhöht werden (nur Pro Plan)
-export const maxDuration = 60;
+// Verwende 300 Sekunden für vollständige Scans (erfordert Pro)
+export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
