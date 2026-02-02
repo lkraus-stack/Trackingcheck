@@ -43,6 +43,7 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [showDataLayerModal, setShowDataLayerModal] = useState(false);
   const [showDataLayerViewerModal, setShowDataLayerViewerModal] = useState(false);
   const [showWhiteLabelModal, setShowWhiteLabelModal] = useState(false);
+  const [showGdprIssues, setShowGdprIssues] = useState(false);
   const overallScore = result.scoreBreakdown?.overall ?? result.score;
   const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
   const gdprIssuesText = useMemo(() => {
@@ -191,19 +192,47 @@ export function QuickActions({ result }: QuickActionsProps) {
 
           {/* DSGVO Probleme kopieren */}
           <button
-            onClick={() => copyToClipboard(gdprIssuesText, 'gdpr-issues')}
+            onClick={() => setShowGdprIssues(!showGdprIssues)}
             className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
           >
-            {copiedAction === 'gdpr-issues' ? (
-              <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-            ) : (
-              <Shield className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-            )}
+            <Shield className="w-5 h-5 text-emerald-400 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-slate-200">DSGVO-Probleme kopieren</p>
-              <p className="text-xs text-slate-500">Für Entwickler/KI</p>
+              <p className="text-xs text-slate-500">
+                {showGdprIssues ? 'Ausklappen schließen' : 'Text ausklappen'}
+              </p>
             </div>
+            {showGdprIssues ? (
+              <ChevronUp className="w-4 h-4 text-slate-400 ml-auto" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400 ml-auto" />
+            )}
           </button>
+
+          {showGdprIssues && (
+            <div className="sm:col-span-2 p-3 bg-slate-800/40 border border-slate-700 rounded-lg">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-sm font-medium text-slate-200">DSGVO-Probleme (Text)</p>
+                <button
+                  onClick={() => copyToClipboard(gdprIssuesText, 'gdpr-issues')}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-xs text-slate-200 rounded-md transition-colors"
+                >
+                  {copiedAction === 'gdpr-issues' ? (
+                    <Check className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-slate-300" />
+                  )}
+                  {copiedAction === 'gdpr-issues' ? 'Kopiert' : 'Text kopieren'}
+                </button>
+              </div>
+              <textarea
+                value={gdprIssuesText}
+                readOnly
+                rows={8}
+                className="w-full text-xs sm:text-sm bg-slate-900/60 border border-slate-700 rounded-md p-2 text-slate-200 resize-y"
+              />
+            </div>
+          )}
 
           {/* DataLayer Generator */}
           <button
