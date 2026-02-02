@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/config"
 import { NextResponse } from "next/server"
+import { isAdminEmail } from "@/lib/auth/admin"
 
 export default auth(async (req) => {
   const { pathname } = req.nextUrl
@@ -16,8 +17,10 @@ export default auth(async (req) => {
 
   // Protected routes - nur für eingeloggte User
   const protectedPaths = ['/dashboard', '/settings', '/profile']
+  const adminPaths = ['/dashboard/admin']
   
   const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path))
+  const isAdminPath = adminPaths.some(path => pathname.startsWith(path))
   
   if (isProtectedPath) {
     // Prüfe Session - bei Database Sessions kann es sein, dass req.auth nicht immer verfügbar ist
@@ -30,6 +33,21 @@ export default auth(async (req) => {
       const signInUrl = new URL('/auth/signin', req.url)
       signInUrl.searchParams.set('callbackUrl', pathname)
       return NextResponse.redirect(signInUrl)
+    }
+  }
+
+  // Admin routes - nur für Admins
+  if (isAdminPath) {
+    const session = req.auth
+    if (!session?.user) {
+      const signInUrl = new URL('/auth/signin', req.url)
+      signInUrl.searchParams.set('callbackUrl', pathname)
+      return NextResponse.redirect(signInUrl)
+    }
+
+    const isAdmin = session.user.role === 'admin' || isAdminEmail(session.user.email)
+    if (!isAdmin) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
     }
   }
 

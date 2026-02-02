@@ -24,10 +24,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Usage Check für eingeloggte User (optional - kann auch ohne Login genutzt werden)
-    // WICHTIG: Für eingeloggte User KEINE Limits - unbegrenzte Analysen
-    // Der checkUsageLimits gibt jetzt immer allowed: true zurück für eingeloggte User
-    // Nur für nicht-eingeloggte User können Limits greifen (z.B. zukünftige Rate-Limiting)
+    // Usage Check für eingeloggte User (Limits je Plan)
+    if (session?.user?.id) {
+      const usageCheck = await checkUsageLimits(session.user.id, 'analyses');
+      if (!usageCheck.allowed) {
+        return NextResponse.json(
+          {
+            error: 'Analyse-Limit erreicht',
+            details: usageCheck.message || 'Limit erreicht',
+            upgradeRequired: true,
+            currentUsage: usageCheck.currentUsage,
+            limit: usageCheck.limit,
+            resetDate: usageCheck.resetDate?.toISOString(),
+          },
+          { status: 429 }
+        );
+      }
+    }
 
     // URL validieren
     let url = body.url.trim();

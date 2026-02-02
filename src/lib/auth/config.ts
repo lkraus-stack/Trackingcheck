@@ -2,6 +2,8 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
+import { isAdminEmail } from "@/lib/auth/admin"
+import { getPlanDefaults } from "@/lib/auth/plans"
 
 // Validate required environment variables at runtime
 const requiredEnvVars = {
@@ -53,6 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         })
         
         if (userData) {
+          (session.user as any).role = userData.role
           if (userData.subscription) {
             (session.user as any).subscription = userData.subscription
           }
@@ -74,21 +77,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!existingLimits) {
             // Erstelle Default Free Plan Limits
             try {
-                // WICHTIG: Keine Limits für eingeloggte User - unbegrenzte Analysen
-                await prisma.usageLimits.create({
-                  data: {
-                    userId: user.id,
-                    plan: 'free',
-                    maxAnalysesPerMonth: 0, // 0 = unlimited
-                    maxProjects: 0, // 0 = unlimited
-                    maxAnalysesPerDay: 0, // 0 = unlimited
-                    aiAnalysisEnabled: true,
-                    aiChatEnabled: false,
-                    exportPdfEnabled: false,
-                    deepScanEnabled: false,
-                    apiAccessEnabled: false,
-                  },
-                })
+              const defaults = getPlanDefaults('free')
+              await prisma.usageLimits.create({
+                data: {
+                  userId: user.id,
+                  ...defaults,
+                },
+              })
             } catch (limitsError) {
               console.error('Error creating usage limits:', limitsError)
               // Don't block login if limits creation fails - they can be created later
@@ -107,6 +102,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               console.error('Error creating subscription:', subscriptionError)
               // Don't block login if subscription creation fails - it can be created later
             }
+          }
+
+          // Admin-User automatisch setzen
+          if (user.email && isAdminEmail(user.email)) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { role: 'admin' },
+            })
           }
         } catch (error) {
           console.error('Error in signIn callback:', error)

@@ -19,37 +19,12 @@ export async function checkUsageLimits(
   type: UsageType
 ): Promise<UsageCheckResult> {
   try {
-    // WICHTIG: Für eingeloggte User KEINE Limits für Analysen - unbegrenzte Nutzung
-    // Nur Feature-Flags werden geprüft (aiChat, exportPdf, etc.)
-    if (type === 'analyses') {
-      const now = new Date()
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      
-      // Hole aktuelle Usage Stats nur für Info (keine Limit-Prüfung)
-      const monthlyStats = await prisma.usageStats.findMany({
-        where: {
-          userId,
-          date: { gte: firstDayOfMonth },
-        },
-      })
-      
-      const currentMonthUsage = monthlyStats.reduce((sum, stat) => sum + stat.analysesCount, 0);
-      
-      // Keine Limits - immer erlaubt für eingeloggte User
-      return {
-        allowed: true,
-        currentUsage: currentMonthUsage,
-        limit: 0, // 0 = unlimited
-      }
-    }
-
-    // Für andere Usage-Types (aiRequests, apiCalls) prüfe Feature-Flags
     const limits = await prisma.usageLimits.findUnique({
       where: { userId },
     })
 
     if (!limits) {
-      // Default: Keine Limits für eingeloggte User
+      // Fallback: keine Limits, wenn Limits fehlen
       return {
         allowed: true,
         currentUsage: 0,
@@ -88,11 +63,53 @@ export async function checkUsageLimits(
         : todayStats.apiCalls
       : 0
 
+    if (type === 'analyses') {
+      const currentMonthAnalyses = monthlyStats.reduce(
+        (sum, stat) => sum + stat.analysesCount,
+        0
+      )
+
+      const monthLimit = limits.maxAnalysesPerMonth
+      const dayLimit = limits.maxAnalysesPerDay
+      const todayAnalyses = todayStats?.analysesCount || 0
+
+      if (monthLimit > 0 && currentMonthAnalyses >= monthLimit) {
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+        return {
+          allowed: false,
+          message: `Monatslimit von ${monthLimit} Analysen erreicht.`,
+          currentUsage: currentMonthAnalyses,
+          limit: monthLimit,
+          resetDate: nextMonth,
+        }
+      }
+
+      if (dayLimit > 0 && todayAnalyses >= dayLimit) {
+        const tomorrow = new Date(now)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        tomorrow.setHours(0, 0, 0, 0)
+        return {
+          allowed: false,
+          message: `Tageslimit von ${dayLimit} Analysen erreicht.`,
+          currentUsage: todayAnalyses,
+          limit: dayLimit,
+          resetDate: tomorrow,
+        }
+      }
+
+      return {
+        allowed: true,
+        currentUsage: currentMonthAnalyses,
+        limit: monthLimit,
+        resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+      }
+    }
+
     // Feature-Flags prüfen (nur für aiRequests und apiCalls)
-    if (type === 'aiRequests' && !limits.aiChatEnabled) {
+    if (type === 'aiRequests' && !limits.aiChatEnabled && !limits.aiAnalysisEnabled) {
       return {
         allowed: false,
-        message: 'KI-Chat ist nur für Pro- und Enterprise-User verfügbar.',
+        message: 'KI-Funktionen sind nur für Pro- und Enterprise-User verfügbar.',
         currentUsage: 0,
         limit: 0,
       }
@@ -107,7 +124,7 @@ export async function checkUsageLimits(
       }
     }
 
-    // Für eingeloggte User: KEINE Limits - immer erlaubt
+    // Für eingeloggte User: keine Limits für aiRequests/apiCalls, nur Feature-Flags
     return {
       allowed: true,
       currentUsage: todayUsage,

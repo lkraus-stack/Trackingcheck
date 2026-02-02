@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   CheckCircle2,
   XCircle,
@@ -29,12 +30,14 @@ import { QuickActions } from './QuickActions';
 import { AnalysisComparison } from './AnalysisComparison';
 import { PerformanceMarketingSection } from './PerformanceMarketing';
 import { AnalysisOverview } from './AnalysisOverview';
+import { UpgradePrompt } from './UpgradePrompt';
 
 interface ResultCardProps {
   result: AnalysisResult;
 }
 
 export function ResultCard({ result }: ResultCardProps) {
+  const { data: session } = useSession();
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     consentTest: false,
     cookieBanner: false,
@@ -47,6 +50,14 @@ export function ResultCard({ result }: ResultCardProps) {
     dma: false,
     issues: true, // Issues bleiben offen da wichtig
   });
+
+  const plan = (session?.user as any)?.subscription?.plan
+    || (session?.user as any)?.usageLimits?.plan
+    || 'free';
+  const showFullAnalysis = plan === 'pro' || plan === 'enterprise';
+  const features = (session?.user as any)?.usageLimits;
+  const canUseAI = showFullAnalysis && (features?.aiAnalysisEnabled ?? false);
+  const canExportPdf = showFullAnalysis && (features?.exportPdfEnabled ?? false);
 
   // Cookie-Filter und Sortierung
   const [cookieFilter, setCookieFilter] = useState<string>('all');
@@ -88,6 +99,20 @@ export function ResultCard({ result }: ResultCardProps) {
       {/* New Visual Overview Dashboard */}
       <AnalysisOverview result={result} />
 
+      {!showFullAnalysis && (
+        <>
+          <FreeSummary result={result} />
+          <UpgradePrompt
+            type="feature-unavailable"
+            plan={plan}
+            message="Im Free-Plan siehst du nur den Überblick. Upgrade auf Pro für die vollständige Analyse."
+            showDismiss={false}
+          />
+        </>
+      )}
+
+      {showFullAnalysis && (
+        <>
       {/* Cookie Consent Test */}
       {result.cookieConsentTest && (
         <Section
@@ -579,13 +604,28 @@ export function ResultCard({ result }: ResultCardProps) {
       <AnalysisComparison currentResult={result} />
 
       {/* KI-Analyse */}
-      <AIAnalysis result={result} />
+      {canUseAI ? (
+        <AIAnalysis result={result} />
+      ) : (
+        <UpgradePrompt
+          type="feature-unavailable"
+          plan={plan}
+          message="KI-Analyse ist nur im Pro-Plan verfügbar."
+          showDismiss={true}
+        />
+      )}
 
       {/* Actions - Compact */}
       <div className="flex gap-2 pt-2">
         <button
-          onClick={() => exportAnalysisToPDF(result)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg font-medium text-xs transition-all"
+          onClick={canExportPdf ? () => exportAnalysisToPDF(result) : undefined}
+          disabled={!canExportPdf}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-medium text-xs transition-all ${
+            canExportPdf
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white'
+              : 'bg-slate-800/60 text-slate-500 cursor-not-allowed border border-slate-700'
+          }`}
+          title={canExportPdf ? 'PDF exportieren' : 'PDF-Export nur im Pro-Plan verfügbar'}
         >
           <Download className="w-3.5 h-3.5" />
           PDF
@@ -600,8 +640,89 @@ export function ResultCard({ result }: ResultCardProps) {
           Website
         </a>
       </div>
+
+        </>
+      )}
     </div>
   );
+}
+
+function FreeSummary({ result }: { result: AnalysisResult }) {
+  const topIssues = getTopIssues(result.issues);
+  const errorCount = result.issues.filter((issue) => issue.severity === 'error').length;
+  const warningCount = result.issues.filter((issue) => issue.severity === 'warning').length;
+  const consentModeLabel = result.googleConsentMode.detected
+    ? result.googleConsentMode.version
+      ? `Consent Mode ${result.googleConsentMode.version}`
+      : 'Consent Mode erkannt'
+    : 'Nicht erkannt';
+
+  return (
+    <div className="bg-slate-800/40 rounded-xl border border-slate-700/50 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-slate-200">Kurz-Zusammenfassung</span>
+        <span className="text-xs text-slate-500">Free-Überblick</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div className="bg-slate-900/50 rounded-lg p-2">
+          <p className="text-slate-500">Cookie-Banner</p>
+          <p className="text-slate-200">{result.cookieBanner.detected ? 'Erkannt' : 'Nicht erkannt'}</p>
+        </div>
+        <div className="bg-slate-900/50 rounded-lg p-2">
+          <p className="text-slate-500">Consent</p>
+          <p className="text-slate-200">{consentModeLabel}</p>
+        </div>
+        <div className="bg-slate-900/50 rounded-lg p-2">
+          <p className="text-slate-500">Probleme</p>
+          <p className="text-slate-200">{result.issues.length}</p>
+        </div>
+        <div className="bg-slate-900/50 rounded-lg p-2">
+          <p className="text-slate-500">Third-Party</p>
+          <p className="text-slate-200">{result.thirdPartyDomains?.totalCount || 0}</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-xs text-slate-400">
+          Top-Issues: {errorCount} Fehler · {warningCount} Warnungen
+        </div>
+        {topIssues.length === 0 ? (
+          <div className="text-xs text-slate-500">Keine kritischen Probleme gefunden.</div>
+        ) : (
+          <ul className="space-y-2">
+            {topIssues.map((issue, index) => (
+              <li key={`${issue.category}-${index}`} className="flex gap-2 text-xs text-slate-300">
+                <span
+                  className={`mt-1 h-1.5 w-1.5 rounded-full ${
+                    issue.severity === 'error'
+                      ? 'bg-red-400'
+                      : issue.severity === 'warning'
+                      ? 'bg-yellow-400'
+                      : 'bg-slate-400'
+                  }`}
+                />
+                <div>
+                  <p className="font-medium text-slate-200">{issue.title}</p>
+                  <p className="text-slate-500">{issue.description}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getTopIssues(issues: Issue[]): Issue[] {
+  const severityOrder: Record<Issue['severity'], number> = {
+    error: 0,
+    warning: 1,
+    info: 2,
+  };
+  return [...issues]
+    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+    .slice(0, 3);
 }
 
 // Helper Components

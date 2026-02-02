@@ -46,6 +46,8 @@ export function UserDropdown() {
     await signOut({ callbackUrl: '/' });
   };
 
+  const isAdmin = (session.user as any)?.role === 'admin';
+
   const menuItems = [
     {
       icon: <Settings className="w-4 h-4" />,
@@ -83,6 +85,16 @@ export function UserDropdown() {
       href: '/settings?section=notifications',
       section: 'notifications',
     },
+    ...(isAdmin
+      ? [
+          {
+            icon: <BarChart3 className="w-4 h-4" />,
+            label: 'Admin Panel',
+            href: '/dashboard/admin',
+            section: 'admin',
+          },
+        ]
+      : []),
   ];
 
   return (

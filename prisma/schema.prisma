@@ -18,6 +18,7 @@ model User {
   emailVerified DateTime?
   image         String?
   googleId      String?   @unique
+  role          String    @default("user") // "user" | "admin"
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -110,7 +111,7 @@ model UsageLimits {
   maxAnalysesPerMonth Int     @default(10) // Free: 10, Pro: 100, Enterprise: unlimited (0 = unlimited)
   maxProjects         Int     @default(3) // Free: 3, Pro: 50, Enterprise: unlimited (0 = unlimited)
   maxAnalysesPerDay   Int     @default(5) // Free: 5, Pro: 30, Enterprise: unlimited (0 = unlimited)
-  aiAnalysisEnabled   Boolean @default(true) // Free: true, Pro: true, Enterprise: true
+  aiAnalysisEnabled   Boolean @default(false) // Free: false, Pro: true, Enterprise: true
   aiChatEnabled       Boolean @default(false) // Free: false, Pro: true, Enterprise: true
   exportPdfEnabled    Boolean @default(false) // Free: false, Pro: true, Enterprise: true
   deepScanEnabled     Boolean @default(false) // Free: false, Pro: true, Enterprise: true
