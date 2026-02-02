@@ -51,13 +51,13 @@ export function ResultCard({ result }: ResultCardProps) {
     issues: true, // Issues bleiben offen da wichtig
   });
 
+  const isLoggedIn = !!session?.user;
   const plan = (session?.user as any)?.subscription?.plan
     || (session?.user as any)?.usageLimits?.plan
     || 'free';
-  const showFullAnalysis = plan === 'pro' || plan === 'enterprise';
-  const features = (session?.user as any)?.usageLimits;
-  const canUseAI = showFullAnalysis && (features?.aiAnalysisEnabled ?? false);
-  const canExportPdf = showFullAnalysis && (features?.exportPdfEnabled ?? false);
+  const showFullAnalysis = isLoggedIn;
+  const canUseAI = isLoggedIn;
+  const canExportPdf = isLoggedIn;
 
   // Cookie-Filter und Sortierung
   const [cookieFilter, setCookieFilter] = useState<string>('all');

@@ -19,19 +19,6 @@ export async function checkUsageLimits(
   type: UsageType
 ): Promise<UsageCheckResult> {
   try {
-    const limits = await prisma.usageLimits.findUnique({
-      where: { userId },
-    })
-
-    if (!limits) {
-      // Fallback: keine Limits, wenn Limits fehlen
-      return {
-        allowed: true,
-        currentUsage: 0,
-        limit: 0, // 0 = unlimited
-      }
-    }
-
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
@@ -69,62 +56,14 @@ export async function checkUsageLimits(
         0
       )
 
-      const monthLimit = limits.maxAnalysesPerMonth
-      const dayLimit = limits.maxAnalysesPerDay
-      const todayAnalyses = todayStats?.analysesCount || 0
-
-      if (monthLimit > 0 && currentMonthAnalyses >= monthLimit) {
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-        return {
-          allowed: false,
-          message: `Monatslimit von ${monthLimit} Analysen erreicht.`,
-          currentUsage: currentMonthAnalyses,
-          limit: monthLimit,
-          resetDate: nextMonth,
-        }
-      }
-
-      if (dayLimit > 0 && todayAnalyses >= dayLimit) {
-        const tomorrow = new Date(now)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        tomorrow.setHours(0, 0, 0, 0)
-        return {
-          allowed: false,
-          message: `Tageslimit von ${dayLimit} Analysen erreicht.`,
-          currentUsage: todayAnalyses,
-          limit: dayLimit,
-          resetDate: tomorrow,
-        }
-      }
-
       return {
         allowed: true,
         currentUsage: currentMonthAnalyses,
-        limit: monthLimit,
-        resetDate: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+        limit: 0, // 0 = unlimited
       }
     }
 
-    // Feature-Flags prüfen (nur für aiRequests und apiCalls)
-    if (type === 'aiRequests' && !limits.aiChatEnabled && !limits.aiAnalysisEnabled) {
-      return {
-        allowed: false,
-        message: 'KI-Funktionen sind nur für Pro- und Enterprise-User verfügbar.',
-        currentUsage: 0,
-        limit: 0,
-      }
-    }
-
-    if (type === 'apiCalls' && !limits.apiAccessEnabled) {
-      return {
-        allowed: false,
-        message: 'API-Zugriff ist nur für Enterprise-User verfügbar.',
-        currentUsage: 0,
-        limit: 0,
-      }
-    }
-
-    // Für eingeloggte User: keine Limits für aiRequests/apiCalls, nur Feature-Flags
+    // Für eingeloggte User: keine Limits für aiRequests/apiCalls
     return {
       allowed: true,
       currentUsage: todayUsage,
@@ -201,26 +140,9 @@ export async function checkFeatureAccess(
   feature: 'aiAnalysis' | 'aiChat' | 'exportPdf' | 'deepScan' | 'apiAccess'
 ): Promise<boolean> {
   try {
-    const limits = await prisma.usageLimits.findUnique({
-      where: { userId },
-    })
-
-    if (!limits) return false
-
-    switch (feature) {
-      case 'aiAnalysis':
-        return limits.aiAnalysisEnabled
-      case 'aiChat':
-        return limits.aiChatEnabled
-      case 'exportPdf':
-        return limits.exportPdfEnabled
-      case 'deepScan':
-        return limits.deepScanEnabled
-      case 'apiAccess':
-        return limits.apiAccessEnabled
-      default:
-        return false
-    }
+    if (!userId) return false
+    // Für eingeloggte User sind alle Features aktiv
+    return true
   } catch (error) {
     console.error('Error checking feature access:', error)
     return false

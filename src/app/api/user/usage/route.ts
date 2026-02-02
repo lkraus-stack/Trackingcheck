@@ -63,32 +63,37 @@ export async function GET(request: NextRequest) {
       where: { userId },
     });
 
+    const fullAccess = true;
+    const analysesLimit = fullAccess ? 0 : usageLimits.maxAnalysesPerMonth;
+    const dailyLimit = fullAccess ? 0 : usageLimits.maxAnalysesPerDay;
+    const projectLimit = fullAccess ? 0 : usageLimits.maxProjects;
+
     return NextResponse.json({
       usage: {
         analyses: {
           current: currentMonthUsage,
-          limit: usageLimits.maxAnalysesPerMonth,
+          limit: analysesLimit,
           today: todayUsage,
-          dailyLimit: usageLimits.maxAnalysesPerDay,
-          percentage: usageLimits.maxAnalysesPerMonth > 0
-            ? Math.round((currentMonthUsage / usageLimits.maxAnalysesPerMonth) * 100)
+          dailyLimit: dailyLimit,
+          percentage: analysesLimit > 0
+            ? Math.round((currentMonthUsage / analysesLimit) * 100)
             : 0,
         },
         projects: {
           current: projectCount,
-          limit: usageLimits.maxProjects,
-          percentage: usageLimits.maxProjects > 0
-            ? Math.round((projectCount / usageLimits.maxProjects) * 100)
+          limit: projectLimit,
+          percentage: projectLimit > 0
+            ? Math.round((projectCount / projectLimit) * 100)
             : 0,
         },
       },
       plan: usageLimits.plan,
       features: {
-        aiAnalysis: usageLimits.aiAnalysisEnabled,
-        aiChat: usageLimits.aiChatEnabled,
-        exportPdf: usageLimits.exportPdfEnabled,
-        deepScan: usageLimits.deepScanEnabled,
-        apiAccess: usageLimits.apiAccessEnabled,
+        aiAnalysis: true,
+        aiChat: true,
+        exportPdf: true,
+        deepScan: true,
+        apiAccess: true,
       },
       stats: {
         totalProjects: projectCount,

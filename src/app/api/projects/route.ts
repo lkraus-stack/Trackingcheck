@@ -67,27 +67,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prüfe Projekt-Limit
-    const usageLimits = await prisma.usageLimits.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    if (usageLimits && usageLimits.maxProjects > 0) {
-      const projectCount = await prisma.project.count({
-        where: { userId: session.user.id },
-      });
-
-      if (projectCount >= usageLimits.maxProjects) {
-        return NextResponse.json(
-          { 
-            error: 'Projekt-Limit erreicht',
-            message: `Du hast das Maximum von ${usageLimits.maxProjects} Projekten erreicht. Upgrade auf Pro für mehr Projekte.`,
-            upgradeRequired: true,
-          },
-          { status: 429 }
-        );
-      }
-    }
+    // Für eingeloggte User keine Projekt-Limits
 
     const project = await prisma.project.create({
       data: {
