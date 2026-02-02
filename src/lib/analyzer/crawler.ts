@@ -519,6 +519,26 @@ export class WebCrawler {
     return null;
   }
 
+  private async safeClosePage(page: Page | null | undefined): Promise<void> {
+    if (!page) return;
+    try {
+      if (!page.isClosed()) {
+        await page.close();
+      }
+    } catch {
+      // Ignorieren - Page ist bereits geschlossen
+    }
+  }
+
+  private async safeCloseContext(context: BrowserContext | null | undefined): Promise<void> {
+    if (!context) return;
+    try {
+      await context.close();
+    } catch {
+      // Ignorieren - Context ist bereits geschlossen
+    }
+  }
+
   private getSearchContexts(page: Page): Array<Page | Frame> {
     const mainFrame = page.mainFrame();
     const frames = page.frames().filter(frame => frame !== mainFrame);
@@ -1712,10 +1732,8 @@ export class WebCrawler {
       result.afterAccept.cookies = await this.collectCookies(pageAccept);
 
     } finally {
-      await pageAccept.close();
-      if (acceptContext) {
-        await acceptContext.close();
-      }
+      await this.safeClosePage(pageAccept);
+      await this.safeCloseContext(acceptContext);
     }
 
     // Test 2: Ablehnen in neuem, sauberen Tab
@@ -1808,10 +1826,8 @@ export class WebCrawler {
       }
 
     } finally {
-      await pageReject.close();
-      if (rejectContext) {
-        await rejectContext.close();
-      }
+      await this.safeClosePage(pageReject);
+      await this.safeCloseContext(rejectContext);
     }
 
     return result;

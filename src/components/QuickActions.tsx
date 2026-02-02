@@ -45,6 +45,45 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [showWhiteLabelModal, setShowWhiteLabelModal] = useState(false);
   const overallScore = result.scoreBreakdown?.overall ?? result.score;
   const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
+  const gdprIssuesText = useMemo(() => {
+    const checks = result.gdprChecklist?.checks ?? [];
+    const problems = checks.filter(check => check.status === 'failed' || check.status === 'warning');
+    const consentModeLabel = result.googleConsentMode?.detected
+      ? `Ja (${result.googleConsentMode.version || 'unbekannt'})`
+      : 'Nein';
+    const tcfLabel = result.tcf?.detected ? `Ja (${result.tcf.version || 'unbekannt'})` : 'Nein';
+
+    const lines = [
+      'DSGVO-Checkliste (Kurzfassung)',
+      `URL: ${result.url}`,
+      `Score: ${gdprScore}%`,
+      `Banner erkannt: ${result.cookieBanner?.detected ? 'Ja' : 'Nein'}`,
+      `Consent Mode: ${consentModeLabel}`,
+      `TCF: ${tcfLabel}`,
+      '',
+    ];
+
+    if (problems.length === 0) {
+      lines.push('Keine DSGVO-Probleme erkannt.');
+    } else {
+      lines.push('Probleme & Hinweise:');
+      for (const check of problems) {
+        const statusLabel = check.status === 'failed' ? 'Fehler' : 'Warnung';
+        const details = check.details || check.description;
+        lines.push(`- [${statusLabel}] ${check.title}: ${details}`);
+        if (check.recommendation) {
+          lines.push(`  Empfehlung: ${check.recommendation}`);
+        }
+        if (check.legalReference) {
+          lines.push(`  Rechtsgrundlage: ${check.legalReference}`);
+        }
+      }
+    }
+
+    lines.push('');
+    lines.push('Hinweis: Automatisch generiert, manuelle Prüfung empfohlen.');
+    return lines.join('\n');
+  }, [result, gdprScore]);
 
   const copyToClipboard = async (text: string, actionId: string) => {
     await navigator.clipboard.writeText(text);
@@ -147,6 +186,22 @@ export function QuickActions({ result }: QuickActionsProps) {
             <div>
               <p className="text-sm font-medium text-slate-200">Setup Checkliste</p>
               <p className="text-xs text-slate-500">Zum Abhaken</p>
+            </div>
+          </button>
+
+          {/* DSGVO Probleme kopieren */}
+          <button
+            onClick={() => copyToClipboard(gdprIssuesText, 'gdpr-issues')}
+            className="flex items-center gap-2 p-3 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg border border-slate-700 transition-colors text-left"
+          >
+            {copiedAction === 'gdpr-issues' ? (
+              <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+            ) : (
+              <Shield className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+            )}
+            <div>
+              <p className="text-sm font-medium text-slate-200">DSGVO-Probleme kopieren</p>
+              <p className="text-xs text-slate-500">Für Entwickler/KI</p>
             </div>
           </button>
 

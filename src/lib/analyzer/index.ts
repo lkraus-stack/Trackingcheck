@@ -32,6 +32,32 @@ import {
   ScoreBreakdown,
 } from '@/types';
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    const cause = (error as Error & { cause?: unknown }).cause;
+    const causeMessage = cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : '';
+    return [error.message, causeMessage].filter(Boolean).join(' | ');
+  }
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return 'Unbekannter Fehler';
+  }
+};
+
+const isTargetClosedError = (error: unknown): boolean => {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes('targetcloseerror') ||
+    message.includes('target closed') ||
+    message.includes('protocol error (target.createtarget)') ||
+    message.includes('session closed') ||
+    message.includes('execution context was destroyed') ||
+    message.includes('browser has disconnected')
+  );
+};
+
 export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
   const crawler = new WebCrawler();
   const analysisSteps: AnalysisStep[] = [];
@@ -100,18 +126,37 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     // Cookie-Consent-Test durchführen (nur wenn Banner erkannt wurde)
     let cookieConsentTest: CookieConsentTestResult | undefined;
     if (cookieBanner.detected) {
-      try {
-        addStep('consent_test', 'running', 'Cookie-Consent wird getestet...', 'Cookies vor und nach Banner-Interaktion werden verglichen');
-        const consentTestData = await crawler.performCookieConsentTest(normalizedUrl);
+      addStep('consent_test', 'running', 'Cookie-Consent wird getestet...', 'Cookies vor und nach Banner-Interaktion werden verglichen');
+
+      const maxAttempts = 2;
+      let consentTestData: CookieConsentTestData | undefined;
+      let lastError: unknown;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          consentTestData = await crawler.performCookieConsentTest(normalizedUrl);
+          break;
+        } catch (error) {
+          lastError = error;
+          if (isTargetClosedError(error) && attempt < maxAttempts) {
+            addStep('consent_test', 'running', `Consent-Test wird wiederholt (${attempt + 1}/${maxAttempts})`, 'Browser-Target wurde geschlossen');
+            continue;
+          }
+          break;
+        }
+      }
+
+      if (consentTestData) {
         cookieConsentTest = processCookieConsentTest(consentTestData);
         addStep('consent_test', 'completed', 
           cookieConsentTest.analysis.trackingBeforeConsent 
             ? 'WARNUNG: Tracking vor Consent erkannt!'
             : 'Consent-Test abgeschlossen'
         );
-      } catch (error) {
-        console.error('Cookie consent test error:', error);
-        addStep('consent_test', 'error', 'Consent-Test fehlgeschlagen');
+      } else if (lastError && isTargetClosedError(lastError)) {
+        addStep('consent_test', 'completed', 'Consent-Test übersprungen', 'Browser-Target wurde geschlossen');
+      } else if (lastError) {
+        console.error('Cookie consent test error:', lastError);
+        addStep('consent_test', 'error', 'Consent-Test fehlgeschlagen', getErrorMessage(lastError));
       }
     }
     
