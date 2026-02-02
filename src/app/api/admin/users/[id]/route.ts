@@ -11,7 +11,7 @@ function toNumber(value: unknown, fallback: number): number {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth();
@@ -31,7 +31,8 @@ export async function PATCH(
       );
     }
 
-    const userId = params.id;
+    const { id } = await params;
+    const userId = id;
     const body = await request.json();
 
     const existing = await prisma.user.findUnique({
