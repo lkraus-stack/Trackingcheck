@@ -2,7 +2,7 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
-import { isAdminEmail } from "@/lib/auth/admin"
+import { ensureUserRole, isAdminEmail } from "@/lib/auth/admin"
 import { getPlanDefaults } from "@/lib/auth/plans"
 
 // Validate required environment variables at runtime
@@ -45,6 +45,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user && user) {
         session.user.id = user.id
         
+        // Sicherstellen, dass role gesetzt ist (Backfill für bestehende Nutzer)
+        await ensureUserRole(user.id, user.email)
+
         // Subscription & Usage Limits laden
         const userData = await prisma.user.findUnique({
           where: { id: user.id },

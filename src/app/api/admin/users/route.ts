@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
-import { isAdminEmail } from '@/lib/auth/admin';
+import { backfillUserRoles, isAdminEmail } from '@/lib/auth/admin';
 import { getPlanDefaults, normalizePlan, PlanId } from '@/lib/auth/plans';
 
 function toNumber(value: unknown, fallback: number): number {
@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    await backfillUserRoles();
 
     const searchParams = request.nextUrl.searchParams;
     const page = Math.max(1, Number(searchParams.get('page') || 1));
