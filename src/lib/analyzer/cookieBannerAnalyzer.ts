@@ -135,19 +135,20 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
 
   // Banner-Erkennung durch Keywords und Struktur
   const bannerDetected = detectBannerPresence(htmlLower, combinedLower);
+  const detected = bannerDetected || !!detectedProvider;
 
-  // Button-Analyse
-  const hasAcceptButton = detectAcceptButton(htmlLower);
-  const hasRejectButton = detectRejectButton(htmlLower);
-  const hasEssentialSaveButton = detectEssentialSaveButton(htmlLower);
-  const hasSettingsOption = detectSettingsOption(htmlLower);
-  const hasPrivacyPolicyLink = detectPrivacyPolicyLink(htmlLower, combinedLower);
+  // Button-Analyse nur wenn ein Banner/CMP wirklich erkannt wurde
+  const hasAcceptButton = detected ? detectAcceptButton(htmlLower) : false;
+  const hasRejectButton = detected ? detectRejectButton(htmlLower) : false;
+  const hasEssentialSaveButton = detected ? detectEssentialSaveButton(htmlLower) : false;
+  const hasSettingsOption = detected ? detectSettingsOption(htmlLower) : false;
+  const hasPrivacyPolicyLink = detected ? detectPrivacyPolicyLink(htmlLower, combinedLower) : false;
 
   // Prüfen ob Banner Content blockiert
-  const blocksContent = detectContentBlocking(html);
+  const blocksContent = detected ? detectContentBlocking(html) : false;
 
   return {
-    detected: bannerDetected || !!detectedProvider,
+    detected,
     provider: detectedProvider,
     hasAcceptButton,
     hasRejectButton,

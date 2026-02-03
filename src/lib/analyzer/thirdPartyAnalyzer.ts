@@ -91,6 +91,12 @@ const KNOWN_DOMAINS: Record<string, { category: ThirdPartyDomain['category']; co
 // Hochrisiko-Domains (Datentransfer in unsichere Länder)
 const HIGH_RISK_COUNTRIES = ['CN', 'RU'];
 
+// Domains, die bewusst NICHT als Third-Party geführt werden sollen
+// (z.B. wenn Third-Party im Produktkontext nur Server-Side-Tracking meint)
+const IGNORED_THIRD_PARTY_DOMAINS = new Set([
+  'posthog.com',
+]);
+
 export function analyzeThirdPartyDomains(
   crawlResult: CrawlResult,
   cookies: CookieResult[]
@@ -108,7 +114,19 @@ export function analyzeThirdPartyDomains(
   for (const request of networkRequests) {
     try {
       const url = new URL(request.url);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        continue;
+      }
+      if (!url.hostname) {
+        continue;
+      }
       const domain = extractBaseDomain(url.hostname);
+      if (!domain) {
+        continue;
+      }
+      if (IGNORED_THIRD_PARTY_DOMAINS.has(domain)) {
+        continue;
+      }
       
       // Nur Third-Party Domains
       if (!isFirstParty(domain, pageDomain)) {
@@ -135,6 +153,9 @@ export function analyzeThirdPartyDomains(
   // Cookies pro Domain zählen
   for (const cookie of cookies) {
     const domain = extractBaseDomain(cookie.domain);
+    if (IGNORED_THIRD_PARTY_DOMAINS.has(domain)) {
+      continue;
+    }
     if (domainStats.has(domain)) {
       const stats = domainStats.get(domain)!;
       stats.cookiesSet++;

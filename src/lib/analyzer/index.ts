@@ -936,6 +936,7 @@ function generateIssues(
     trackingTags.tiktokPixel.detected;
   
   const hasOnlyOtherTracking = !hasMajorTracking && trackingTags.other.length > 0;
+  const hasOnlyPostHog = hasOnlyOtherTracking && trackingTags.other.every(t => t.name === 'PostHog');
   const hasTrackingCookies = cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
   
   // Kombinierte Variable für Abwärtskompatibilität
@@ -957,13 +958,23 @@ function generateIssues(
     } else if (hasOnlyOtherTracking) {
       // Nur "Other" Tracking (z.B. PostHog, Hotjar) ohne Cookie-Banner = Warning (weniger kritisch)
       const otherNames = trackingTags.other.map(o => o.name).join(', ');
-      issues.push({
-        severity: 'warning',
-        category: 'cookie-banner',
-        title: 'Tracking-Tool ohne Cookie-Banner',
-        description: `${otherNames} erkannt, aber kein Cookie-Banner gefunden. Je nach Konfiguration könnte ein Consent erforderlich sein.`,
-        recommendation: 'Prüfen Sie, ob das Tool personenbezogene Daten sammelt und implementieren Sie ggf. ein Consent-Management.',
-      });
+      if (hasOnlyPostHog) {
+        issues.push({
+          severity: 'info',
+          category: 'cookie-banner',
+          title: 'PostHog ohne Cookie-Banner',
+          description: 'PostHog erkannt, aber kein Cookie-Banner gefunden. Bei geschlossenen Alpha/Beta-Umgebungen kann das bewusst sein.',
+          recommendation: 'Falls öffentlich ausgerollt: Consent-Management prüfen und ggf. Banner ergänzen.',
+        });
+      } else {
+        issues.push({
+          severity: 'warning',
+          category: 'cookie-banner',
+          title: 'Tracking-Tool ohne Cookie-Banner',
+          description: `${otherNames} erkannt, aber kein Cookie-Banner gefunden. Je nach Konfiguration könnte ein Consent erforderlich sein.`,
+          recommendation: 'Prüfen Sie, ob das Tool personenbezogene Daten sammelt und implementieren Sie ggf. ein Consent-Management.',
+        });
+      }
     } else if (hasServerSideIndicators) {
       // Server-Side Tracking erkannt, aber kein Banner - neutral bewerten
       issues.push({
@@ -1160,7 +1171,10 @@ function generateIssues(
         recommendation: issue.impact,
       });
     }
-    if (conversionTrackingAudit.overallScore < 50) {
+    const hasConversionContext =
+      conversionTrackingAudit.platforms.length > 0 ||
+      dataLayerAnalysis.ecommerce.detected;
+    if (conversionTrackingAudit.overallScore < 50 && hasConversionContext) {
       issues.push({
         severity: 'warning',
         category: 'conversion',

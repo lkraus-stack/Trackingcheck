@@ -341,6 +341,7 @@ export function analyzeTrackingTags(crawlResult: CrawlResult): TrackingTagsResul
     pageDomain 
   } = crawlResult;
   
+  const scriptContent = scripts.join(' ');
   const combinedContent = html + scripts.join(' ');
   const gtmDetected = detectGTMPresence(combinedContent, networkRequests);
 
@@ -381,7 +382,7 @@ export function analyzeTrackingTags(crawlResult: CrawlResult): TrackingTagsResul
   const criteo = analyzeCriteo(combinedContent, networkRequests, gtmDetected);
 
   // Andere Tracking-Dienste
-  const other = analyzeOtherTracking(combinedContent, networkRequests, gtmDetected);
+  const other = analyzeOtherTracking(scriptContent, networkRequests, gtmDetected);
 
   // Marketing-Parameter - erweitert
   const marketingParameters = detectMarketingParameters(networkRequests, crawlResult.pageUrl);
@@ -1018,12 +1019,12 @@ function analyzeCriteo(
 }
 
 function analyzeOtherTracking(
-  content: string,
+  scriptContent: string,
   requests: NetworkRequest[],
   gtmDetected: boolean
 ): TrackingTagsResult['other'] {
   const results: TrackingTagsResult['other'] = [];
-  const contentLower = content.toLowerCase();
+  const contentLower = scriptContent.toLowerCase();
 
   for (const service of OTHER_TRACKING_SERVICES) {
     const scriptDetected = service.patterns.some(pattern => 
@@ -1036,7 +1037,7 @@ function analyzeOtherTracking(
 
     if (scriptDetected || networkDetected) {
       const likelyViaGTM = gtmDetected && !service.patterns.some(p => 
-        content.includes(p) && !contentLower.includes('gtm')
+        scriptContent.includes(p) && !contentLower.includes('gtm')
       );
 
       results.push({

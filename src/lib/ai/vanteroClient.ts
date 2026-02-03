@@ -197,6 +197,8 @@ Erstelle einen **ausführlichen und professionellen Analyse-Bericht** mit folgen
 ### Was wurde gefunden?
 - Beschreibe detailliert, welches Cookie-Banner/CMP erkannt wurde
 - Erkläre, was ein Cookie-Banner macht und warum es wichtig ist
+- WICHTIG: Wenn cookieBanner.detected = false, schreibe klar "Kein Cookie-Banner erkannt" und mache **keine** Aussagen zu Akzeptieren/Ablehnen, Klickbarkeit oder Banner-Interaktionen
+- WICHTIG: Wenn cookieConsentTest fehlt, keine Aussagen über Banner-Interaktionen treffen
 ### Bewertung
 - Ist das Banner DSGVO-konform implementiert?
 - Werden alle Anforderungen erfüllt (Ablehnen-Button, granulare Einwilligung, etc.)?
@@ -209,6 +211,7 @@ Erstelle einen **ausführlichen und professionellen Analyse-Bericht** mit folgen
 ### Was wurde gefunden?
 - Welche Consent-Signale werden gesendet?
 - Werden ad_storage, analytics_storage, ad_user_data, ad_personalization korrekt implementiert?
+- WICHTIG: Wenn keine Google-Tags erkannt wurden (GA/GTM/Google Ads), dann GCM nur als optionalen Zukunftshinweis erwähnen, nicht als Pflicht/Fehler
 ### Handlungsempfehlungen
 - Falls nicht implementiert: Schritt-für-Schritt Anleitung zur Implementierung
 - Falls implementiert: Optimierungsmöglichkeiten
