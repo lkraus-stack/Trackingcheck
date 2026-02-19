@@ -38,6 +38,14 @@ export interface CookieConsentTestData {
   };
 }
 
+export interface AcceptOnlyTestResult {
+  cookies: CookieData[];
+  clickSuccessful: boolean;
+  buttonFound: boolean;
+  buttonText?: string;
+  consentSignals?: GoogleConsentSignals;
+}
+
 export interface GoogleConsentSignals {
   dataLayerConsentDetected: boolean;
   gcsOrGcdRequests: number;
@@ -1849,6 +1857,79 @@ export class WebCrawler {
     }
 
     return result;
+  }
+
+  // Fallback: Nur Accept ausführen und Cookies sammeln
+  async performAcceptOnlyTest(url: string): Promise<AcceptOnlyTestResult> {
+    if (!this.browser) {
+      await this.init();
+    }
+
+    const acceptContext = await this.createIsolatedContext();
+    const pageAccept = acceptContext ? await acceptContext.newPage() : await this.browser!.newPage();
+    const acceptNetworkRequests: string[] = [];
+    pageAccept.on('request', (request) => {
+      acceptNetworkRequests.push(request.url());
+    });
+
+    await this.setupPage(pageAccept);
+
+    try {
+      await this.clearStorage(pageAccept, url);
+      await pageAccept.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      await this.waitForConsentBanner(pageAccept);
+
+      let acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+
+      if (!acceptResult.found) {
+        await this.waitForCmpApi(pageAccept);
+        const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
+        if (apiResult.applied) {
+          acceptResult = { found: true, clicked: true, buttonText: apiResult.method };
+        }
+      }
+
+      if (!acceptResult.found) {
+        const settingsResult = await this.findAndClickSettingsButton(pageAccept);
+        if (settingsResult.clicked) {
+          await new Promise(resolve => setTimeout(resolve, 1200));
+          acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
+        }
+      }
+
+      if (!acceptResult.found) {
+        const hasApi = await pageAccept.evaluate(() => {
+          const win = window as any;
+          return !!(win.consentApi || win.UC_UI || win.Cookiebot || win.OneTrust);
+        });
+        if (hasApi) {
+          const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
+          if (apiResult.applied) {
+            acceptResult = { found: true, clicked: true, buttonText: apiResult.method + ' (no banner)' };
+          }
+        }
+      }
+
+      if (acceptResult.clicked) {
+        await this.waitAfterConsentClick(pageAccept);
+      }
+
+      const cookies = await this.collectCookies(pageAccept);
+      const consentSignals = await this.collectGoogleConsentSignals(pageAccept, acceptNetworkRequests);
+
+      return {
+        cookies,
+        clickSuccessful: acceptResult.clicked,
+        buttonFound: acceptResult.found,
+        buttonText: acceptResult.buttonText,
+        consentSignals,
+      };
+    } finally {
+      await this.safeClosePage(pageAccept);
+      await this.safeCloseContext(acceptContext);
+    }
   }
 
   private async collectGoogleConsentSignals(page: Page, networkRequests: string[]): Promise<GoogleConsentSignals> {

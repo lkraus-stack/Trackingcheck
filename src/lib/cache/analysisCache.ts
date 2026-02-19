@@ -5,6 +5,8 @@ const CACHE_DURATION_MS = 24 * 60 * 60 * 1000;
 // Cache-Dauer für reduzierte KI-Daten: 1 Stunde (kürzer, da weniger wertvoll)
 const REDUCED_DATA_CACHE_DURATION_MS = 60 * 60 * 1000;
 const HISTORY_MAX_ITEMS = 50;
+// Cache-Version (bump, wenn sich Analyse-Logik verändert)
+const CACHE_VERSION = 'full-scan-only-v1';
 
 // Server-Side Cache (In-Memory für Vercel Serverless)
 const memoryCache: Map<string, CachedAnalysis> = new Map();
@@ -21,9 +23,10 @@ function getCacheKey(url: string): string {
   try {
     const urlObj = new URL(normalizedUrl);
     // Nur Host und Pfad verwenden (ohne Query-Parameter für Cache)
-    return `${urlObj.host}${urlObj.pathname}`.replace(/\/$/, '');
+    const base = `${urlObj.host}${urlObj.pathname}`.replace(/\/$/, '');
+    return `${CACHE_VERSION}:${base}`;
   } catch {
-    return normalizedUrl;
+    return `${CACHE_VERSION}:${normalizedUrl}`;
   }
 }
 

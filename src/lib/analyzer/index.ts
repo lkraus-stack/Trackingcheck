@@ -1,4 +1,4 @@
-import { WebCrawler, CookieConsentTestData, GoogleConsentSignals } from './crawler';
+import { WebCrawler, CookieConsentTestData, GoogleConsentSignals, AcceptOnlyTestResult } from './crawler';
 import { analyzeCookieBanner } from './cookieBannerAnalyzer';
 import { analyzeTCF } from './tcfAnalyzer';
 import { analyzeGoogleConsentMode, checkConsentModeCompleteness } from './googleConsentModeAnalyzer';
@@ -125,6 +125,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     
     // Cookie-Consent-Test durchführen (nur wenn Banner erkannt wurde)
     let cookieConsentTest: CookieConsentTestResult | undefined;
+    let acceptFallback: AcceptOnlyTestResult | undefined;
     if (cookieBanner.detected) {
       addStep('consent_test', 'running', 'Cookie-Consent wird getestet...', 'Cookies vor und nach Banner-Interaktion werden verglichen');
 
@@ -163,11 +164,37 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
         addStep('consent_test', 'error', 'Consent-Test fehlgeschlagen', getErrorMessage(lastError));
       }
     }
+
+    // Fallback: Wenn Consent-Test keine Cookies liefert, versuche Accept-only Flow
+    if (
+      cookieBanner.detected &&
+      (!cookieConsentTest || cookieConsentTest.afterAccept.cookieCount === 0) &&
+      crawlResult.cookies.length === 0
+    ) {
+      addStep('consent_fallback', 'running', 'Fallback: Accept-only Test läuft...');
+      try {
+        acceptFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
+        if (acceptFallback.cookies.length > 0) {
+          addStep('consent_fallback', 'completed', `${acceptFallback.cookies.length} Cookies nach Accept gefunden`);
+          googleConsentMode = enrichConsentModeWithPostConsentSignals(
+            googleConsentMode,
+            acceptFallback.consentSignals
+          );
+        } else {
+          addStep('consent_fallback', 'completed', 'Fallback abgeschlossen, keine Cookies gefunden');
+        }
+      } catch (error) {
+        console.error('Consent fallback error:', error);
+        addStep('consent_fallback', 'error', 'Fallback fehlgeschlagen', getErrorMessage(error));
+      }
+    }
     
     // Cookies kategorisieren
     addStep('analyze_cookies', 'running', 'Cookies werden kategorisiert...');
     const cookiesToUse = cookieConsentTest?.afterAccept.cookies.length 
       ? cookieConsentTest.afterAccept.cookies 
+      : acceptFallback?.cookies.length
+      ? acceptFallback.cookies
       : categorizeCookies(crawlResult.cookies);
     const cookies = Array.isArray(cookiesToUse) && cookiesToUse.length > 0 && 'category' in cookiesToUse[0]
       ? cookiesToUse
