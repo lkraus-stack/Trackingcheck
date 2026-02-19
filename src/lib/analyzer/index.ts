@@ -1,4 +1,4 @@
-import { WebCrawler, CookieConsentTestData } from './crawler';
+import { WebCrawler, CookieConsentTestData, GoogleConsentSignals } from './crawler';
 import { analyzeCookieBanner } from './cookieBannerAnalyzer';
 import { analyzeTCF } from './tcfAnalyzer';
 import { analyzeGoogleConsentMode, checkConsentModeCompleteness } from './googleConsentModeAnalyzer';
@@ -91,7 +91,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     addStep('analyze_tcf', 'completed', tcf.detected ? `TCF ${tcf.version || '2.x'} erkannt` : 'Kein TCF erkannt');
 
     addStep('analyze_consent_mode', 'running', 'Google Consent Mode wird analysiert...');
-    const googleConsentMode = analyzeGoogleConsentMode(crawlResult);
+    let googleConsentMode = analyzeGoogleConsentMode(crawlResult);
     addStep('analyze_consent_mode', 'completed', 
       googleConsentMode.detected 
         ? `Consent Mode ${googleConsentMode.version || ''} erkannt${googleConsentMode.updateConsent?.detected ? ' (mit Update)' : ''}`
@@ -147,6 +147,10 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
 
       if (consentTestData) {
         cookieConsentTest = processCookieConsentTest(consentTestData);
+        googleConsentMode = enrichConsentModeWithPostConsentSignals(
+          googleConsentMode,
+          consentTestData.afterAccept.consentSignals
+        );
         addStep('consent_test', 'completed', 
           cookieConsentTest.analysis.trackingBeforeConsent 
             ? 'WARNUNG: Tracking vor Consent erkannt!'
@@ -495,6 +499,59 @@ function normalizeUrl(url: string): string {
   }
   
   return normalizedUrl;
+}
+
+function enrichConsentModeWithPostConsentSignals(
+  current: AnalysisResult['googleConsentMode'],
+  signals?: GoogleConsentSignals
+): AnalysisResult['googleConsentMode'] {
+  if (!signals) {
+    return current;
+  }
+
+  const hasPostConsentEvidence = signals.dataLayerConsentDetected || signals.gcsOrGcdRequests > 0;
+  if (!hasPostConsentEvidence) {
+    return current;
+  }
+
+  const parameters = {
+    ...current.parameters,
+    ad_storage: current.parameters.ad_storage || !!signals.parameterValues.ad_storage,
+    analytics_storage: current.parameters.analytics_storage || !!signals.parameterValues.analytics_storage,
+    ad_user_data: current.parameters.ad_user_data || !!signals.parameterValues.ad_user_data,
+    ad_personalization: current.parameters.ad_personalization || !!signals.parameterValues.ad_personalization,
+  };
+
+  let version = current.version;
+  if (!version) {
+    if (parameters.ad_user_data || parameters.ad_personalization) {
+      version = 'v2';
+    } else if (parameters.ad_storage || parameters.analytics_storage) {
+      version = 'v1';
+    }
+  }
+
+  const updateConsent = current.updateConsent?.detected
+    ? current.updateConsent
+    : {
+        detected: true,
+        triggeredAfterBanner: true,
+        updateTrigger: 'banner_click' as const,
+        updateSettings: {
+          ad_storage: signals.parameterValues.ad_storage,
+          analytics_storage: signals.parameterValues.analytics_storage,
+          ad_user_data: signals.parameterValues.ad_user_data,
+          ad_personalization: signals.parameterValues.ad_personalization,
+        },
+      };
+
+  return {
+    ...current,
+    detected: true,
+    version,
+    parameters,
+    updateConsent,
+  };
 }
 
 function categorizeCookies(cookies: Array<{
@@ -1465,7 +1522,7 @@ function hasAnyTrackingSignal(
 }
 
 // Quick-Scan Funktion (schneller, weniger Details)
-export async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> {
+async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> {
   const crawler = new WebCrawler();
   const analysisSteps: AnalysisStep[] = [];
   

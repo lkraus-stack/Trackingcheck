@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeWebsite, analyzeWebsiteQuick } from '@/lib/analyzer';
+import { analyzeWebsite } from '@/lib/analyzer';
 import { AnalysisRequest } from '@/types';
 import { getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
 import { auth } from '@/lib/auth/config';
@@ -58,7 +58,6 @@ export async function POST(request: NextRequest) {
 
     // Cache prüfen (wenn nicht explizit übersprungen)
     const skipCache = body.options?.skipCache === true;
-    const quickScan = body.options?.quickScan === true;
     
     if (!skipCache) {
       const cachedResult = getCachedAnalysis(url);
@@ -74,41 +73,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Analyse durchführen (Quick oder Full)
-    // Bei Full-Scan: Timeout-Schutz mit Fallback auf Quick-Scan
+    // Analyse durchführen (nur Full-Scan)
+    // Timeout-Schutz bleibt aktiv, aber ohne Fallback auf Quick-Scan
     let result;
-    if (quickScan) {
-      result = await analyzeWebsiteQuick(url);
-    } else {
-      try {
-        // Timeout-Wrapper für Full-Scan (50 Sekunden, damit noch Zeit für Fallback bleibt)
-        const timeoutWrapper = 50000; // 50 Sekunden
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('TIMEOUT_PROTECTION')), timeoutWrapper)
-        );
-        
-        result = await Promise.race([
-          analyzeWebsite(url),
-          timeoutPromise
-        ]) as Awaited<ReturnType<typeof analyzeWebsite>>;
-      } catch (error) {
-        // Bei Timeout: Fallback auf Quick-Scan
-        if (error instanceof Error && error.message === 'TIMEOUT_PROTECTION') {
-          console.warn(`Full-Scan timeout für ${url}, fallback auf Quick-Scan`);
-          result = await analyzeWebsiteQuick(url);
-          // Markiere als Quick-Scan
-          result.scanMode = 'quick';
-          result.status = 'partial' as const;
-        } else {
-          throw error;
-        }
+    try {
+      // Timeout-Wrapper für Full-Scan.
+      // Einige Seiten (inkl. Consent-Test) brauchen >50s, daher großzügiger Timeout.
+      const timeoutWrapper = 90000; // 90 Sekunden
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TIMEOUT_PROTECTION')), timeoutWrapper)
+      );
+      
+      result = await Promise.race([
+        analyzeWebsite(url),
+        timeoutPromise
+      ]) as Awaited<ReturnType<typeof analyzeWebsite>>;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'TIMEOUT_PROTECTION') {
+        console.warn(`Full-Scan timeout für ${url}`);
       }
+      throw error;
     }
 
-    // Ergebnis cachen (nur bei Full-Scan)
-    if (!quickScan) {
-      setCachedAnalysis(url, result);
-    }
+    // Ergebnis cachen
+    setCachedAnalysis(url, result);
 
     // Usage Stats für eingeloggte User inkrementieren
     if (session?.user?.id) {
@@ -121,7 +109,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...result,
       fromCache: false,
-      scanMode: quickScan || (result as any).scanMode === 'quick' ? 'quick' : 'full',
     });
   } catch (error) {
     console.error('Analyse-Fehler:', error);

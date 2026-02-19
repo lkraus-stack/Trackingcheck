@@ -4,7 +4,6 @@ export interface AnalysisResult {
   url: string;
   timestamp: string;
   status: 'success' | 'error' | 'pending' | 'partial';
-  scanMode?: 'full' | 'quick';
   
   // Cookie Banner / CMP
   cookieBanner: CookieBannerResult;
@@ -496,7 +495,6 @@ export interface AnalysisRequest {
   options?: {
     skipCache?: boolean;
     deepScan?: boolean;
-    quickScan?: boolean;
   };
 }
 

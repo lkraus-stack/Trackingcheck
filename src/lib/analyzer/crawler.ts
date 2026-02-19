@@ -19,6 +19,7 @@ export interface CrawlResult {
 
 export interface CookieConsentTestData {
   pageDomain?: string;
+  acceptNetworkRequests?: string[];
   beforeConsent: {
     cookies: CookieData[];
   };
@@ -27,6 +28,7 @@ export interface CookieConsentTestData {
     clickSuccessful: boolean;
     buttonFound: boolean;
     buttonText?: string;
+    consentSignals?: GoogleConsentSignals;
   };
   afterReject: {
     cookies: CookieData[];
@@ -34,6 +36,15 @@ export interface CookieConsentTestData {
     buttonFound: boolean;
     buttonText?: string;
   };
+}
+
+export interface GoogleConsentSignals {
+  dataLayerConsentDetected: boolean;
+  gcsOrGcdRequests: number;
+  parameterValues: Partial<Record<
+    'ad_storage' | 'analytics_storage' | 'ad_user_data' | 'ad_personalization',
+    'granted' | 'denied'
+  >>;
 }
 
 export interface NetworkRequest {
@@ -1673,6 +1684,10 @@ export class WebCrawler {
     // Test 1: Cookies vor Consent + Akzeptieren
     const acceptContext = await this.createIsolatedContext();
     const pageAccept = acceptContext ? await acceptContext.newPage() : await this.browser!.newPage();
+    const acceptNetworkRequests: string[] = [];
+    pageAccept.on('request', (request) => {
+      acceptNetworkRequests.push(request.url());
+    });
     await this.setupPage(pageAccept);
     
     try {
@@ -1730,11 +1745,14 @@ export class WebCrawler {
 
       // Cookies NACH Akzeptieren sammeln
       result.afterAccept.cookies = await this.collectCookies(pageAccept);
+      result.afterAccept.consentSignals = await this.collectGoogleConsentSignals(pageAccept, acceptNetworkRequests);
 
     } finally {
       await this.safeClosePage(pageAccept);
       await this.safeCloseContext(acceptContext);
     }
+
+    result.acceptNetworkRequests = acceptNetworkRequests;
 
     // Test 2: Ablehnen in neuem, sauberen Tab
     const rejectContext = await this.createIsolatedContext();
@@ -1831,6 +1849,70 @@ export class WebCrawler {
     }
 
     return result;
+  }
+
+  private async collectGoogleConsentSignals(page: Page, networkRequests: string[]): Promise<GoogleConsentSignals> {
+    const gcsOrGcdRequests = networkRequests.filter((url) =>
+      /[?&](gcs|gcd)=/i.test(url)
+    ).length;
+
+    // String-basierte Evaluation verhindert "__name is not defined" in Page-Context
+    const jsCode = `
+      (function() {
+        var values = {};
+        var dataLayerConsentDetected = false;
+        var readConsentValues = function(obj) {
+          if (!obj || typeof obj !== 'object') return;
+          var keys = ['ad_storage', 'analytics_storage', 'ad_user_data', 'ad_personalization'];
+          for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
+            var raw = obj[key];
+            if (raw === 'granted' || raw === 'denied') {
+              values[key] = raw;
+            }
+          }
+        };
+
+        var dl = window.dataLayer;
+        if (Array.isArray(dl)) {
+          for (var i = 0; i < dl.length; i++) {
+            var entry = dl[i];
+            if (entry && typeof entry === 'object') {
+              var command = entry['0'];
+              var action = entry['1'];
+              var payload = entry['2'];
+
+              if (command === 'consent' && (action === 'default' || action === 'update')) {
+                dataLayerConsentDetected = true;
+                readConsentValues(payload);
+              }
+
+              if (typeof entry.event === 'string' && entry.event.toLowerCase().indexOf('consent') !== -1) {
+                dataLayerConsentDetected = true;
+              }
+
+              readConsentValues(entry);
+            }
+          }
+        }
+
+        return { dataLayerConsentDetected: dataLayerConsentDetected, parameterValues: values };
+      })()
+    `;
+
+    const dataLayerSignals = await page.evaluate(jsCode) as {
+      dataLayerConsentDetected: boolean;
+      parameterValues: Partial<Record<
+        'ad_storage' | 'analytics_storage' | 'ad_user_data' | 'ad_personalization',
+        'granted' | 'denied'
+      >>;
+    };
+
+    return {
+      dataLayerConsentDetected: dataLayerSignals.dataLayerConsentDetected,
+      gcsOrGcdRequests,
+      parameterValues: dataLayerSignals.parameterValues,
+    };
   }
 
   private async collectCookies(page: Page): Promise<CookieData[]> {
