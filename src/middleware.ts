@@ -14,7 +14,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Protected routes - nur für eingeloggte User
-  const protectedPaths = ['/dashboard', '/settings', '/profile', '/dashboard/admin']
+  const protectedPaths = ['/app', '/dashboard', '/settings', '/profile', '/dashboard/admin']
   const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path))
 
   if (isProtectedPath) {
