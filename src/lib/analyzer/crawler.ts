@@ -84,6 +84,16 @@ export interface WindowObjectData {
   dataLayerContent?: unknown[];
   tcfApiResponse?: unknown;
   fbqQueue?: unknown[];
+  /**
+   * Runtime-Instrumentation (evaluateOnNewDocument) um Consent Mode zuverlässig zu erkennen,
+   * auch wenn der Code in externen Scripts (z.B. GTM) steckt.
+   */
+  consentModeCalls?: Array<{
+    source: 'gtag' | 'dataLayer' | 'gtag_stub' | 'unknown';
+    args: unknown[];
+  }>;
+  gtagCalls?: unknown[][];
+  dataLayerPushCalls?: unknown[][];
   // Zusätzliche Tracking-Objekte
   additionalTrackingObjects: {
     _fbq?: boolean;
@@ -180,11 +190,7 @@ export class WebCrawler {
       consoleMessages.push(`${msg.type()}: ${msg.text()}`);
     });
 
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
-
-    await page.setViewport({ width: 1920, height: 1080 });
+    await this.setupPage(page);
 
     try {
       // Schnelleres Laden mit kürzerer Wartezeit
@@ -245,6 +251,7 @@ export class WebCrawler {
     }
 
     const page = await this.browser!.newPage();
+    await this.setupPage(page);
     
     // URL und Domain extrahieren
     const urlObj = new URL(url);
@@ -310,14 +317,6 @@ export class WebCrawler {
     page.on('console', (msg) => {
       consoleMessages.push(`${msg.type()}: ${msg.text()}`);
     });
-
-    // User-Agent setzen (wie ein normaler Browser)
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
-
-    // Viewport setzen
-    await page.setViewport({ width: 1920, height: 1080 });
 
     try {
       // Seite laden und warten bis alles geladen ist
@@ -482,6 +481,35 @@ export class WebCrawler {
       // DataLayer Inhalt - erweitert auf mehr Einträge
       if (result.hasDataLayer && Array.isArray(win.dataLayer)) {
         result.dataLayerContent = (win.dataLayer as unknown[]).slice(0, 50); // Mehr Einträge für bessere Analyse
+      }
+
+      // Runtime Instrumentation Logs (falls vorhanden)
+      try {
+        const tc = (win as any).__trackingChecker as
+          | { consentModeCalls?: Array<{ source?: string; args?: unknown[] }>; gtagCalls?: unknown[][]; dataLayerPushCalls?: unknown[][] }
+          | undefined;
+        if (tc) {
+          if (Array.isArray(tc.gtagCalls)) {
+            result.gtagCalls = tc.gtagCalls.slice(0, 200);
+          }
+          if (Array.isArray(tc.dataLayerPushCalls)) {
+            result.dataLayerPushCalls = tc.dataLayerPushCalls.slice(0, 200);
+          }
+          if (Array.isArray(tc.consentModeCalls)) {
+            result.consentModeCalls = tc.consentModeCalls
+              .filter((c) => Array.isArray(c?.args) && (c.args as unknown[]).length > 0)
+              .slice(0, 200)
+              .map((c) => ({
+                source:
+                  c?.source === 'gtag' || c?.source === 'dataLayer' || c?.source === 'gtag_stub'
+                    ? (c.source as any)
+                    : 'unknown',
+                args: c.args as unknown[],
+              }));
+          }
+        }
+      } catch {
+        // Instrumentation nicht verfügbar
       }
 
       // fbq Queue für Pixel-ID Erkennung
@@ -2120,6 +2148,94 @@ export class WebCrawler {
       Object.defineProperty(navigator, 'webdriver', {
         get: () => undefined,
       });
+
+      // Runtime Instrumentation für Consent Mode / DataLayer / gtag Calls
+      // Ziel: Consent Mode zuverlässig erkennen, auch wenn der Code in externen Scripts steckt.
+      try {
+        const w = window as any;
+        const log: {
+          consentModeCalls: Array<{ source: 'gtag' | 'dataLayer' | 'gtag_stub' | 'unknown'; args: unknown[] }>;
+          gtagCalls: unknown[][];
+          dataLayerPushCalls: unknown[][];
+        } = {
+          consentModeCalls: [],
+          gtagCalls: [],
+          dataLayerPushCalls: [],
+        };
+
+        // Expose log object
+        Object.defineProperty(w, '__trackingChecker', {
+          value: log,
+          configurable: false,
+          enumerable: false,
+          writable: false,
+        });
+
+        const safePushConsent = (source: 'gtag' | 'dataLayer' | 'gtag_stub' | 'unknown', args: unknown[]) => {
+          try {
+            if (Array.isArray(args) && args[0] === 'consent') {
+              log.consentModeCalls.push({ source, args });
+            }
+          } catch {
+            // ignore
+          }
+        };
+
+        // Wrap dataLayer assignment + push
+        const wrapDataLayer = (arr: any): any => {
+          if (!arr || typeof arr !== 'object') return arr;
+          if (!Array.isArray(arr)) return arr;
+          if ((arr as any).__tcWrapped) return arr;
+          try {
+            const originalPush = arr.push.bind(arr);
+            arr.push = (...pushArgs: any[]) => {
+              try {
+                log.dataLayerPushCalls.push(pushArgs);
+                // gtag pushes an "Arguments" object into dataLayer: arguments[0]==='consent'
+                // Or direct arrays: ['consent','default', {...}]
+                const first = pushArgs[0];
+                if (Array.isArray(first)) {
+                  safePushConsent('dataLayer', first);
+                } else if (first && typeof first === 'object') {
+                  const maybeCmd = (first as any)[0];
+                  if (maybeCmd === 'consent') {
+                    try {
+                      const normalized = Array.prototype.slice.call(first) as unknown[];
+                      safePushConsent('dataLayer', normalized);
+                    } catch {
+                      // ignore
+                    }
+                  }
+                }
+              } catch {
+                // ignore
+              }
+              return originalPush(...pushArgs);
+            };
+            Object.defineProperty(arr, '__tcWrapped', { value: true, configurable: true });
+          } catch {
+            // ignore
+          }
+          return arr;
+        };
+
+        let dataLayerValue = wrapDataLayer(w.dataLayer || []);
+        Object.defineProperty(w, 'dataLayer', {
+          configurable: true,
+          get() {
+            return dataLayerValue;
+          },
+          set(v) {
+            dataLayerValue = wrapDataLayer(v);
+          },
+        });
+
+        // Hinweis: gtag selbst wird NICHT als Stub gesetzt, um keine False Positives
+        // in der GA/GTM-Erkennung zu erzeugen. Consent Calls werden über dataLayer.push
+        // zuverlässig mitgeschnitten (gtag verwendet intern dataLayer.push(arguments)).
+      } catch {
+        // Instrumentation Fehler ignorieren
+      }
     });
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'

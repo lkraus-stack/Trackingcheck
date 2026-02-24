@@ -2,29 +2,29 @@ import { CrawlResult, WindowObjectData } from './crawler';
 import { GoogleConsentModeResult, ConsentSettings } from '@/types';
 
 export function analyzeGoogleConsentMode(crawlResult: CrawlResult): GoogleConsentModeResult {
-  const { scripts, windowObjects, html } = crawlResult;
+  const { scripts, windowObjects, html, networkRequests } = crawlResult;
   const combinedContent = html + scripts.join(' ');
 
   // Google Consent Mode erkennen
-  const detected = detectConsentMode(combinedContent, windowObjects);
+  const detected = detectConsentMode(combinedContent, windowObjects, networkRequests.map(r => r.url));
   
   // Version erkennen (v1 vs v2)
-  const version = detectVersion(combinedContent);
+  const version = detectVersion(combinedContent, windowObjects);
 
   // Default Consent Settings extrahieren
-  const defaultConsent = extractDefaultConsent(combinedContent, scripts);
+  const defaultConsent = extractDefaultConsent(combinedContent, scripts, windowObjects);
 
   // NEU: Update Consent erkennen
   const updateConsent = extractUpdateConsent(combinedContent, scripts, windowObjects);
 
   // Alle Parameter prüfen
-  const parameters = analyzeParameters(combinedContent, scripts);
+  const parameters = analyzeParameters(combinedContent, scripts, windowObjects);
 
   // NEU: Regions-spezifische Einstellungen
-  const regionSettings = detectRegionSettings(combinedContent);
+  const regionSettings = detectRegionSettings(combinedContent, windowObjects);
 
   // NEU: Wait for Update
-  const waitForUpdate = detectWaitForUpdate(combinedContent);
+  const waitForUpdate = detectWaitForUpdate(combinedContent, windowObjects);
 
   return {
     detected,
@@ -37,7 +37,26 @@ export function analyzeGoogleConsentMode(crawlResult: CrawlResult): GoogleConsen
   };
 }
 
-function detectConsentMode(content: string, windowObjects: WindowObjectData): boolean {
+function getRuntimeConsentCalls(windowObjects: WindowObjectData): Array<{ source: string; args: unknown[] }> {
+  const calls = windowObjects.consentModeCalls;
+  if (!Array.isArray(calls) || calls.length === 0) return [];
+  return calls
+    .filter((c) => Array.isArray(c?.args) && c.args.length > 0)
+    .map((c) => ({ source: c.source, args: c.args }));
+}
+
+function detectConsentMode(content: string, windowObjects: WindowObjectData, requestUrls: string[]): boolean {
+  // 1) Runtime-Instrumentation: zuverlässig auch bei externen Scripts (GTM/CMP)
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects);
+  if (runtimeCalls.some(c => c.args?.[0] === 'consent' && (c.args?.[1] === 'default' || c.args?.[1] === 'update'))) {
+    return true;
+  }
+
+  // 2) Netzwerk-Evidenz: Consent Mode Signalparameter in Google Requests (gcs/gcd)
+  if (requestUrls.some((url) => /[?&](gcs|gcd)=/i.test(url))) {
+    return true;
+  }
+
   // Prüfe auf EXPLIZITE gtag consent Aufrufe - NICHT allgemeine Keywords
   // Das Pattern muss im JavaScript-Code sein, nicht im Text-Content
   
@@ -85,7 +104,15 @@ function detectConsentMode(content: string, windowObjects: WindowObjectData): bo
   return false;
 }
 
-function detectVersion(content: string): 'v1' | 'v2' | undefined {
+function detectVersion(content: string, windowObjects: WindowObjectData): 'v1' | 'v2' | undefined {
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects);
+  const runtimeArgsStr = runtimeCalls.length ? JSON.stringify(runtimeCalls.map(c => c.args)) : '';
+
+  // v2 Parameter, ggf. nur zur Laufzeit gesetzt
+  if (/ad_user_data/i.test(runtimeArgsStr) || /ad_personalization/i.test(runtimeArgsStr)) {
+    return 'v2';
+  }
+
   // Prüfe erst ob überhaupt Consent Mode vorhanden ist (strikte Erkennung)
   // Parameter müssen im JavaScript-Code-Kontext stehen, nicht als Text
   
@@ -123,7 +150,18 @@ function detectVersion(content: string): 'v1' | 'v2' | undefined {
   return undefined;
 }
 
-function extractDefaultConsent(content: string, scripts: string[]): ConsentSettings | undefined {
+function extractDefaultConsent(content: string, scripts: string[], windowObjects: WindowObjectData): ConsentSettings | undefined {
+  // 1) Runtime Calls bevorzugen
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects)
+    .filter(c => c.args?.[0] === 'consent' && c.args?.[1] === 'default');
+  for (let i = runtimeCalls.length - 1; i >= 0; i--) {
+    const args = runtimeCalls[i].args;
+    const payload = args?.[2];
+    if (payload && typeof payload === 'object') {
+      return normalizeConsentSettings(payload as Record<string, string>);
+    }
+  }
+
   const combinedScripts = scripts.join('\n');
   
   // Suche nach gtag('consent', 'default', {...})
@@ -162,12 +200,26 @@ function extractUpdateConsent(
   const combinedScripts = scripts.join('\n');
   const combinedContent = content + combinedScripts;
   
+  // 1) Runtime Calls bevorzugen (Consent Update wird häufig dynamisch nach CMP-Interaktion gesetzt)
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects)
+    .filter(c => c.args?.[0] === 'consent' && c.args?.[1] === 'update');
+  let detected = runtimeCalls.length > 0;
+  let updateSettings: ConsentSettings | undefined;
+  if (runtimeCalls.length > 0) {
+    for (let i = runtimeCalls.length - 1; i >= 0; i--) {
+      const payload = runtimeCalls[i].args?.[2];
+      if (payload && typeof payload === 'object') {
+        updateSettings = normalizeConsentSettings(payload as Record<string, string>);
+        break;
+      }
+    }
+  }
+
   // Suche nach gtag('consent', 'update', {...})
   const updateConsentRegex = /gtag\s*\(\s*['"]consent['"]\s*,\s*['"]update['"]\s*,\s*(\{[^}]+\})/gi;
   
   let match = updateConsentRegex.exec(combinedContent);
-  let detected = !!match;
-  let updateSettings: ConsentSettings | undefined;
+  detected = detected || !!match;
   let updateTrigger: 'banner_click' | 'tcf_api' | 'custom' | 'unknown' = 'unknown';
 
   if (match) {
@@ -229,7 +281,10 @@ function extractUpdateConsent(
   }
 
   // Prüfe ob Update nach Banner-Interaktion getriggert wird
-  const triggeredAfterBanner = detectUpdateAfterBanner(combinedContent);
+  const triggeredAfterBanner =
+    detectUpdateAfterBanner(combinedContent) ||
+    // Runtime: wenn überhaupt ein update Call beobachtet wurde, ist der Trigger sehr wahrscheinlich Banner/CMP
+    (runtimeCalls.length > 0);
 
   return {
     detected,
@@ -256,7 +311,17 @@ function detectUpdateAfterBanner(content: string): boolean {
 }
 
 // NEU: Regions-spezifische Einstellungen erkennen
-function detectRegionSettings(content: string): GoogleConsentModeResult['regionSettings'] {
+function detectRegionSettings(content: string, windowObjects: WindowObjectData): GoogleConsentModeResult['regionSettings'] {
+  // Runtime: region settings können als payload im consent default/update gesetzt sein
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects);
+  const runtimeStr = runtimeCalls.length ? JSON.stringify(runtimeCalls.map(c => c.args)) : '';
+  const runtimeRegionMatch = /"region"\s*:\s*\[([^\]]+)\]/i.exec(runtimeStr);
+  if (runtimeRegionMatch) {
+    const regionsStr = runtimeRegionMatch[1];
+    const regions = regionsStr.match(/["']?([A-Z]{2})["']?/g)?.map(r => r.replace(/['"]/g, '')) || [];
+    return { detected: true, regions };
+  }
+
   // Suche nach region-spezifischen Consent-Einstellungen
   const regionPattern = /region\s*:\s*\[([^\]]+)\]/gi;
   const match = regionPattern.exec(content);
@@ -283,7 +348,16 @@ function detectRegionSettings(content: string): GoogleConsentModeResult['regionS
 }
 
 // NEU: Wait for Update erkennen
-function detectWaitForUpdate(content: string): GoogleConsentModeResult['waitForUpdate'] {
+function detectWaitForUpdate(content: string, windowObjects: WindowObjectData): GoogleConsentModeResult['waitForUpdate'] {
+  // Runtime: wait_for_update kann als payload übergeben werden
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects);
+  const runtimeStr = runtimeCalls.length ? JSON.stringify(runtimeCalls.map(c => c.args)) : '';
+  const runtimeWait = /wait_for_update\s*"\s*:\s*"?(\\d+|[0-9]+)"?/i.exec(runtimeStr) || /wait_for_update"\s*:\s*(\d+)/i.exec(runtimeStr);
+  if (runtimeWait?.[1]) {
+    const timeout = parseInt(runtimeWait[1], 10);
+    return Number.isFinite(timeout) ? { detected: true, timeout } : { detected: true };
+  }
+
   // Suche nach wait_for_update Parameter
   const waitPattern = /wait_for_update\s*:\s*(\d+)/i;
   const match = waitPattern.exec(content);
@@ -350,18 +424,20 @@ function normalizeConsentSettings(parsed: Record<string, string>): ConsentSettin
   return settings;
 }
 
-function analyzeParameters(content: string, scripts: string[]): GoogleConsentModeResult['parameters'] {
+function analyzeParameters(content: string, scripts: string[], windowObjects: WindowObjectData): GoogleConsentModeResult['parameters'] {
   const combinedContent = content + scripts.join('\n');
   const contentLower = combinedContent.toLowerCase();
+  const runtimeCalls = getRuntimeConsentCalls(windowObjects);
+  const runtimeLower = runtimeCalls.length ? JSON.stringify(runtimeCalls.map(c => c.args)).toLowerCase() : '';
 
   return {
-    ad_storage: contentLower.includes('ad_storage'),
-    analytics_storage: contentLower.includes('analytics_storage'),
-    ad_user_data: contentLower.includes('ad_user_data'),
-    ad_personalization: contentLower.includes('ad_personalization'),
-    functionality_storage: contentLower.includes('functionality_storage'),
-    personalization_storage: contentLower.includes('personalization_storage'),
-    security_storage: contentLower.includes('security_storage'),
+    ad_storage: contentLower.includes('ad_storage') || runtimeLower.includes('ad_storage'),
+    analytics_storage: contentLower.includes('analytics_storage') || runtimeLower.includes('analytics_storage'),
+    ad_user_data: contentLower.includes('ad_user_data') || runtimeLower.includes('ad_user_data'),
+    ad_personalization: contentLower.includes('ad_personalization') || runtimeLower.includes('ad_personalization'),
+    functionality_storage: contentLower.includes('functionality_storage') || runtimeLower.includes('functionality_storage'),
+    personalization_storage: contentLower.includes('personalization_storage') || runtimeLower.includes('personalization_storage'),
+    security_storage: contentLower.includes('security_storage') || runtimeLower.includes('security_storage'),
   };
 }
 
