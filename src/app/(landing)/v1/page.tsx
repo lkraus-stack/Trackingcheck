@@ -2,6 +2,8 @@
 
 import { Shield, Sparkles, CheckCircle2, Lock, Zap, TrendingUp } from 'lucide-react';
 import { LandingAnalyzer } from '@/components/landing/LandingAnalyzer';
+import { ProblemSection } from '@/components/ProblemSection';
+import { AgencySection } from '@/components/AgencySection';
 
 export default function V1LandingPage() {
   return (
@@ -27,9 +29,7 @@ export default function V1LandingPage() {
           </p>
         </div>
 
-        <div
-          className="max-w-4xl mx-auto"
-        >
+        <div id="analysis-section" className="max-w-4xl mx-auto">
           <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-6 backdrop-blur-sm">
             <LandingAnalyzer autoFocus />
           </div>
@@ -66,6 +66,16 @@ export default function V1LandingPage() {
           </div>
         </section>
       </section>
+
+      <div className="section-divider max-w-4xl mx-auto" />
+
+      {/* Warum falsches Tracking teuer wird */}
+      <ProblemSection />
+
+      <div className="section-divider max-w-4xl mx-auto" />
+
+      {/* Franco Consulting / Leistungen / Kontakt */}
+      <AgencySection />
     </div>
   );
 }
