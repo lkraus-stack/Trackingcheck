@@ -1,5 +1,6 @@
 // Vantero KI API Client (OpenAI-kompatibel)
-import { reduceAnalysisResultForAI, reduceForQuestion, reduceForSection } from './dataReducer';
+import { reduceAnalysisResultForAI, reduceForQuestion } from './dataReducer';
+import type { ReducedAnalysisData } from './dataReducer';
 import { getCachedReducedData, setCachedReducedData } from '@/lib/cache/analysisCache';
 import { AnalysisResult } from '@/types';
 
@@ -131,7 +132,7 @@ export class VanteroClient {
     if (contentType && contentType.includes('application/json')) {
       try {
         data = await response.json();
-      } catch (jsonError) {
+      } catch {
         const errorText = await response.text();
         throw new Error(`Vantero API: Antwort konnte nicht als JSON gelesen werden. Status: ${response.status}, Antwort: ${errorText.substring(0, 200)}`);
       }
@@ -158,7 +159,7 @@ export class VanteroClient {
     const dataUrl = (analysisData as AnalysisResult)?.url;
     const cacheKey = dataUrl ? `reduced:${dataUrl}` : null;
     
-    let reducedData: Partial<AnalysisResult>;
+    let reducedData: ReducedAnalysisData;
     if (cacheKey) {
       const cached = getCachedReducedData(cacheKey);
       if (cached) {

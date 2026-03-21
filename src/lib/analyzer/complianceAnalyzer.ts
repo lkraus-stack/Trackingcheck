@@ -137,34 +137,6 @@ const GDPR_CHECKS: Omit<GDPRCheck, 'status' | 'details'>[] = [
   },
 ];
 
-// DMA Gatekeeper und ihre Anforderungen
-const DMA_GATEKEEPERS = {
-  google: {
-    name: 'Google/Alphabet',
-    services: ['Google Ads', 'Google Analytics', 'YouTube', 'Google Tag Manager', 'DV360'],
-  },
-  meta: {
-    name: 'Meta',
-    services: ['Facebook Ads', 'Instagram', 'Meta Pixel', 'WhatsApp'],
-  },
-  amazon: {
-    name: 'Amazon',
-    services: ['Amazon Ads', 'Amazon Attribution'],
-  },
-  microsoft: {
-    name: 'Microsoft',
-    services: ['Bing Ads', 'LinkedIn Ads', 'Microsoft Clarity'],
-  },
-  apple: {
-    name: 'Apple',
-    services: ['Apple Search Ads', 'App Store'],
-  },
-  tiktok: {
-    name: 'ByteDance',
-    services: ['TikTok Ads', 'TikTok Pixel'],
-  },
-};
-
 export function analyzeGDPRCompliance(
   cookieBanner: CookieBannerResult,
   tcf: TCFResult,

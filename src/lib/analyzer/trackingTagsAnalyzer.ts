@@ -1432,7 +1432,7 @@ function analyzeServerSideTracking(
   }
 
   // 6. NEU: Cookie Bridging Erkennung
-  const cookieBridgingResult = detectCookieBridging(cookies, content, requests);
+  const cookieBridgingResult = detectCookieBridging(cookies, content);
 
   if (cookieBridgingResult.detected) {
     indicators.push({
@@ -1461,8 +1461,7 @@ function analyzeServerSideTracking(
 
 function detectCookieBridging(
   cookies: { name: string; value: string; domain: string }[],
-  content: string,
-  requests: NetworkRequest[]
+  content: string
 ): { detected: boolean; confidence: 'high' | 'medium' | 'low'; cookies: string[]; indicators: string[] } {
   const evidence: string[] = [];
   const bridgingCookies: string[] = [];

@@ -1,22 +1,22 @@
 // Datenreduktions-Funktionen für KI-Anfragen
 // Reduziert die Größe von AnalysisResult um 70-90% für Token-Einsparung
 
-import { AnalysisResult } from '@/types';
+import type { AnalysisResult } from '@/types';
 
 // Maximale Anzahl von Einträgen in Arrays (um Token zu sparen)
 const MAX_COOKIES = 20;
-const MAX_NETWORK_REQUESTS = 50;
-const MAX_DATA_LAYER_ENTRIES = 30;
 const MAX_THIRD_PARTY_DOMAINS = 30;
 const MAX_ISSUES = 30;
+
+export type ReducedAnalysisData = Record<string, unknown>;
 
 /**
  * Reduziert AnalysisResult für KI-Anfragen
  * Entfernt große Arrays und behält nur relevante Zusammenfassungen
  */
-export function reduceAnalysisResultForAI(data: AnalysisResult): Partial<AnalysisResult> {
+export function reduceAnalysisResultForAI(data: AnalysisResult): ReducedAnalysisData {
   // Basis-Informationen behalten
-  const reduced: any = {
+  const reduced: ReducedAnalysisData = {
     url: data.url,
     timestamp: data.timestamp,
     status: data.status,
@@ -54,7 +54,7 @@ export function reduceAnalysisResultForAI(data: AnalysisResult): Partial<Analysi
 
     // Top Cookies pro Kategorie + kritische Cookies
     const topCookies: typeof data.cookies = [];
-    Object.entries(cookiesByCategory).forEach(([category, cookies]) => {
+    Object.entries(cookiesByCategory).forEach(([, cookies]) => {
       const criticalCookies = cookies.filter(c => c.isThirdParty || c.category === 'marketing');
       const regularCookies = cookies.filter(c => !c.isThirdParty && c.category !== 'marketing');
       
@@ -267,8 +267,8 @@ export function reduceAnalysisResultForAI(data: AnalysisResult): Partial<Analysi
 export function reduceForSection(
   data: AnalysisResult,
   sectionName: string
-): Partial<AnalysisResult> {
-  const base = {
+): ReducedAnalysisData {
+  const base: ReducedAnalysisData = {
     url: data.url,
     timestamp: data.timestamp,
     status: data.status,
@@ -372,7 +372,7 @@ export function reduceForSection(
 export function reduceForQuestion(
   data: AnalysisResult,
   question: string
-): Partial<AnalysisResult> {
+): ReducedAnalysisData {
   const questionLower = question.toLowerCase();
 
   // Identifiziere relevante Themen aus der Frage
@@ -409,7 +409,7 @@ export function reduceForQuestion(
   }
 
   // Kombiniere relevante Sektionen
-  const reduced: any = {
+  const reduced: ReducedAnalysisData = {
     url: data.url,
     timestamp: data.timestamp,
     status: data.status,

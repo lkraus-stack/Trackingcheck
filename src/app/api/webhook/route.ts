@@ -5,6 +5,8 @@ import { AnalysisResult } from '@/types';
 // Vercel Serverless Konfiguration
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const preferredRegion = 'fra1';
 
 // In-Memory Job Queue (für Produktionsumgebung würde man Redis/BullMQ verwenden)
 const jobQueue: Map<string, {

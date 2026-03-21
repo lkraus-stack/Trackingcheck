@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import {
   BarChart3,
-  TrendingUp,
   ShoppingCart,
   Cookie,
   Lightbulb,
@@ -13,13 +12,11 @@ import {
   CheckCircle2,
   XCircle,
   Target,
-  Zap,
   Server,
   Globe,
   DollarSign,
   PieChart,
   ArrowRight,
-  Info,
   Link2,
   Tag,
   ShieldCheck,

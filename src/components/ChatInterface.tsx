@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Globe, Loader2, History, RefreshCw, Brain, CheckCircle2, XCircle, Clock, Sparkles, LayoutDashboard, Save, BookOpen } from 'lucide-react';
+import { Send, Globe, Loader2, History, RefreshCw, Brain, XCircle, Clock, LayoutDashboard, BookOpen } from 'lucide-react';
 import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
 import { SetupWizard } from './SetupWizard';
 import { ExpertRecommendation } from './ExpertRecommendation';
 import { UpgradePrompt } from './UpgradePrompt';
-import { getAnalysisHistory, addToHistory, removeFromHistory, clearHistory } from '@/lib/cache/analysisCache';
+import { getAnalysisHistory, addToHistory, clearHistory } from '@/lib/cache/analysisCache';
 import { saveAnalysis } from '@/lib/storage/projectStorage';
 
 interface Message {
@@ -35,6 +35,16 @@ interface ChatInterfaceProps {
   embedded?: boolean;
   autoFocus?: boolean;
 }
+
+type AnalyzeApiResponse = AnalysisResult & {
+  error?: string;
+  details?: string;
+  technicalError?: string;
+  upgradeRequired?: boolean;
+  currentUsage?: number;
+  limit?: number;
+  resetDate?: string;
+};
 
 function normalizeComparableUrl(value?: string | null): string | null {
   if (!value) return null;
@@ -105,7 +115,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       { step: 'compliance', message: '⚖️ DSGVO & DMA Compliance wird bewertet...', delay: 15000 },
     ];
 
-    steps.forEach(({ step, message, delay }) => {
+    steps.forEach(({ message, delay }) => {
       setTimeout(() => {
         setMessages(prev => 
           prev.map(msg => 
@@ -181,13 +191,13 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       });
 
       // Sicher JSON parsen - prüfe Content-Type und handle Fehler
-      let data: any;
+      let data: AnalyzeApiResponse;
       const contentType = response.headers.get('content-type');
       
       if (contentType && contentType.includes('application/json')) {
         try {
-          data = await response.json();
-        } catch (jsonError) {
+          data = await response.json() as AnalyzeApiResponse;
+        } catch {
           // Wenn JSON-Parsing fehlschlägt, versuche Text zu lesen
           const errorText = await response.text();
           throw {
@@ -549,6 +559,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
               placeholder="Website-URL eingeben (z.B. www.example.com)"
               className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-slate-800 border border-slate-700 rounded-lg sm:rounded-xl text-sm sm:text-base text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               disabled={isLoading}
+              autoFocus={autoFocus}
             />
           </div>
           

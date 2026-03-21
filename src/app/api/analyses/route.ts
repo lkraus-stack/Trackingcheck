@@ -1,6 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
+import type { AnalysisResult } from '@/types';
+import {
+  analysisResultFromJson,
+  analysisResultToJson,
+  getAnalysisScoreFromJson,
+} from '@/lib/db/analysisJson';
+
+interface StoredAnalysisResponse {
+  id: string;
+  url: string;
+  projectId?: string;
+  result: AnalysisResult;
+  notes?: string;
+  tags: string[];
+  createdAt: string;
+}
+
+interface CreateAnalysisBody {
+  url?: string;
+  result?: AnalysisResult;
+  projectId?: string;
+  notes?: string;
+  tags?: string[];
+}
+
+function formatAnalysis(analysis: {
+  id: string;
+  url: string;
+  projectId: string | null;
+  result: Prisma.JsonValue;
+  notes: string | null;
+  tags: string[];
+  createdAt: Date;
+}): StoredAnalysisResponse | null {
+  const result = analysisResultFromJson(analysis.result);
+  if (!result) {
+    return null;
+  }
+
+  return {
+    id: analysis.id,
+    url: analysis.url,
+    projectId: analysis.projectId || undefined,
+    result,
+    notes: analysis.notes || undefined,
+    tags: analysis.tags,
+    createdAt: analysis.createdAt.toISOString(),
+  };
+}
 
 // GET: Alle Analysen des Users
 export async function GET(request: NextRequest) {
@@ -19,7 +69,7 @@ export async function GET(request: NextRequest) {
     const url = searchParams.get('url');
     const limit = parseInt(searchParams.get('limit') || '100');
 
-    const where: any = { userId: session.user.id };
+    const where: Prisma.AnalysisWhereInput = { userId: session.user.id };
     if (projectId) where.projectId = projectId;
     if (url) where.url = url;
 
@@ -29,16 +79,9 @@ export async function GET(request: NextRequest) {
       take: limit,
     });
 
-    // Konvertiere Prisma Analyses zu Dashboard Analysis Format
-    const formattedAnalyses = analyses.map(analysis => ({
-      id: analysis.id,
-      url: analysis.url,
-      projectId: analysis.projectId || undefined,
-      result: analysis.result as any,
-      notes: analysis.notes || undefined,
-      tags: analysis.tags,
-      createdAt: analysis.createdAt.toISOString(),
-    }));
+    const formattedAnalyses = analyses
+      .map(formatAnalysis)
+      .filter((analysis): analysis is StoredAnalysisResponse => analysis !== null);
 
     return NextResponse.json({ analyses: formattedAnalyses });
   } catch (error) {
@@ -62,7 +105,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as CreateAnalysisBody;
     const { url, result, projectId, notes, tags } = body;
 
     if (!url || !result) {
@@ -93,7 +136,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         url,
-        result: result as any,
+        result: analysisResultToJson(result),
         projectId: projectId || null,
         notes: notes || null,
         tags: tags || [],
@@ -107,7 +150,7 @@ export async function POST(request: NextRequest) {
       });
 
       const scores = projectAnalyses
-        .map(a => (a.result as any)?.score)
+        .map((analysisItem) => getAnalysisScoreFromJson(analysisItem.result))
         .filter((s): s is number => typeof s === 'number');
 
       const avgScore = scores.length > 0
@@ -123,16 +166,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const formattedAnalysis = formatAnalysis(analysis);
+    if (!formattedAnalysis) {
+      throw new Error('Gespeicherte Analyse konnte nicht gelesen werden.');
+    }
+
     return NextResponse.json({
-      analysis: {
-        id: analysis.id,
-        url: analysis.url,
-        projectId: analysis.projectId || undefined,
-        result: analysis.result as any,
-        notes: analysis.notes || undefined,
-        tags: analysis.tags,
-        createdAt: analysis.createdAt.toISOString(),
-      },
+      analysis: formattedAnalysis,
     });
   } catch (error) {
     console.error('Error saving analysis:', error);

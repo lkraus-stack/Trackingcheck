@@ -1,6 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
+import type { AnalysisResult } from '@/types';
+import { analysisResultToJson, getAnalysisScoreFromJson } from '@/lib/db/analysisJson';
+
+interface MigratedProjectInput {
+  id: string;
+  name: string;
+  description?: string;
+  urls: string[];
+  color?: string;
+  isFavorite?: boolean;
+  notes?: string;
+  tags?: string[];
+  lastAnalysis?: string;
+  avgScore?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface MigratedAnalysisInput {
+  id: string;
+  url: string;
+  result: AnalysisResult;
+  projectId?: string;
+  notes?: string;
+  tags?: string[];
+  createdAt?: string;
+}
+
+interface MigrateRequestBody {
+  projects?: MigratedProjectInput[];
+  analyses?: MigratedAnalysisInput[];
+}
 
 // POST: Migrate IndexedDB data to database
 export async function POST(request: NextRequest) {
@@ -14,7 +46,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as MigrateRequestBody;
     const { projects, analyses } = body;
 
     if (!projects || !analyses) {
@@ -45,6 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Create URL to project ID mapping for analyses
     const urlToProjectId = new Map<string, string>();
+    const legacyProjectIdMap = new Map<string, string>();
 
     // Migrate projects
     for (const project of projects || []) {
@@ -65,8 +98,9 @@ export async function POST(request: NextRequest) {
               p.urls.some((url: string) => project.urls.includes(url)))
         );
         if (existing) {
+          legacyProjectIdMap.set(project.id, existing.id);
           // Map URLs to existing project ID
-          project.urls.forEach((url: string) => {
+          project.urls.forEach((url) => {
             urlToProjectId.set(url, existing.id);
           });
         }
@@ -92,8 +126,9 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        legacyProjectIdMap.set(project.id, dbProject.id);
         // Map URLs to project ID
-        dbProject.urls.forEach((url: string) => {
+        dbProject.urls.forEach((url) => {
           urlToProjectId.set(url, dbProject.id);
         });
 
@@ -106,14 +141,20 @@ export async function POST(request: NextRequest) {
 
     // Migrate analyses
     for (const analysis of analyses || []) {
+      const analysisCreatedAt = analysis.createdAt
+        ? new Date(analysis.createdAt).getTime()
+        : null;
+
       // Check for duplicates by URL and creation date
       const isDuplicate = existingAnalyses.some(
         (existing) =>
           existing.url === analysis.url &&
-          Math.abs(
-            new Date(existing.createdAt).getTime() -
-              new Date(analysis.createdAt).getTime()
-          ) < 60000 // Within 1 minute = likely duplicate
+          (
+            analysisCreatedAt === null ||
+            Math.abs(
+              new Date(existing.createdAt).getTime() - analysisCreatedAt
+            ) < 60000
+          ) // Within 1 minute = likely duplicate
       );
 
       if (isDuplicate) {
@@ -123,7 +164,7 @@ export async function POST(request: NextRequest) {
 
       // Find project ID for this analysis URL
       const projectId = analysis.projectId
-        ? urlToProjectId.get(analysis.projectId) || null
+        ? legacyProjectIdMap.get(analysis.projectId) || null
         : urlToProjectId.get(analysis.url) || null;
 
       try {
@@ -131,8 +172,8 @@ export async function POST(request: NextRequest) {
           data: {
             userId,
             url: analysis.url,
-            result: analysis.result as any,
-            projectId: projectId,
+            result: analysisResultToJson(analysis.result),
+            projectId,
             notes: analysis.notes || null,
             tags: analysis.tags || [],
             createdAt: analysis.createdAt ? new Date(analysis.createdAt) : new Date(),
@@ -148,7 +189,7 @@ export async function POST(request: NextRequest) {
           });
 
           const scores = projectAnalyses
-            .map((a) => (a.result as any)?.score)
+            .map((analysisItem) => getAnalysisScoreFromJson(analysisItem.result))
             .filter((s): s is number => typeof s === 'number');
 
           const avgScore =

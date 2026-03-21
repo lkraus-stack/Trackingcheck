@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
@@ -12,7 +13,6 @@ import {
   Mail, 
   Bell,
   ChevronRight,
-  Save,
   Loader2
 } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
@@ -189,9 +189,11 @@ function SettingsContent() {
                     <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-4 mb-4">
                         {session.user.image ? (
-                          <img
+                          <Image
                             src={session.user.image}
                             alt={session.user.name || 'User'}
+                            width={64}
+                            height={64}
                             className="h-16 w-16 rounded-full border-2 border-indigo-500/30"
                           />
                         ) : (

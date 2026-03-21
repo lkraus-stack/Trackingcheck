@@ -1,5 +1,11 @@
 import type { AnalysisCacheInfo, AnalysisDebugInfo, AnalysisResult } from '@/types';
 import { getCacheVersion } from '@/lib/cache/analysisCache';
+import {
+  getAnalyzerBrowserRuntime,
+  getBuildId,
+  getDeploymentEnvironment,
+  getExecutionRegion,
+} from '@/lib/runtime/serverRuntime';
 
 function hasLikelyTrackingSignals(trackingTags: AnalysisResult['trackingTags']): boolean {
   return (
@@ -38,24 +44,12 @@ export function getSuspiciousAnalysisReason(
 }
 
 export function getAnalysisDebugInfo(): AnalysisDebugInfo {
-  const isVercel = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const environment = isVercel
-    ? `vercel-${process.env.VERCEL_ENV ?? 'serverless'}`
-    : process.env.NODE_ENV === 'development'
-    ? 'local-dev'
-    : process.env.NODE_ENV || 'server';
-  const runtime = isVercel ? 'serverless-chromium' : 'puppeteer';
-  const buildId =
-    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
-    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
-    process.env.GIT_COMMIT_SHA?.slice(0, 7) ||
-    'local-dev';
-
   return {
-    environment,
-    runtime,
-    buildId,
+    environment: getDeploymentEnvironment(),
+    runtime: getAnalyzerBrowserRuntime(),
+    buildId: getBuildId(),
     cacheVersion: getCacheVersion(),
+    region: getExecutionRegion(),
   };
 }
 

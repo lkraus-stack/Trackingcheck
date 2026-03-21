@@ -1,4 +1,4 @@
-import { CrawlResult, NetworkRequest } from './crawler';
+import { CrawlResult } from './crawler';
 import { ThirdPartyDomainsResult, ThirdPartyDomain, CookieResult } from '@/types';
 
 // Bekannte Third-Party Domains und ihre Kategorien

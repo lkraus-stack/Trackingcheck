@@ -12,7 +12,6 @@ import {
   ArrowRight,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Clock,
 } from 'lucide-react';
 import { AnalysisResult } from '@/types';

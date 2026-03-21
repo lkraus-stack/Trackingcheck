@@ -1,4 +1,5 @@
 import { AnalysisResult, CachedAnalysis, AnalysisHistoryItem } from '@/types';
+import type { ReducedAnalysisData } from '@/lib/ai/dataReducer';
 
 // Cache-Dauer: 24 Stunden
 const CACHE_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -17,7 +18,7 @@ export function getCacheVersion(): string {
 // Server-Side Cache (In-Memory für Vercel Serverless)
 const memoryCache: Map<string, CachedAnalysis> = new Map();
 // Cache für reduzierte KI-Daten (zur Token-Einsparung)
-const reducedDataCache: Map<string, { data: Partial<AnalysisResult>; expiresAt: number }> = new Map();
+const reducedDataCache: Map<string, { data: ReducedAnalysisData; expiresAt: number }> = new Map();
 
 // Cache-Key generieren
 function getCacheKey(url: string): string {
@@ -224,7 +225,7 @@ export function compareAnalyses(
 }
 
 // Cache für reduzierte KI-Daten
-export function getCachedReducedData(cacheKey: string): Partial<AnalysisResult> | null {
+export function getCachedReducedData(cacheKey: string): ReducedAnalysisData | null {
   const cached = reducedDataCache.get(cacheKey);
   
   if (cached && cached.expiresAt > Date.now()) {
@@ -242,7 +243,7 @@ export function getCachedReducedData(cacheKey: string): Partial<AnalysisResult> 
 
 export function setCachedReducedData(
   cacheKey: string,
-  data: Partial<AnalysisResult>
+  data: ReducedAnalysisData
 ): void {
   const now = Date.now();
   

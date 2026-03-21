@@ -79,6 +79,7 @@ export interface AnalysisDebugInfo {
   runtime: string;
   buildId: string;
   cacheVersion: string;
+  region?: string;
 }
 
 // Analyse-Schritte für KI-ähnliche Gedankengänge in der UI

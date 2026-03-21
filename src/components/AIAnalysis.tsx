@@ -10,6 +10,41 @@ interface AIAnalysisProps {
   onAnalysisGenerated?: (analysis: string | null) => void;
 }
 
+interface AnalyzeAiResponse {
+  analysis?: string;
+  validation?: string | null;
+  configured?: boolean;
+  details?: string;
+  error?: string;
+}
+
+interface ChatAiResponse {
+  answer?: string;
+  details?: string;
+  error?: string;
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type');
+  const responseText = await response.text();
+
+  if (!contentType || !contentType.includes('application/json')) {
+    throw new Error(
+      response.ok
+        ? 'Unerwartetes Antwortformat vom Server'
+        : `Server-Fehler (${response.status}): ${responseText.substring(0, 100)}`
+    );
+  }
+
+  try {
+    return JSON.parse(responseText) as T;
+  } catch {
+    throw new Error(
+      `Server-Antwort konnte nicht als JSON gelesen werden: ${responseText.substring(0, 100)}`
+    );
+  }
+}
+
 export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [validation, setValidation] = useState<string | null>(null);
@@ -31,29 +66,17 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
         body: JSON.stringify({ analysisResult: result }),
       });
 
-      // Sicher JSON parsen
-      let data: any;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonError) {
-          const errorText = await response.text();
-          throw new Error(`Server-Antwort konnte nicht als JSON gelesen werden: ${errorText.substring(0, 100)}`);
-        }
-      } else {
-        const errorText = await response.text();
-        throw new Error(response.ok 
-          ? 'Unerwartetes Antwortformat vom Server'
-          : `Server-Fehler (${response.status}): ${errorText.substring(0, 100)}`);
-      }
+      const data = await readJsonResponse<AnalyzeAiResponse>(response);
 
       if (!response.ok) {
         if (data.configured === false) {
           throw new Error('KI-API ist nicht konfiguriert. Bitte API-Key in .env.local hinterlegen.');
         }
         throw new Error(data.details || data.error || 'Analyse fehlgeschlagen');
+      }
+
+      if (!data.analysis) {
+        throw new Error('KI-Analyse-Antwort enthält keinen Bericht.');
       }
 
       setAiAnalysis(data.analysis);
@@ -81,29 +104,16 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
         body: JSON.stringify({ question: userMessage, context: result }),
       });
 
-      // Sicher JSON parsen
-      let data: any;
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonError) {
-          const errorText = await response.text();
-          throw new Error(`Server-Antwort konnte nicht als JSON gelesen werden: ${errorText.substring(0, 100)}`);
-        }
-      } else {
-        const errorText = await response.text();
-        throw new Error(response.ok 
-          ? 'Unerwartetes Antwortformat vom Server'
-          : `Server-Fehler (${response.status}): ${errorText.substring(0, 100)}`);
-      }
+      const data = await readJsonResponse<ChatAiResponse>(response);
 
       if (!response.ok) {
         throw new Error(data.details || data.error || 'Antwort fehlgeschlagen');
       }
 
-      setChatMessages((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.answer || 'Keine Antwort erhalten.' },
+      ]);
     } catch (err) {
       setChatMessages((prev) => [
         ...prev,

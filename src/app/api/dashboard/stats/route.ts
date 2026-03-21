@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
+import { getAnalysisIssuesFromJson, getAnalysisScoreFromJson } from '@/lib/db/analysisJson';
 
 // GET: Dashboard Statistiken
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     analyses.forEach(a => allUrls.add(a.url));
 
     const scores = analyses
-      .map(a => (a.result as any)?.score)
+      .map((analysis) => getAnalysisScoreFromJson(analysis.result))
       .filter((s): s is number => typeof s === 'number');
 
     const avgScore = scores.length > 0
@@ -40,9 +41,9 @@ export async function GET(request: NextRequest) {
 
     // Zähle Issues
     const issueCounts: Record<string, number> = {};
-    analyses.forEach(a => {
-      const issues = (a.result as any)?.issues || [];
-      issues.forEach((issue: any) => {
+    analyses.forEach((analysis) => {
+      const issues = getAnalysisIssuesFromJson(analysis.result);
+      issues.forEach((issue) => {
         const key = issue.title || issue.category || 'Unknown';
         issueCounts[key] = (issueCounts[key] || 0) + 1;
       });

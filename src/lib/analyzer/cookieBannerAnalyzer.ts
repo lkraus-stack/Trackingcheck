@@ -43,35 +43,6 @@ const CMP_PROVIDERS = [
   { name: 'Ensighten', patterns: ['ensighten', 'ensighten-'] },
 ];
 
-// Keywords für Banner-Erkennung
-const BANNER_KEYWORDS = [
-  'cookie',
-  'consent',
-  'privacy',
-  'datenschutz',
-  'privatsphäre',
-  'privatsphaere',
-  'einwilligung',
-  'akzeptieren',
-  'accept',
-  'ablehnen',
-  'reject',
-  'decline',
-  'alle akzeptieren',
-  'alles akzeptieren',
-  'accept all',
-  'alle ablehnen',
-  'reject all',
-  'einstellungen',
-  'settings',
-  'preferences',
-  'datenschutz-einstellungen',
-  'cookie-einstellungen',
-  'privacy settings',
-  'nur essenzielle',
-  'only essential',
-];
-
 export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResult {
   const { html, scripts, networkRequests } = crawlResult;
   const htmlLower = html.toLowerCase();
@@ -134,7 +105,7 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
   }
 
   // Banner-Erkennung durch Keywords und Struktur
-  const bannerDetected = detectBannerPresence(htmlLower, combinedLower);
+  const bannerDetected = detectBannerPresence(htmlLower);
   const detected = bannerDetected || !!detectedProvider;
 
   // Button-Analyse nur wenn ein Banner/CMP wirklich erkannt wurde
@@ -159,7 +130,7 @@ export function analyzeCookieBanner(crawlResult: CrawlResult): CookieBannerResul
   };
 }
 
-function detectBannerPresence(htmlLower: string, combinedLower: string): boolean {
+function detectBannerPresence(htmlLower: string): boolean {
   // Prüfe auf typische Cookie-Banner Elemente (CSS-Klassen und IDs)
   // Diese sind sehr spezifisch und zeigen definitiv einen CMP/Banner an
   const definitiveBannerPatterns = [

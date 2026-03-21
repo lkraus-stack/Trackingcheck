@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Shield, ChevronDown, CheckCircle2, Sparkles, Zap, TrendingUp, Lock, LayoutDashboard, Save, History, FolderOpen, ArrowRight, LogIn, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -9,15 +8,14 @@ import { signIn } from 'next-auth/react';
 export function HeroSection() {
   const { data: session } = useSession();
   const router = useRouter();
-  const [isVisible, setIsVisible] = useState(false);
   const isLoggedIn = !!session?.user;
 
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
-
   const handleSignIn = async () => {
-    await signIn('google', { callbackUrl: '/' });
+    try {
+      await signIn('google', { callbackUrl: '/' });
+    } catch (error) {
+      console.error('Hero sign in error:', error);
+    }
   };
 
   return (
@@ -28,7 +26,7 @@ export function HeroSection() {
       <div className="absolute bottom-20 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow animation-delay-2000" />
       
       {/* Franco Consulting Badge */}
-      <div className={`mb-6 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="mb-6">
         <a 
           href="https://www.franco-consulting.com/" 
           target="_blank" 
@@ -42,7 +40,7 @@ export function HeroSection() {
       </div>
 
       {/* Main Headline */}
-      <div className={`text-center max-w-4xl mx-auto transition-all duration-700 delay-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="text-center max-w-4xl mx-auto">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
           <span className="text-slate-100">Ist dein Tracking</span>
           <br />
@@ -56,7 +54,7 @@ export function HeroSection() {
       </div>
 
       {/* CTA Button */}
-      <div className={`transition-all duration-700 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div>
         <button
           onClick={() => {
             const el = document.getElementById('analysis-section');
@@ -74,7 +72,7 @@ export function HeroSection() {
       </div>
 
       {/* Trust Badges - Different für eingeloggte User */}
-      <div className={`mt-12 flex flex-wrap justify-center gap-6 sm:gap-8 transition-all duration-700 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="mt-12 flex flex-wrap justify-center gap-6 sm:gap-8">
         {isLoggedIn ? (
           <>
             <TrustBadge icon={<Save className="w-4 h-4" />} text="Analysen speichern" />
@@ -94,7 +92,7 @@ export function HeroSection() {
 
       {/* Benefits Box für nicht-eingeloggte User */}
       {!isLoggedIn && (
-        <div className={`mt-8 max-w-2xl mx-auto transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className="mt-8 max-w-2xl mx-auto">
           <div className="p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl backdrop-blur-sm shadow-lg shadow-indigo-500/10">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
@@ -137,7 +135,7 @@ export function HeroSection() {
 
       {/* Benefits für eingeloggte User */}
       {isLoggedIn && (
-        <div className={`mt-8 max-w-2xl mx-auto transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className="mt-8 max-w-2xl mx-auto">
           <div className="p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-xl backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-4">
               <Sparkles className="w-5 h-5 text-indigo-400" />
@@ -173,7 +171,7 @@ export function HeroSection() {
       )}
 
       {/* Feature Grid */}
-      <div className={`mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto transition-all duration-700 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
         <FeatureCard 
           emoji="🍪" 
           title="Cookie Banner" 
@@ -197,7 +195,7 @@ export function HeroSection() {
       </div>
 
       {/* Scroll Indicator */}
-      <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 transition-all duration-700 delay-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
         <button 
           onClick={() => {
             const el = document.getElementById('analysis-section');

@@ -1,12 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 import { backfillUserRoles, isAdminEmail } from '@/lib/auth/admin';
-import { getPlanDefaults, normalizePlan, PlanId } from '@/lib/auth/plans';
+import { getPlanDefaults, normalizePlan } from '@/lib/auth/plans';
 
 function toNumber(value: unknown, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+interface CreateAdminUserBody {
+  email?: string;
+  name?: string;
+  role?: 'user' | 'admin';
+  plan?: string;
+  subscription?: {
+    status?: string;
+  };
+  usageLimits?: {
+    maxAnalysesPerMonth?: number;
+    maxProjects?: number;
+    maxAnalysesPerDay?: number;
+    aiAnalysisEnabled?: boolean;
+    aiChatEnabled?: boolean;
+    exportPdfEnabled?: boolean;
+    deepScanEnabled?: boolean;
+    apiAccessEnabled?: boolean;
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -38,7 +59,7 @@ export async function GET(request: NextRequest) {
     const roleFilter = searchParams.get('role');
     const statusFilter = searchParams.get('status');
 
-    const where: any = {};
+    const where: Prisma.UserWhereInput = {};
     if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
@@ -48,11 +69,15 @@ export async function GET(request: NextRequest) {
     if (roleFilter && (roleFilter === 'admin' || roleFilter === 'user')) {
       where.role = roleFilter;
     }
+    const subscriptionWhere: Prisma.SubscriptionWhereInput = {};
     if (planFilter && (planFilter === 'free' || planFilter === 'pro' || planFilter === 'enterprise')) {
-      where.subscription = { plan: planFilter };
+      subscriptionWhere.plan = planFilter;
     }
     if (statusFilter) {
-      where.subscription = { ...(where.subscription || {}), status: statusFilter };
+      subscriptionWhere.status = statusFilter;
+    }
+    if (Object.keys(subscriptionWhere).length > 0) {
+      where.subscription = { is: subscriptionWhere };
     }
 
     const [total, users] = await Promise.all([
@@ -175,7 +200,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as CreateAdminUserBody;
     const email = String(body.email || '').trim().toLowerCase();
     const name = body.name ? String(body.name).trim() : null;
     const role = body.role === 'admin' ? 'admin' : 'user';

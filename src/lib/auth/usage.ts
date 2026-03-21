@@ -30,12 +30,6 @@ export async function checkUsageLimits(
       },
     })
 
-    const currentMonthUsage = monthlyStats.reduce((sum, stat) => {
-      if (type === 'aiRequests') return sum + stat.aiRequests
-      if (type === 'apiCalls') return sum + stat.apiCalls
-      return sum
-    }, 0)
-
     // Hole heutige Usage (für Info)
     const todayStats = await prisma.usageStats.findFirst({
       where: {
@@ -124,15 +118,6 @@ export async function incrementUsage(
 }
 
 /**
- * Holt Default Limits für einen Plan
- * WICHTIG: Für eingeloggte User werden KEINE Limits verwendet (0 = unlimited)
- */
-function getDefaultLimit(type: UsageType, plan: string): number {
-  // Für alle eingeloggten User: 0 = unlimited
-  return 0
-}
-
-/**
  * Prüft ob ein Feature für User verfügbar ist
  */
 export async function checkFeatureAccess(
@@ -141,6 +126,7 @@ export async function checkFeatureAccess(
 ): Promise<boolean> {
   try {
     if (!userId) return false
+    void feature
     // Für eingeloggte User sind alle Features aktiv
     return true
   } catch (error) {

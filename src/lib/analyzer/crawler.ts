@@ -1,4 +1,5 @@
 import type { Browser, Page, Frame, BrowserContext } from 'puppeteer-core';
+import { getAnalyzerBrowserRuntime } from '@/lib/runtime/serverRuntime';
 
 export interface CrawlResult {
   html: string;
@@ -122,18 +123,80 @@ export interface NetworkRequestExtended extends NetworkRequest {
   redirectChain?: string[];
 }
 
-// Erkennung ob wir auf Vercel/Serverless laufen
-const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+type ConsentCallSource = 'gtag' | 'dataLayer' | 'gtag_stub' | 'unknown';
+
+type RuntimeTrackingCheckerData = {
+  consentModeCalls?: Array<{ source?: ConsentCallSource; args?: unknown[] }>;
+  gtagCalls?: unknown[][];
+  dataLayerPushCalls?: unknown[][];
+};
+
+type UsercentricsWindowApi = {
+  isInitialized?: () => boolean;
+  acceptAllConsents?: () => unknown;
+};
+
+type RealCookieBannerApi = {
+  getOptions?: () => { groups?: unknown[] };
+};
+
+type CookiebotApi = {
+  show?: () => unknown;
+};
+
+type OneTrustApi = {
+  AllowAll?: () => unknown;
+};
+
+type BorlabsApi = {
+  acceptAll?: () => unknown;
+};
+
+type GenericConsentApi = {
+  consent?: () => unknown;
+};
+
+type WindowLikeRecord = Record<string, unknown> & {
+  UC_UI?: UsercentricsWindowApi;
+  __ucCmp?: unknown;
+  CookieConsent?: { accept?: () => unknown };
+  Cookiebot?: CookiebotApi;
+  OnetrustActiveGroups?: unknown;
+  consentApi?: GenericConsentApi;
+  rcbConsentManager?: RealCookieBannerApi;
+  realCookieBanner?: unknown;
+  BorlabsCookie?: BorlabsApi;
+  cmplz_banner?: unknown;
+  OneTrust?: OneTrustApi;
+  gtag?: unknown;
+  dataLayer?: unknown;
+  __trackingChecker?: RuntimeTrackingCheckerData;
+};
+
+type WrappedDataLayerArray = unknown[] & { __tcWrapped?: boolean };
+type WrappedTrackingFunction = ((this: unknown, ...args: unknown[]) => unknown) & { __tcWrapped?: boolean };
+
+const COMMON_BROWSER_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-accelerated-2d-canvas',
+  '--disable-gpu',
+  '--disable-blink-features=AutomationControlled',
+];
 
 async function getBrowser(): Promise<Browser> {
-  if (isVercel) {
+  const runtime = getAnalyzerBrowserRuntime();
+
+  if (runtime === 'serverless-chromium') {
     // Vercel/Serverless: Verwende @sparticuz/chromium
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const chromium = require('@sparticuz/chromium');
     const puppeteerCore = (await import('puppeteer-core')).default;
+    const args = Array.from(new Set([...chromium.args, ...COMMON_BROWSER_ARGS]));
     
     return puppeteerCore.launch({
-      args: chromium.args,
+      args,
       executablePath: await chromium.executablePath(),
       headless: chromium.headless,
       defaultViewport: { width: 1920, height: 1080 },
@@ -141,16 +204,11 @@ async function getBrowser(): Promise<Browser> {
   } else {
     // Lokal: Verwende normales puppeteer
     const puppeteer = (await import('puppeteer')).default;
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim() || undefined;
     return puppeteer.launch({
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--disable-blink-features=AutomationControlled',
-      ],
+      args: COMMON_BROWSER_ARGS,
+      ...(executablePath ? { executablePath } : {}),
     }) as Promise<Browser>;
   }
 }
@@ -562,9 +620,7 @@ export class WebCrawler {
 
       // Runtime Instrumentation Logs (falls vorhanden)
       try {
-        const tc = (win as any).__trackingChecker as
-          | { consentModeCalls?: Array<{ source?: string; args?: unknown[] }>; gtagCalls?: unknown[][]; dataLayerPushCalls?: unknown[][] }
-          | undefined;
+        const tc = (win as WindowLikeRecord).__trackingChecker;
         if (tc) {
           if (Array.isArray(tc.gtagCalls)) {
             result.gtagCalls = tc.gtagCalls.slice(0, 200);
@@ -579,7 +635,7 @@ export class WebCrawler {
               .map((c) => ({
                 source:
                   c?.source === 'gtag' || c?.source === 'dataLayer' || c?.source === 'gtag_stub'
-                    ? (c.source as any)
+                    ? c.source
                     : 'unknown',
                 args: c.args as unknown[],
               }));
@@ -746,20 +802,20 @@ export class WebCrawler {
     // Warten auf CMP JavaScript APIs
     waits.push(
       page.waitForFunction(() => {
-        const win = window as unknown as Record<string, unknown>;
-        const uc = (win as any).UC_UI;
+        const win = window as unknown as WindowLikeRecord;
+        const uc = win.UC_UI;
         const ucReady = uc && typeof uc.isInitialized === 'function' ? uc.isInitialized() : Boolean(uc);
         return Boolean(
           ucReady ||
-          (win as any).__ucCmp ||
-          (win as any).CookieConsent ||
-          (win as any).Cookiebot ||
-          (win as any).OnetrustActiveGroups ||
-          (win as any).consentApi ||
-          (win as any).rcbConsentManager ||
-          (win as any).realCookieBanner ||
-          (win as any).BorlabsCookie ||
-          (win as any).cmplz_banner
+          win.__ucCmp ||
+          win.CookieConsent ||
+          win.Cookiebot ||
+          win.OnetrustActiveGroups ||
+          win.consentApi ||
+          win.rcbConsentManager ||
+          win.realCookieBanner ||
+          win.BorlabsCookie ||
+          win.cmplz_banner
         );
       }, { timeout: Math.max(1200, Math.min(timeout, 4000)) }).catch(() => null)
     );
@@ -790,10 +846,10 @@ export class WebCrawler {
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const apiReady = await page.evaluate(() => {
-      const win = window as unknown as Record<string, any>;
+        const win = window as unknown as WindowLikeRecord;
         
         // Usercentrics prüfen
-      const uc = win.UC_UI;
+        const uc = win.UC_UI;
         if (uc) {
           if (typeof uc.isInitialized === 'function') {
             if (uc.isInitialized()) return { ready: true, cmp: 'usercentrics' };
@@ -808,8 +864,8 @@ export class WebCrawler {
         if (win.consentApi && typeof win.consentApi.consent === 'function') {
           return { ready: true, cmp: 'real_cookie_banner' };
         }
-      if (win.rcbConsentManager && typeof win.rcbConsentManager.getOptions === 'function') {
-        const groups = win.rcbConsentManager.getOptions?.()?.groups;
+        if (win.rcbConsentManager && typeof win.rcbConsentManager.getOptions === 'function') {
+          const groups = win.rcbConsentManager.getOptions()?.groups;
           if (Array.isArray(groups) && groups.length > 0) {
             return { ready: true, cmp: 'real_cookie_banner' };
           }
@@ -848,7 +904,7 @@ export class WebCrawler {
     
     // Fallback: Warten auf irgendein CMP-Zeichen
     await page.waitForFunction(() => {
-      const win = window as unknown as Record<string, any>;
+      const win = window as unknown as WindowLikeRecord;
       return Boolean(
         win.UC_UI ||
         win.__ucCmp ||
@@ -1839,7 +1895,7 @@ export class WebCrawler {
       // Letzter Fallback: Wenn API vorhanden aber Banner nicht sichtbar, trotzdem API nutzen
       if (!acceptResult.found) {
         const hasApi = await pageAccept.evaluate(() => {
-          const win = window as any;
+          const win = window as unknown as WindowLikeRecord;
           return !!(win.consentApi || win.UC_UI || win.Cookiebot || win.OneTrust);
         });
         if (hasApi) {
@@ -1917,7 +1973,7 @@ export class WebCrawler {
       // Letzter Fallback: Wenn API vorhanden aber Banner nicht sichtbar, trotzdem API nutzen
       if (!rejectResult.found) {
         const hasApi = await pageReject.evaluate(() => {
-          const win = window as any;
+          const win = window as unknown as WindowLikeRecord;
           return !!(win.consentApi || win.UC_UI || win.Cookiebot || win.OneTrust);
         });
         if (hasApi) {
@@ -2014,7 +2070,7 @@ export class WebCrawler {
 
       if (!acceptResult.found) {
         const hasApi = await pageAccept.evaluate(() => {
-          const win = window as any;
+          const win = window as unknown as WindowLikeRecord;
           return !!(win.consentApi || win.UC_UI || win.Cookiebot || win.OneTrust);
         });
         if (hasApi) {
@@ -2229,9 +2285,9 @@ export class WebCrawler {
       // Runtime Instrumentation für Consent Mode / DataLayer / gtag Calls
       // Ziel: Consent Mode zuverlässig erkennen, auch wenn der Code in externen Scripts steckt.
       try {
-        const w = window as any;
+        const w = window as unknown as WindowLikeRecord;
         const log: {
-          consentModeCalls: Array<{ source: 'gtag' | 'dataLayer' | 'gtag_stub' | 'unknown'; args: unknown[] }>;
+          consentModeCalls: Array<{ source: ConsentCallSource; args: unknown[] }>;
           gtagCalls: unknown[][];
           dataLayerPushCalls: unknown[][];
         } = {
@@ -2259,13 +2315,14 @@ export class WebCrawler {
         };
 
         // Wrap dataLayer assignment + push
-        const wrapDataLayer = (arr: any): any => {
+        const wrapDataLayer = (arr: unknown): unknown => {
           if (!arr || typeof arr !== 'object') return arr;
           if (!Array.isArray(arr)) return arr;
-          if ((arr as any).__tcWrapped) return arr;
+          const dataLayerArray = arr as WrappedDataLayerArray;
+          if (dataLayerArray.__tcWrapped) return dataLayerArray;
           try {
-            const originalPush = arr.push.bind(arr);
-            arr.push = (...pushArgs: any[]) => {
+            const originalPush = dataLayerArray.push.bind(dataLayerArray);
+            dataLayerArray.push = (...pushArgs: unknown[]) => {
               try {
                 log.dataLayerPushCalls.push(pushArgs);
                 // gtag pushes an "Arguments" object into dataLayer: arguments[0]==='consent'
@@ -2274,7 +2331,7 @@ export class WebCrawler {
                 if (Array.isArray(first)) {
                   safePushConsent('dataLayer', first);
                 } else if (first && typeof first === 'object') {
-                  const maybeCmd = (first as any)[0];
+                  const maybeCmd = (first as ArrayLike<unknown>)[0];
                   if (maybeCmd === 'consent') {
                     try {
                       const normalized = Array.prototype.slice.call(first) as unknown[];
@@ -2289,11 +2346,11 @@ export class WebCrawler {
               }
               return originalPush(...pushArgs);
             };
-            Object.defineProperty(arr, '__tcWrapped', { value: true, configurable: true });
+            Object.defineProperty(dataLayerArray, '__tcWrapped', { value: true, configurable: true });
           } catch {
             // ignore
           }
-          return arr;
+          return dataLayerArray;
         };
 
         let dataLayerValue = wrapDataLayer(w.dataLayer || []);
@@ -2316,14 +2373,15 @@ export class WebCrawler {
           get() {
             return gtagValue;
           },
-          set(v) {
+          set(v: unknown) {
             if (typeof v !== 'function') {
               gtagValue = v;
               return;
             }
 
-            if ((v as any).__tcWrapped) {
-              gtagValue = v;
+            const original = v as WrappedTrackingFunction;
+            if (original.__tcWrapped) {
+              gtagValue = original;
               return;
             }
 
@@ -2334,7 +2392,7 @@ export class WebCrawler {
               } catch {
                 // ignore
               }
-              return v.apply(this, args as any);
+              return original.apply(this, args);
             };
 
             Object.defineProperty(wrapped, '__tcWrapped', {

@@ -11,6 +11,7 @@ import { analyzeCookieBanner } from '../cookieBannerAnalyzer';
 import { analyzeGoogleConsentMode } from '../googleConsentModeAnalyzer';
 import { analyzeTrackingTags } from '../trackingTagsAnalyzer';
 import { getSuspiciousAnalysisReason } from '@/lib/analysisResultMeta';
+import type { AnalysisResult } from '@/types';
 import {
   consentModeV2Fixture,
   gaViaDataLayerFixture,
@@ -24,6 +25,124 @@ type ValidationCase = {
   name: string;
   run: () => void;
 };
+
+function createBaseTrackingTags(): AnalysisResult['trackingTags'] {
+  const baseDetection = {
+    detected: false,
+    loadedViaGTM: false,
+    detectionMethod: [],
+    confidence: 'low' as const,
+    evidence: [],
+  };
+
+  return {
+    googleAnalytics: {
+      ...baseDetection,
+      measurementIds: [],
+      hasMultipleMeasurementIds: false,
+      hasLegacyUA: false,
+    },
+    googleTagManager: {
+      ...baseDetection,
+      containerIds: [],
+      hasMultipleContainers: false,
+    },
+    googleAdsConversion: {
+      ...baseDetection,
+      conversionIds: [],
+      hasRemarketing: false,
+    },
+    metaPixel: {
+      ...baseDetection,
+      pixelIds: [],
+      hasMultiplePixels: false,
+    },
+    linkedInInsight: { ...baseDetection },
+    tiktokPixel: { ...baseDetection },
+    pinterestTag: { ...baseDetection },
+    snapchatPixel: { ...baseDetection },
+    twitterPixel: { ...baseDetection },
+    redditPixel: { ...baseDetection },
+    bingAds: { ...baseDetection },
+    criteo: { ...baseDetection },
+    other: [],
+    marketingParameters: {
+      gclid: false,
+      dclid: false,
+      wbraid: false,
+      pbraid: false,
+      fbclid: false,
+      msclkid: false,
+      ttclid: false,
+      li_fat_id: false,
+      utm: false,
+      any: false,
+    },
+    serverSideTracking: {
+      detected: false,
+      indicators: [],
+      firstPartyEndpoints: [],
+      cookieBridging: {
+        detected: false,
+        cookies: [],
+        indicators: [],
+      },
+      summary: {
+        hasServerSideGTM: false,
+        hasMetaCAPI: false,
+        hasFirstPartyProxy: false,
+        hasTikTokEventsAPI: false,
+        hasLinkedInCAPI: false,
+        hasCookieBridging: false,
+      },
+    },
+  };
+}
+
+function createSuspiciousReasonInput(overrides: {
+  trackingTags?: AnalysisResult['trackingTags'];
+  cookies?: AnalysisResult['cookies'];
+  afterAcceptCookieCount?: number;
+}): Pick<AnalysisResult, 'cookieBanner' | 'trackingTags' | 'cookies' | 'cookieConsentTest'> {
+  return {
+    cookieBanner: {
+      detected: true,
+      hasAcceptButton: true,
+      hasRejectButton: true,
+      hasSettingsOption: true,
+      blocksContent: true,
+    },
+    trackingTags: overrides.trackingTags ?? createBaseTrackingTags(),
+    cookies: overrides.cookies ?? [],
+    cookieConsentTest: {
+      beforeConsent: {
+        cookies: [],
+        cookieCount: 0,
+        trackingCookiesFound: false,
+      },
+      afterAccept: {
+        cookies: [],
+        cookieCount: overrides.afterAcceptCookieCount ?? 0,
+        newCookies: [],
+        clickSuccessful: true,
+        buttonFound: true,
+      },
+      afterReject: {
+        cookies: [],
+        cookieCount: 0,
+        newCookies: [],
+        clickSuccessful: false,
+        buttonFound: false,
+      },
+      analysis: {
+        consentWorksProperly: true,
+        rejectWorksProperly: true,
+        trackingBeforeConsent: false,
+        issues: [],
+      },
+    },
+  };
+}
 
 const cases: ValidationCase[] = [
   {
@@ -90,35 +209,17 @@ const cases: ValidationCase[] = [
   {
     name: 'Verdächtiges 0-Cookie-Cache-Ergebnis wird erkannt',
     run: () => {
-      const reason = getSuspiciousAnalysisReason({
-        cookieBanner: {
-          detected: true,
-          hasAcceptButton: true,
-          hasRejectButton: true,
-          hasSettingsOption: true,
-          blocksContent: true,
-        },
-        trackingTags: {
-          googleAnalytics: { detected: true },
-          googleTagManager: { detected: true },
-          googleAdsConversion: { detected: false },
-          metaPixel: { detected: false },
-          linkedInInsight: { detected: false },
-          tiktokPixel: { detected: false },
-          pinterestTag: { detected: false },
-          snapchatPixel: { detected: false },
-          twitterPixel: { detected: false },
-          redditPixel: { detected: false },
-          bingAds: { detected: false },
-          criteo: { detected: false },
-          other: [],
-          serverSideTracking: { detected: false },
-        } as never,
-        cookies: [],
-        cookieConsentTest: {
-          afterAccept: { cookieCount: 12 },
-        },
-      } as any);
+      const trackingTags = createBaseTrackingTags();
+      trackingTags.googleAnalytics.detected = true;
+      trackingTags.googleTagManager.detected = true;
+
+      const reason = getSuspiciousAnalysisReason(
+        createSuspiciousReasonInput({
+          trackingTags,
+          cookies: [],
+          afterAcceptCookieCount: 12,
+        })
+      );
 
       assert.equal(typeof reason, 'string');
       assert.match(reason as string, /12/);
@@ -127,35 +228,25 @@ const cases: ValidationCase[] = [
   {
     name: 'Konsistente Cookie-Ergebnisse werden nicht als verdächtig markiert',
     run: () => {
-      const reason = getSuspiciousAnalysisReason({
-        cookieBanner: {
-          detected: true,
-          hasAcceptButton: true,
-          hasRejectButton: true,
-          hasSettingsOption: true,
-          blocksContent: true,
-        },
-        trackingTags: {
-          googleAnalytics: { detected: true },
-          googleTagManager: { detected: false },
-          googleAdsConversion: { detected: false },
-          metaPixel: { detected: false },
-          linkedInInsight: { detected: false },
-          tiktokPixel: { detected: false },
-          pinterestTag: { detected: false },
-          snapchatPixel: { detected: false },
-          twitterPixel: { detected: false },
-          redditPixel: { detected: false },
-          bingAds: { detected: false },
-          criteo: { detected: false },
-          other: [],
-          serverSideTracking: { detected: false },
-        } as never,
-        cookies: [{ name: '_ga' }],
-        cookieConsentTest: {
-          afterAccept: { cookieCount: 1 },
-        },
-      } as any);
+      const trackingTags = createBaseTrackingTags();
+      trackingTags.googleAnalytics.detected = true;
+
+      const reason = getSuspiciousAnalysisReason(
+        createSuspiciousReasonInput({
+          trackingTags,
+          cookies: [
+            {
+              name: '_ga',
+              value: 'test',
+              domain: 'example.com',
+              path: '/',
+              httpOnly: false,
+              secure: false,
+            },
+          ],
+          afterAcceptCookieCount: 1,
+        })
+      );
 
       assert.equal(reason, null);
     },

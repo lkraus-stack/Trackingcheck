@@ -81,7 +81,6 @@ export function generateGTMContainer(
   } = {}
 ): GTMContainerTemplate {
   const timestamp = new Date().toISOString();
-  const containerId = analysis.trackingTags.googleTagManager.containerId || 'GTM-XXXXXXX';
   
   const tags: GTMTag[] = [];
   const triggers: GTMTrigger[] = [];
@@ -397,7 +396,7 @@ function createConstantVariable(id: string, name: string, value: string): GTMVar
 }
 
 // E-Commerce Tags generieren
-export function generateEcommerceGTMTags(platform: 'ga4' | 'shopify' | 'woocommerce' | 'shopware'): GTMTag[] {
+export function generateEcommerceGTMTags(): GTMTag[] {
   const tags: GTMTag[] = [];
   
   const ecommerceEvents = [

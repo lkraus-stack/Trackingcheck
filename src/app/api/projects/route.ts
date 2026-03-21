@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth/config';
 import { prisma } from '@/lib/db/prisma';
 
 // GET: Alle Projekte des Users
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
 

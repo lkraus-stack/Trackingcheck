@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/contexts/ToastContext';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -9,8 +9,6 @@ import {
   FolderOpen,
   History,
   Star,
-  TrendingUp,
-  TrendingDown,
   Plus,
   Search,
   MoreVertical,
@@ -69,7 +67,6 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [showAssignToProject, setShowAssignToProject] = useState(false);
-  const [migrating, setMigrating] = useState(false);
   const [migrationComplete, setMigrationComplete] = useState(false);
   
   // Confirm Dialog State
@@ -89,11 +86,7 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
 
   const isLoggedIn = !!session?.user;
 
-  useEffect(() => {
-    loadData();
-  }, [isLoggedIn]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       if (isLoggedIn) {
@@ -117,7 +110,6 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
 
             // Wenn IndexedDB Daten vorhanden sind, migriere automatisch
             if (indexedDBProjects.length > 0 || indexedDBAnalyses.length > 0) {
-              setMigrating(true);
               const migrationResponse = await fetch('/api/migrate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -128,7 +120,7 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
               });
 
               if (migrationResponse.ok) {
-                const migrationResult = await migrationResponse.json();
+                await migrationResponse.json();
                 setMigrationComplete(true);
                 
                 // Lade Daten nach Migration neu
@@ -147,8 +139,6 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
             }
           } catch (migrationError) {
             console.error('Error during migration:', migrationError);
-          } finally {
-            setMigrating(false);
           }
         } else {
           setProjects(dbProjects);
@@ -171,7 +161,11 @@ export function Dashboard({ onSelectUrl, onClose, currentAnalysis, embedded = fa
     } finally {
       setLoading(false);
     }
-  }
+  }, [isLoggedIn, migrationComplete]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleDeleteProject = async (projectId: string) => {
     setConfirmDialog({
@@ -877,7 +871,6 @@ function AnalysisCard({
   onSelect: () => void;
   onDelete?: () => void;
 }) {
-  const [showMenu, setShowMenu] = useState(false);
   const analysisScore = analysis.result.scoreBreakdown?.overall ?? analysis.result.score;
 
   if (compact) {

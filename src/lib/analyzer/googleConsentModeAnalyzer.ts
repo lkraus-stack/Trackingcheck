@@ -218,7 +218,7 @@ function extractUpdateConsent(
   // Suche nach gtag('consent', 'update', {...})
   const updateConsentRegex = /gtag\s*\(\s*['"]consent['"]\s*,\s*['"]update['"]\s*,\s*(\{[^}]+\})/gi;
   
-  let match = updateConsentRegex.exec(combinedContent);
+  const match = updateConsentRegex.exec(combinedContent);
   detected = detected || !!match;
   let updateTrigger: 'banner_click' | 'tcf_api' | 'custom' | 'unknown' = 'unknown';
 

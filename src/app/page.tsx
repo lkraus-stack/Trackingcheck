@@ -11,8 +11,6 @@ import { UsageIndicator } from '@/components/UsageIndicator';
 import { Onboarding, useOnboarding } from '@/components/Onboarding';
 import { 
   Shield, 
-  Cookie, 
-  BarChart3, 
   Zap, 
   ExternalLink, 
   Phone, 
@@ -302,15 +300,6 @@ export default function Home() {
           <ChevronUp className="w-5 h-5" />
         </button>
       )}
-    </div>
-  );
-}
-
-function FeatureBadge({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 rounded-full border border-slate-700">
-      <span className="text-indigo-400">{icon}</span>
-      <span className="text-xs text-slate-400">{text}</span>
     </div>
   );
 }

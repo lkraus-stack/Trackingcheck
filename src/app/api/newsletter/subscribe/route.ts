@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET: Newsletter-Status abrufen
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await auth();
     

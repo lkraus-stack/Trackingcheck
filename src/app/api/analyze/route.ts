@@ -11,6 +11,8 @@ import { checkUsageLimits, incrementUsage } from '@/lib/auth/usage';
 // Verwende 300 Sekunden für vollständige Scans (erfordert Pro)
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const preferredRegion = 'fra1';
 
 export async function POST(request: NextRequest) {
   try {

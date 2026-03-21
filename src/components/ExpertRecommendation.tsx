@@ -32,7 +32,6 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
   // Determine recommendation level
   const isCritical = score < 50 || criticalIssues.length >= 3;
   const needsOptimization = score < 80 || criticalIssues.length > 0 || warnings.length >= 3;
-  const isGood = score >= 80 && criticalIssues.length === 0;
 
   // Generate specific fix recommendations based on issues
   const getFixRecommendations = () => {
@@ -132,40 +131,44 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
   return (
     <div className={`mt-3 ${style.bg} ${style.border} border rounded-lg overflow-hidden transition-all duration-300`}>
       {/* Header - Always visible */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full p-2.5 flex items-center justify-between hover:bg-white/5 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-indigo-500/20 rounded-lg">
-            <Wrench className="w-4 h-4 text-indigo-400" />
-          </div>
-          <div className="text-left">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`font-medium text-sm ${style.titleColor}`}>{style.title}</span>
-              <span className={`px-1.5 py-0.5 ${style.badge} border text-[10px] rounded-full`}>
-                {style.badgeText}
-              </span>
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          aria-expanded={expanded}
+          className="flex-1 p-2.5 flex items-center justify-between gap-3 hover:bg-white/5 transition-colors text-left"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+              <Wrench className="w-4 h-4 text-indigo-400" />
             </div>
-            <p className="text-xs text-slate-500">
-              Franco Consulting kann helfen
-            </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`font-medium text-sm ${style.titleColor}`}>{style.title}</span>
+                <span className={`px-1.5 py-0.5 ${style.badge} border text-[10px] rounded-full`}>
+                  {style.badgeText}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Franco Consulting kann helfen
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); setDismissed(true); }}
-            className="p-1 text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
           {expanded ? (
             <ChevronUp className="w-4 h-4 text-slate-400" />
           ) : (
             <ChevronDown className="w-4 h-4 text-slate-400" />
           )}
-        </div>
-      </button>
+        </button>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="px-3 text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors"
+          aria-label="Empfehlung ausblenden"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
       {/* Expanded Content */}
       {expanded && (

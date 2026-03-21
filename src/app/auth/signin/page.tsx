@@ -3,7 +3,7 @@
 import { signIn, useSession } from 'next-auth/react';
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Shield, LogIn, ArrowLeft } from 'lucide-react';
+import { Shield, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 // Force dynamic rendering
@@ -14,49 +14,40 @@ function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(true);
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const errorParam = searchParams.get('error');
+  const errorMessage =
+    errorParam === 'AccessDenied'
+      ? 'Zugriff verweigert. Bitte versuche es erneut.'
+      : errorParam
+      ? 'Ein Fehler ist aufgetreten. Bitte versuche es erneut.'
+      : null;
 
   useEffect(() => {
-    // Prüfe ob User bereits eingeloggt ist
-    if (status === 'authenticated' && session) {
-      // Newsletter-Subscription beim Login speichern (wenn Checkbox aktiviert)
-      if (newsletterSubscribed && session.user) {
-        fetch('/api/newsletter/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscribe: true, tags: ['new-user'] }),
-        }).catch(err => console.error('Newsletter subscription error:', err));
-      }
-      
-      const callbackUrl = searchParams.get('callbackUrl') || '/';
-      router.push(callbackUrl);
+    if (status !== 'authenticated' || !session) {
       return;
     }
 
-    // Prüfe ob es einen Fehler in der URL gibt
-    const errorParam = searchParams.get('error');
-    
-    if (errorParam === 'AccessDenied') {
-      setError('Zugriff verweigert. Bitte versuche es erneut.');
-    } else if (errorParam) {
-      setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+    if (newsletterSubscribed && session.user) {
+      fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscribe: true, tags: ['new-user'] }),
+      }).catch(err => console.error('Newsletter subscription error:', err));
     }
-  }, [session, status, router, searchParams, newsletterSubscribed]);
+
+    router.push(callbackUrl);
+  }, [callbackUrl, newsletterSubscribed, router, session, status]);
 
   const handleSignIn = async () => {
     setIsLoading(true);
-    setError(null);
     
     try {
-      // Hole callbackUrl aus URL params
-      const callbackUrl = searchParams.get('callbackUrl') || '/';
-      
       // NextAuth leitet automatisch weiter nach dem Login
       await signIn('google', { callbackUrl, redirect: true });
     } catch (err) {
       console.error('Sign in error:', err);
-      setError('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
       setIsLoading(false);
     }
   };
@@ -82,9 +73,9 @@ function SignInContent() {
 
         {/* Sign In Card */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-sm">
-          {error && (
+          {errorMessage && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-              {error}
+              {errorMessage}
             </div>
           )}
 

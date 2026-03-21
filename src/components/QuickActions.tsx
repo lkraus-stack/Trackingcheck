@@ -44,7 +44,6 @@ export function QuickActions({ result }: QuickActionsProps) {
   const [showDataLayerViewerModal, setShowDataLayerViewerModal] = useState(false);
   const [showWhiteLabelModal, setShowWhiteLabelModal] = useState(false);
   const [showGdprIssues, setShowGdprIssues] = useState(false);
-  const overallScore = result.scoreBreakdown?.overall ?? result.score;
   const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
   const gdprIssuesText = useMemo(() => {
     const checks = result.gdprChecklist?.checks ?? [];

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, ArrowRight, ArrowLeft, Sparkles, Globe, LayoutDashboard, CheckCircle2, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { X, ArrowRight, ArrowLeft, Sparkles, Globe, LayoutDashboard, CheckCircle2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -26,11 +26,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setIsLoggedIn(!!session?.user);
-  }, [session]);
+  const isLoggedIn = !!session?.user;
 
   const steps: OnboardingStep[] = [
     {

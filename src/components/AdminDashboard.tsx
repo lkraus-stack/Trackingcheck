@@ -1,4 +1,3 @@
-/* eslint-disable react/no-unescaped-entities */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -142,7 +141,7 @@ export function AdminDashboard() {
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [editForm, setEditForm] = useState<UserFormState | null>(null);
 
-  const isAdmin = (session?.user as any)?.role === 'admin';
+  const isAdmin = session?.user?.role === 'admin';
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
 

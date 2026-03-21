@@ -1,4 +1,4 @@
-import { CrawlResult, WindowObjectData } from './crawler';
+import { CrawlResult } from './crawler';
 import { DataLayerAnalysisResult, DataLayerEvent, EcommerceAnalysis, EcommerceEvent, EcommerceIssue, DataLayerEntry } from '@/types';
 
 // GA4 E-Commerce Events
@@ -30,30 +30,6 @@ const UA_ECOMMERCE_EVENTS = [
   'refund',
   'promoView',
   'promoClick',
-];
-
-// Empfohlene Parameter für Wertübergabe
-const RECOMMENDED_VALUE_PARAMS = {
-  purchase: ['value', 'currency', 'transaction_id', 'items', 'tax', 'shipping'],
-  add_to_cart: ['value', 'currency', 'items'],
-  begin_checkout: ['value', 'currency', 'items'],
-  view_item: ['value', 'currency', 'items'],
-  view_item_list: ['item_list_id', 'item_list_name', 'items'],
-};
-
-// Item-Parameter für E-Commerce
-const ITEM_PARAMETERS = [
-  'item_id',
-  'item_name',
-  'item_brand',
-  'item_category',
-  'item_variant',
-  'price',
-  'quantity',
-  'index',
-  'affiliation',
-  'coupon',
-  'discount',
 ];
 
 export function analyzeDataLayer(crawlResult: CrawlResult): DataLayerAnalysisResult {
@@ -267,7 +243,7 @@ function analyzeEcommerce(
       });
 
       // Issues für dieses Event generieren
-      const eventIssues = checkEventIssues(eventName, eventData, platform);
+      const eventIssues = checkEventIssues(eventName, eventData);
       issues.push(...eventIssues);
     }
   }
@@ -316,7 +292,9 @@ function extractEventData(dataLayerContent: unknown[], eventName: string): {
           sampleData = sanitizeSampleData(ecom);
         } else {
           // Sample Data aus flacher Struktur
-          const { event, ...rest } = obj;
+          const rest = Object.fromEntries(
+            Object.entries(obj).filter(([key]) => key !== 'event')
+          );
           sampleData = sanitizeSampleData(rest);
         }
         
@@ -370,11 +348,9 @@ function sanitizeSampleData(data: Record<string, unknown>): Record<string, unkno
 
 function checkEventIssues(
   eventName: string, 
-  eventData: { hasValue: boolean; hasCurrency: boolean; hasItems: boolean },
-  platform: 'ga4' | 'ua' | 'both' | 'unknown'
+  eventData: { hasValue: boolean; hasCurrency: boolean; hasItems: boolean }
 ): EcommerceIssue[] {
   const issues: EcommerceIssue[] = [];
-  const recommended = RECOMMENDED_VALUE_PARAMS[eventName as keyof typeof RECOMMENDED_VALUE_PARAMS];
 
   // Purchase Event - kritisch für Wertübergabe
   if (eventName === 'purchase') {

@@ -162,6 +162,7 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
     result.cacheInfo?.message || (result.fromCache ? 'Cache' : 'Frisch berechnet'),
     result.debugInfo?.environment ? `Umgebung: ${result.debugInfo.environment}` : null,
     result.debugInfo?.runtime ? `Runtime: ${result.debugInfo.runtime}` : null,
+    result.debugInfo?.region ? `Region: ${result.debugInfo.region}` : null,
     result.debugInfo?.buildId ? `Build: ${result.debugInfo.buildId}` : null,
     result.cacheInfo?.version ? `Cache: ${result.cacheInfo.version}` : null,
   ].filter((entry): entry is string => Boolean(entry));

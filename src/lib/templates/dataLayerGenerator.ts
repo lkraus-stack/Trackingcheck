@@ -165,7 +165,7 @@ export function generateDataLayerCode(
     format?: 'standard' | 'gtm';
   } = {}
 ): string {
-  const { includeEcommerceClear = true, format = 'standard' } = options;
+  const { includeEcommerceClear = true } = options;
   
   const event = standardEvents.find(e => e.event === eventType);
   const isEcommerceEvent = event?.category === 'ecommerce';

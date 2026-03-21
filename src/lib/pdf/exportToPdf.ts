@@ -239,9 +239,18 @@ export async function exportAnalysisToPDF(
     doc.setFont('helvetica', 'normal');
     
     const sst = result.trackingTags.serverSideTracking.summary;
-    if (sst.hasServerSideGTM) doc.text('  Server-Side GTM', margin + 5, yPos), yPos += 5;
-    if (sst.hasMetaCAPI) doc.text('  Meta Conversions API', margin + 5, yPos), yPos += 5;
-    if (sst.hasCookieBridging) doc.text('  Cookie Bridging', margin + 5, yPos), yPos += 5;
+    if (sst.hasServerSideGTM) {
+      doc.text('  Server-Side GTM', margin + 5, yPos);
+      yPos += 5;
+    }
+    if (sst.hasMetaCAPI) {
+      doc.text('  Meta Conversions API', margin + 5, yPos);
+      yPos += 5;
+    }
+    if (sst.hasCookieBridging) {
+      doc.text('  Cookie Bridging', margin + 5, yPos);
+      yPos += 5;
+    }
   }
   yPos += 5;
 

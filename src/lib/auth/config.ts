@@ -1,43 +1,78 @@
 import NextAuth from "next-auth"
+import type { Adapter } from "next-auth/adapters"
 import Google from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/db/prisma"
 import { ensureUserRole, isAdminEmail } from "@/lib/auth/admin"
 import { getPlanDefaults } from "@/lib/auth/plans"
+import { getNextAuthSecret, isVercelServerlessRuntime } from "@/lib/runtime/serverRuntime"
 
-// Validate required environment variables at runtime
-const requiredEnvVars = {
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-};
+const globalForAuthWarnings = globalThis as typeof globalThis & {
+  __trackingCheckerAuthWarnings?: Set<string>
+}
 
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key);
+const authWarnings = globalForAuthWarnings.__trackingCheckerAuthWarnings ?? new Set<string>()
+globalForAuthWarnings.__trackingCheckerAuthWarnings = authWarnings
 
-if (missingVars.length > 0 && process.env.NODE_ENV !== 'test') {
-  console.error('❌ Missing required environment variables:', missingVars.join(', '));
-  console.error('Please set these in Vercel Dashboard → Settings → Environment Variables');
+function warnOnce(key: string, log: () => void) {
+  if (authWarnings.has(key)) {
+    return
+  }
+
+  authWarnings.add(key)
+  log()
+}
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
+const nextAuthSecret = getNextAuthSecret()
+const shouldWarnAboutAuthConfig = process.env.NODE_ENV === 'development' || isVercelServerlessRuntime()
+
+const missingCriticalVars = !nextAuthSecret ? ['NEXTAUTH_SECRET'] : []
+const missingGoogleVars = [
+  !googleClientId ? 'GOOGLE_CLIENT_ID' : null,
+  !googleClientSecret ? 'GOOGLE_CLIENT_SECRET' : null,
+].filter((value): value is string => Boolean(value))
+
+if (missingCriticalVars.length > 0 && process.env.NODE_ENV !== 'test') {
+  warnOnce('missing-critical-auth-vars', () => {
+    console.error('❌ Missing critical auth environment variables:', missingCriticalVars.join(', '))
+    console.error('Set them in `.env.local` for local dev and in Vercel Project Settings for production.')
+  })
+}
+
+if (!process.env.NEXTAUTH_SECRET && !isVercelServerlessRuntime() && shouldWarnAboutAuthConfig && process.env.NODE_ENV !== 'test') {
+  warnOnce('local-fallback-nextauth-secret', () => {
+    console.warn('⚠️ NEXTAUTH_SECRET fehlt. Lokal wird ein Fallback-Secret verwendet; für Vercel bitte NEXTAUTH_SECRET explizit setzen.')
+  })
+}
+
+if (!process.env.NEXTAUTH_URL && !isVercelServerlessRuntime() && shouldWarnAboutAuthConfig && process.env.NODE_ENV !== 'test') {
+  warnOnce('missing-local-nextauth-url', () => {
+    console.warn('⚠️ NEXTAUTH_URL ist lokal nicht gesetzt. Bitte in `.env.local` auf deine Dev-URL setzen (z.B. http://localhost:3000 oder http://localhost:3001).')
+  })
 }
 
 // Build providers array - only add Google if credentials are available
 const providers = [];
-if (requiredEnvVars.GOOGLE_CLIENT_ID && requiredEnvVars.GOOGLE_CLIENT_SECRET) {
+if (googleClientId && googleClientSecret) {
   providers.push(
     Google({
-      clientId: requiredEnvVars.GOOGLE_CLIENT_ID,
-      clientSecret: requiredEnvVars.GOOGLE_CLIENT_SECRET,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
     })
   );
 } else {
-  console.warn('⚠️ Google OAuth provider not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+  if (shouldWarnAboutAuthConfig) {
+    warnOnce(`missing-google-oauth:${missingGoogleVars.join(',')}`, () => {
+      console.warn(`⚠️ Google OAuth provider not configured - missing ${missingGoogleVars.join(' oder ') || 'Google credentials'}`)
+    })
+  }
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma) as any,
-  secret: requiredEnvVars.NEXTAUTH_SECRET,
+  adapter: PrismaAdapter(prisma) as Adapter,
+  secret: nextAuthSecret,
   providers: providers.length > 0 ? providers : [],
   callbacks: {
     async session({ session, user }) {
@@ -58,18 +93,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         })
         
         if (userData) {
-          (session.user as any).role = userData.role
+          session.user.role = userData.role === 'admin' ? 'admin' : 'user'
           if (userData.subscription) {
-            (session.user as any).subscription = userData.subscription
+            session.user.subscription = {
+              plan: userData.subscription.plan as 'free' | 'pro' | 'enterprise',
+              status: userData.subscription.status,
+            }
           }
           if (userData.usageLimits) {
-            (session.user as any).usageLimits = userData.usageLimits
+            session.user.usageLimits = {
+              plan: userData.usageLimits.plan as 'free' | 'pro' | 'enterprise',
+              maxAnalysesPerMonth: userData.usageLimits.maxAnalysesPerMonth,
+              maxProjects: userData.usageLimits.maxProjects,
+              maxAnalysesPerDay: userData.usageLimits.maxAnalysesPerDay,
+              aiAnalysisEnabled: userData.usageLimits.aiAnalysisEnabled,
+              aiChatEnabled: userData.usageLimits.aiChatEnabled,
+              exportPdfEnabled: userData.usageLimits.exportPdfEnabled,
+              deepScanEnabled: userData.usageLimits.deepScanEnabled,
+              apiAccessEnabled: userData.usageLimits.apiAccessEnabled,
+            }
           }
         }
       }
       return session
     },
-    async signIn({ user, account, profile }) {
+    async signIn({ user }) {
       // Erstelle UsageLimits wenn User zum ersten Mal einloggt
       if (user.id) {
         try {

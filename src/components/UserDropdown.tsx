@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -46,7 +47,7 @@ export function UserDropdown() {
     await signOut({ callbackUrl: '/' });
   };
 
-  const isAdmin = (session.user as any)?.role === 'admin';
+  const isAdmin = session.user.role === 'admin';
 
   const menuItems = [
     {
@@ -105,10 +106,13 @@ export function UserDropdown() {
         title="Account-Menü"
       >
         {session.user.image ? (
-          <img
+          <Image
             src={session.user.image}
             alt={session.user.name || 'User'}
+            width={20}
+            height={20}
             className="h-5 w-5 rounded-full"
+            unoptimized
           />
         ) : (
           <User className="h-4 w-4 text-slate-400" />
