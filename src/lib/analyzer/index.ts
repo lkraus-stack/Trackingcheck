@@ -35,12 +35,13 @@ import {
 /** Normalisiert Cookie-Arrays zu CookieResult[] (für CookieData[] aus acceptFallback wird crawlCookies kategorisiert). */
 function toCookieResults(
   cookiesToUse: CookieResult[] | Array<{ name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string }>,
-  crawlCookies: Array<{ name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string }>
+  crawlCookies: Array<{ name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string }>,
+  pageDomain?: string
 ): CookieResult[] {
   if (Array.isArray(cookiesToUse) && cookiesToUse.length > 0 && 'category' in cookiesToUse[0]) {
     return cookiesToUse as CookieResult[];
   }
-  return categorizeCookies(crawlCookies);
+  return categorizeCookies(crawlCookies, pageDomain);
 }
 
 const getErrorMessage = (error: unknown): string => {
@@ -206,8 +207,8 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       ? cookieConsentTest.afterAccept.cookies 
       : acceptFallback?.cookies.length
       ? acceptFallback.cookies
-      : categorizeCookies(crawlResult.cookies);
-    const cookies = toCookieResults(cookiesToUse, crawlResult.cookies);
+      : categorizeCookies(crawlResult.cookies, crawlResult.pageDomain);
+    const cookies = toCookieResults(cookiesToUse, crawlResult.cookies, crawlResult.pageDomain);
     addStep('analyze_cookies', 'completed', `${cookies.length} Cookies kategorisiert`);
 
     // NEU: Third-Party Domains analysieren
@@ -1431,7 +1432,9 @@ function calculateScoreBreakdown(
   );
   const gdprScore = gdprChecklist.score;
   const trackingDetected = hasAnyTracking(trackingTags, cookies);
-  const overall = Math.round((gdprScore * 0.4) + (trackingScore * 0.6));
+  const overall = trackingDetected
+    ? Math.round((gdprScore * 0.4) + (trackingScore * 0.6))
+    : gdprScore;
 
   return {
     overall: Math.max(0, Math.min(100, overall)),
@@ -1584,7 +1587,7 @@ async function analyzeWebsiteQuick(url: string): Promise<AnalysisResult> {
     const tcf = analyzeTCF(crawlResult);
     const googleConsentMode = analyzeGoogleConsentMode(crawlResult);
     const trackingTags = analyzeTrackingTags(crawlResult);
-    const cookies = categorizeCookies(crawlResult.cookies);
+    const cookies = categorizeCookies(crawlResult.cookies, crawlResult.pageDomain);
     
     // DataLayer-Analyse (schnell, aber funktional)
     const dataLayerAnalysis = analyzeDataLayer(crawlResult);

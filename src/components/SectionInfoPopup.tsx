@@ -23,23 +23,23 @@ Ein **Cookie-Banner** (auch Consent-Banner genannt) ist eine rechtliche Anforder
 - **Erkennung**: Welches Cookie-Banner/CMP wurde gefunden?
 - **Funktionen**: Hat das Banner einen "Ablehnen"-Button?
 - **Granularität**: Können Besucher einzelne Cookie-Kategorien auswählen?
-- **DSGVO-Konformität**: Erfüllt das Banner alle rechtlichen Anforderungen?
+- **Compliance-Indizien**: Spricht das Setup für einen sauberen Consent-Flow?
 
 ### Warum ist das wichtig?
 
-Ohne DSGVO-konformes Cookie-Banner können Cookies und Tracking-Tools nicht rechtmäßig verwendet werden. Dies kann zu Abmahnungen und Bußgeldern führen.
+Wenn auf einer Website einwilligungspflichtige Cookies oder Tracker eingesetzt werden, ist ein funktionierendes Consent-Setup in vielen Fällen entscheidend. Die Analyse liefert dafür technische Indizien, ersetzt aber keine Rechtsberatung.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ Erkannt mit Ablehnen-Button**: Gut - Besucher können Tracking ablehnen
-- **⚠️ Erkannt ohne Ablehnen-Button**: Kritisch - rechtlich problematisch
-- **❌ Nicht erkannt**: Kein Banner vorhanden - Tracking ohne Consent ist illegal`;
+- **✅ Erkannt mit Ablehnen-Button**: Technisch gutes Signal für einen sauberen Consent-Flow
+- **⚠️ Erkannt ohne Ablehnen-Button**: Prüfen - die Ablehnung wurde nicht gleichwertig bestätigt
+- **❌ Nicht erkannt**: Kein Banner sichtbar - je nach eingesetzten Cookies/Trackern kann das problematisch sein`;
   }
 
   if (normalizedName.includes('consent') && normalizedName.includes('mode')) {
     return `## Google Consent Mode V2
 
-**Google Consent Mode V2** ist seit März 2024 verpflichtend für personalisierte Werbung in Google Ads. Es ermöglicht Google-Tools (Analytics, Ads, Tag Manager), basierend auf der Cookie-Einwilligung unterschiedlich zu funktionieren.
+**Google Consent Mode V2** ist für viele Google-Ads-Szenarien relevant. Er hilft Google-Tools (Analytics, Ads, Tag Manager), abhängig von der Einwilligung unterschiedlich zu arbeiten.
 
 ### Was wird hier analysiert?
 
@@ -50,13 +50,13 @@ Ohne DSGVO-konformes Cookie-Banner können Cookies und Tracking-Tools nicht rech
 
 ### Warum ist das wichtig?
 
-Ohne Consent Mode V2 können Sie keine personalisierte Werbung in Google Ads schalten. Außerdem hilft es, Tracking-Daten auch bei abgelehnten Cookies teilweise zu erhalten (anonymisiert).
+Ohne sauber erkannten Consent Mode V2 kann Datenqualität in Google-Setups leiden. Die Analyse prüft technische Signale, aber nicht jede Google-Konfiguration vollständig.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ V2 erkannt**: Konsent Mode V2 ist implementiert
-- **⚠️ V1 erkannt**: Veraltet - muss auf V2 aktualisiert werden
-- **❌ Nicht erkannt**: Consent Mode fehlt - muss implementiert werden`;
+- **✅ V2 erkannt**: Starkes technisches Signal für eine aktuelle Implementierung
+- **⚠️ V1 erkannt**: Veraltet oder unvollständig - sollte geprüft werden
+- **❌ Nicht erkannt**: Im Scan wurde kein belastbares Consent-Mode-Signal gefunden`;
   }
 
   if (normalizedName.includes('tcf') || normalizedName.includes('transparency')) {
@@ -96,13 +96,13 @@ TCF ist besonders wichtig, wenn Sie Werbenetzwerke oder programmatische Werbung 
 
 ### Warum ist das wichtig?
 
-Tags müssen **nach** der Cookie-Einwilligung geladen werden. Werden sie vorher geladen, verstößt das gegen die DSGVO und kann zu Abmahnungen führen.
+Tags sollten bei einwilligungspflichtigen Setups **nach** der gültigen Einwilligung feuern. Werden sie vorher geladen, kann das rechtlich und datentechnisch problematisch sein.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ Nach Consent geladen**: Korrekt implementiert
-- **⚠️ Vor Consent geladen**: Rechtswidrig - muss behoben werden
-- **✅ Server-Side erkannt**: Moderne, datenschutzfreundliche Lösung`;
+- **✅ Nach Consent geladen**: Technisch sauberes Signal
+- **⚠️ Vor Consent geladen**: Prüfen - kann auf ein Consent-Gating-Problem hindeuten
+- **✅ Server-Side erkannt**: Starkes Signal für eine modernere Tracking-Architektur`;
   }
 
   if (normalizedName.includes('e-commerce') || normalizedName.includes('ecommerce')) {
@@ -142,13 +142,13 @@ Ohne korrektes E-Commerce-Tracking können Sie keine ROAS (Return on Ad Spend) m
 
 ### Warum ist das wichtig?
 
-Die DSGVO erfordert, dass Third-Party-Datenübertragungen rechtlich abgesichert sind (z.B. Standardvertragsklauseln). Ungesicherte Übertragungen können zu Bußgeldern führen.
+Externe Datenübertragungen sollten datenschutzrechtlich bewertet und sauber dokumentiert werden. Die Analyse zeigt technische Ziele und bekannte Risikohinweise, aber keine vollständige juristische Bewertung.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ EU-basierte Domains**: Rechtlich unproblematisch
-- **⚠️ USA-Domains ohne SCC**: Rechtlich problematisch - benötigt Standardvertragsklauseln
-- **❌ Unbekannte Domains**: Unklare Datenübertragung - sollte geprüft werden`;
+- **✅ EU-basierte Domains**: Technisch unauffälliges Signal
+- **⚠️ Nicht-EU-Domains**: Sollte datenschutzrechtlich geprüft werden
+- **❌ Unbekannte Domains**: Unklare Einordnung - manuelle Prüfung sinnvoll`;
   }
 
   if (normalizedName.includes('cookie') && !normalizedName.includes('banner') && !normalizedName.includes('consent')) {
@@ -165,19 +165,19 @@ Die DSGVO erfordert, dass Third-Party-Datenübertragungen rechtlich abgesichert 
 
 ### Warum ist das wichtig?
 
-Marketing- und Analytics-Cookies benötigen eine Einwilligung nach DSGVO. Cookies ohne Einwilligung zu setzen ist rechtswidrig und kann zu Abmahnungen führen.
+Marketing- und Analytics-Cookies sind häufig einwilligungspflichtig. Die Analyse zeigt, welche Cookies technisch sichtbar waren, nicht aber den vollständigen rechtlichen Kontext jeder Implementierung.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ Nur notwendige Cookies**: Rechtlich unproblematisch
-- **⚠️ Marketing-Cookies vor Consent**: Rechtswidrig - muss behoben werden
-- **✅ Third-Party Cookies erkannt**: Benötigen Einwilligung und Datenschutzerklärung`;
+- **✅ Nur notwendige Cookies**: Technisch zurückhaltiges Setup
+- **⚠️ Marketing-Cookies vor Consent**: Starkes Warnsignal - Consent-Flow prüfen
+- **✅ Third-Party Cookies erkannt**: Sollten transparent dokumentiert und bewertet werden`;
   }
 
   if (normalizedName.includes('gdpr') || normalizedName.includes('dsgvo')) {
     return `## DSGVO-Checkliste
 
-Die **DSGVO-Checkliste** prüft, ob Ihre Website die Anforderungen der Datenschutz-Grundverordnung erfüllt.
+Die **DSGVO-Checkliste** prüft technische und prozessuale Indizien, die häufig für Datenschutz-Setups relevant sind.
 
 ### Was wird hier analysiert?
 
@@ -189,13 +189,13 @@ Die **DSGVO-Checkliste** prüft, ob Ihre Website die Anforderungen der Datenschu
 
 ### Warum ist das wichtig?
 
-Nichtkonformität mit der DSGVO kann zu Bußgeldern von bis zu 4% des Jahresumsatzes oder 20 Mio. € führen.
+Die Checkliste ersetzt keine Rechtsberatung. Sie hilft dabei, technische Auffälligkeiten systematisch sichtbar zu machen.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ Score 80-100%**: Gut - die meisten Anforderungen erfüllt
-- **⚠️ Score 50-79%**: Mittel - einige Verbesserungen nötig
-- **❌ Score <50%**: Kritisch - sofortiger Handlungsbedarf`;
+- **✅ Score 80-100%**: Viele technische Prüfpunkte wirken stimmig
+- **⚠️ Score 50-79%**: Gemischtes Bild - einige Punkte sollten geprüft werden
+- **❌ Score <50%**: Mehrere Auffälligkeiten - Priorisierung empfohlen`;
   }
 
   if (normalizedName.includes('dma')) {
@@ -235,13 +235,13 @@ Der **Cookie-Consent Test** prüft, ob Ihr Cookie-Banner tatsächlich funktionie
 
 ### Warum ist das wichtig?
 
-Ein defektes Cookie-Banner kann rechtswidrig sein, auch wenn es vorhanden ist. Tracking vor Consent ist immer illegal.
+Ein sichtbares Banner allein reicht nicht aus, wenn der tatsächliche Consent-Flow fehlerhaft ist. Der Test bewertet technische Interaktionen und liefert starke Hinweise, aber keine finale Rechtsbewertung.
 
 ### Was bedeuten die Ergebnisse?
 
-- **✅ Tracking nur nach Consent**: Korrekt implementiert
-- **❌ Tracking vor Consent**: Rechtswidrig - muss sofort behoben werden
-- **⚠️ Ablehnen funktioniert nicht**: Banner ist defekt - rechtlich problematisch`;
+- **✅ Tracking nur nach Consent**: Technisch gutes Signal
+- **❌ Tracking vor Consent**: Starkes Warnsignal - Consent-Setup prüfen
+- **⚠️ Ablehnen funktioniert nicht**: Der Flow wirkt unvollständig oder mehrdeutig`;
   }
 
   if (normalizedName.includes('problem') || normalizedName.includes('hinweis') || normalizedName.includes('issue')) {
@@ -257,13 +257,13 @@ Diese Sektion listet alle identifizierten Probleme und Warnungen aus der Analyse
 
 ### Warum ist das wichtig?
 
-Kritische Fehler können zu rechtlichen Problemen führen. Warnungen sollten nicht ignoriert werden, um Compliance sicherzustellen.
+Die Einordnung hilft bei der Priorisierung. Nicht jeder Hinweis ist automatisch ein Rechtsverstoß, aber kritische Punkte sollten zeitnah geprüft werden.
 
 ### Was bedeuten die Ergebnisse?
 
-- **🔴 Fehler**: Sofort handeln - rechtliche Risiken
-- **🟡 Warnung**: Zeitnah beheben - Verbesserung nötig
-- **🔵 Hinweis**: Optimierungsmöglichkeit - nicht kritisch`;
+- **🔴 Fehler**: Starkes technisches Warnsignal
+- **🟡 Warnung**: Auffälligkeit mit Prüfbedarf
+- **🔵 Hinweis**: Optimierungsmöglichkeit oder ergänzende Kontextinfo`;
   }
 
   // Fallback für unbekannte Sektionen

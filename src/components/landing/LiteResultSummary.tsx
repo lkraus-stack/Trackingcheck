@@ -17,17 +17,22 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
 
   const title =
     level === 'critical'
-      ? 'Dein Tracking hat kritische Lücken'
+      ? 'Mehrere prüfbedürftige Signale erkannt'
       : level === 'optimize'
-        ? 'Dein Tracking hat ungenutzte Potenziale'
-        : 'Gutes Setup – mit Optimierungspotenzial';
+        ? 'Solides Setup mit auffälligen Punkten'
+        : 'Schnellcheck ohne grobe Auffälligkeiten';
 
   const subtitle =
     level === 'critical'
-      ? 'Einige Punkte sollten zeitnah behoben werden, sonst gehen Daten und Performance verloren.'
+      ? 'Mehrere Heuristiken deuten auf Compliance-, Datenqualitäts- oder Implementierungsrisiken hin.'
       : level === 'optimize'
-        ? 'Du kannst mit kleinen Anpassungen deutlich bessere Datenqualität und ROAS-Optimierung erreichen.'
-        : 'Sieht solide aus – wir zeigen dir die größten Hebel für noch bessere Daten.';
+        ? 'Einige Signale verdienen einen zweiten Blick, bevor sie als unkritisch gelten.'
+        : 'Die Kurzprüfung sieht ordentlich aus, ersetzt aber keine vollständige Einzelprüfung.';
+
+  const scanTimestamp = new Date(result.timestamp).toLocaleString('de-DE', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 
   return (
     <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-4 sm:p-5">
@@ -38,6 +43,9 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
             <div className="text-sm text-slate-400">Kurz-Auswertung</div>
             <div className="text-lg sm:text-xl font-semibold text-slate-100">{title}</div>
             <div className="text-sm text-slate-400 mt-1">{subtitle}</div>
+            <div className="text-[11px] text-slate-500 mt-2">
+              Stand: {scanTimestamp}{result.fromCache ? ' · Ergebnis aus Cache' : ' · frisch berechnet'}
+            </div>
           </div>
         </div>
       </div>
@@ -58,7 +66,7 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
             typeof result.summary.trackingBeforeConsent === 'boolean'
               ? result.summary.trackingBeforeConsent
                 ? 'Tracking vor Consent: erkannt'
-                : 'Tracking vor Consent: ok'
+                : 'Tracking vor Consent: nicht bestätigt'
               : undefined,
           ]}
           tone={
@@ -74,13 +82,16 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
           icon={<TrendingUp className="w-4 h-4" />}
           title="Tracking & Potenzial"
           lines={[
+            result.summary.detectedTrackers.length > 0
+              ? `Erkannte Signale: ${result.summary.detectedTrackers.slice(0, 4).join(', ')}`
+              : 'Keine klar bestätigten Tracker-Signale',
             result.summary.serverSideTrackingDetected
               ? 'Server-Side Tracking: erkannt'
-              : 'Server-Side Tracking: fehlt (häufiger ROAS-Hebel)',
+              : 'Server-Side Tracking: nicht bestätigt',
             result.summary.ecommerceDetected
               ? result.summary.ecommerceHasTransactionValue
                 ? 'E-Commerce Werte: vorhanden'
-                : 'E-Commerce Werte: fehlen (ROAS leidet)'
+                : 'E-Commerce Werte: nicht vollständig bestätigt'
               : 'E-Commerce: nicht erkannt',
             typeof result.summary.thirdPartyTotalCount === 'number'
               ? `Third-Party Requests: ${result.summary.thirdPartyTotalCount}`
@@ -111,7 +122,16 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
                   <FindingIcon severity={f.severity} />
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-100">{f.title}</div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      <FindingBadge>{KIND_LABELS[f.kind]}</FindingBadge>
+                      <FindingBadge>{`Sicherheit: ${CONFIDENCE_LABELS[f.confidence]}`}</FindingBadge>
+                    </div>
                     <div className="text-xs text-slate-400 mt-0.5">{f.description}</div>
+                    {f.evidence.length > 0 && (
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Basis: {f.evidence.join(' | ')}
+                      </div>
+                    )}
                     {f.recommendation && (
                       <div className="text-xs text-indigo-300 mt-1">{f.recommendation}</div>
                     )}
@@ -121,7 +141,7 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
             ))}
           </div>
           <div className="text-[11px] text-slate-500 mt-2">
-            Hinweis: Die Landing zeigt bewusst nur einen Auszug.
+            Hinweis: Die Landing zeigt bewusst nur einen heuristischen Auszug und keine Rechtsberatung.
           </div>
         </div>
       )}
@@ -129,10 +149,31 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
   );
 }
 
+const KIND_LABELS: Record<NonNullable<PublicAnalysisResult['findings'][number]['kind']>, string> = {
+  compliance: 'Compliance',
+  data_quality: 'Datenqualität',
+  optimization: 'Optimierung',
+  technical: 'Technik',
+};
+
+const CONFIDENCE_LABELS: Record<NonNullable<PublicAnalysisResult['findings'][number]['confidence']>, string> = {
+  high: 'hoch',
+  medium: 'mittel',
+  low: 'niedrig',
+};
+
 function FindingIcon({ severity }: { severity: 'error' | 'warning' | 'info' }) {
   if (severity === 'error') return <XCircle className="w-4 h-4 text-red-400 mt-0.5" />;
   if (severity === 'warning') return <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5" />;
   return <CheckCircle2 className="w-4 h-4 text-blue-400 mt-0.5" />;
+}
+
+function FindingBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="px-1.5 py-0.5 rounded-full bg-slate-700/70 text-[10px] text-slate-300">
+      {children}
+    </span>
+  );
 }
 
 function MiniTile({

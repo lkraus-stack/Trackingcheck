@@ -10,9 +10,12 @@ export const dynamic = 'force-dynamic';
 const PublicFindingSchema = z.object({
   id: z.string(),
   severity: z.enum(['error', 'warning', 'info']),
+  kind: z.enum(['compliance', 'data_quality', 'optimization', 'technical']),
+  confidence: z.enum(['high', 'medium', 'low']),
   title: z.string(),
   description: z.string(),
   recommendation: z.string().optional(),
+  evidence: z.array(z.string()).max(5),
 });
 
 const PublicSummarySchema: z.ZodType<PublicAnalysisSummary> = z.object({
@@ -25,6 +28,7 @@ const PublicSummarySchema: z.ZodType<PublicAnalysisSummary> = z.object({
   ecommerceDetected: z.boolean(),
   ecommerceHasTransactionValue: z.boolean(),
   thirdPartyTotalCount: z.number().optional(),
+  detectedTrackers: z.array(z.string()).max(10),
 });
 
 const LeadSchema = z.object({
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
     const phoneLine = lead.phone ? `Telefon: ${lead.phone}` : 'Telefon: (nicht angegeben)';
 
     const findingsText = (lead.analysis?.findings || [])
-      .map((f: PublicAnalysisFinding) => `- [${f.severity}] ${f.title}\n  ${f.description}${f.recommendation ? `\n  Empfehlung: ${f.recommendation}` : ''}`)
+      .map((f: PublicAnalysisFinding) => `- [${f.severity}/${f.kind}/${f.confidence}] ${f.title}\n  ${f.description}${f.evidence.length ? `\n  Evidenz: ${f.evidence.join(' | ')}` : ''}${f.recommendation ? `\n  Empfehlung: ${f.recommendation}` : ''}`)
       .join('\n\n');
 
     const summary = lead.analysis?.summary;
@@ -86,6 +90,7 @@ export async function POST(request: NextRequest) {
           `Tracking vor Consent: ${typeof summary.trackingBeforeConsent === 'boolean' ? (summary.trackingBeforeConsent ? 'ja' : 'nein') : 'n/a'}`,
           `Server-Side: ${summary.serverSideTrackingDetected ? 'erkannt' : 'nicht erkannt'}`,
           `E-Commerce: ${summary.ecommerceDetected ? (summary.ecommerceHasTransactionValue ? 'Werte ok' : 'Werte fehlen') : 'nicht erkannt'}`,
+          `Erkannte Tracker: ${summary.detectedTrackers.length > 0 ? summary.detectedTrackers.join(', ') : 'keine klaren Signale'}`,
         ].join('\n')
       : '';
 

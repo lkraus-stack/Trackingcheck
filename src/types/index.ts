@@ -270,6 +270,9 @@ export interface DMACheck {
   recommendation?: string;
 }
 
+export type TrackingDetectionMethod = 'script' | 'network' | 'window' | 'dataLayer';
+export type DetectionConfidence = 'high' | 'medium' | 'low';
+
 export interface TrackingTagsResult {
   googleAnalytics: {
     detected: boolean;
@@ -279,12 +282,18 @@ export interface TrackingTagsResult {
     hasMultipleMeasurementIds: boolean;
     hasLegacyUA: boolean;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   googleTagManager: {
     detected: boolean;
     containerId?: string;
     containerIds: string[];
     hasMultipleContainers: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
     serverSideGTM?: ServerSideGTMResult;
   };
   googleAdsConversion: {
@@ -293,6 +302,9 @@ export interface TrackingTagsResult {
     conversionIds: string[];
     hasRemarketing: boolean;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   metaPixel: {
     detected: boolean;
@@ -300,54 +312,83 @@ export interface TrackingTagsResult {
     pixelIds: string[];
     hasMultiplePixels: boolean;
     loadedViaGTM: boolean;
-    detectionMethod: ('script' | 'network' | 'window' | 'dataLayer')[];
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
     serverSide?: MetaServerSideResult;
   };
   linkedInInsight: {
     detected: boolean;
     partnerId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   tiktokPixel: {
     detected: boolean;
     pixelId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   pinterestTag: {
     detected: boolean;
     tagId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   snapchatPixel: {
     detected: boolean;
     pixelId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   twitterPixel: {
     detected: boolean;
     pixelId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   redditPixel: {
     detected: boolean;
     pixelId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   bingAds: {
     detected: boolean;
     tagId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   criteo: {
     detected: boolean;
     accountId?: string;
     loadedViaGTM: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   };
   other: Array<{
     name: string;
     detected: boolean;
     identifier?: string;
     loadedViaGTM?: boolean;
+    detectionMethod: TrackingDetectionMethod[];
+    confidence: DetectionConfidence;
+    evidence: string[];
   }>;
   marketingParameters: {
     gclid: boolean;
@@ -406,7 +447,7 @@ export interface ServerSideTrackingResult {
 
 export interface ServerSideIndicator {
   type: 'sgtm' | 'meta_capi' | 'tiktok_events_api' | 'linkedin_capi' | 'first_party_proxy' | 'custom_endpoint' | 'cookie_bridging';
-  confidence: 'high' | 'medium' | 'low';
+  confidence: DetectionConfidence;
   description: string;
   evidence: string[];
 }

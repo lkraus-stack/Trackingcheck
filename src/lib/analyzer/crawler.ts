@@ -162,6 +162,89 @@ export class WebCrawler {
     this.browser = await getBrowser();
   }
 
+  private async waitForDocumentReady(page: Page, timeout: number): Promise<void> {
+    await page
+      .waitForFunction(() => document.readyState === 'interactive' || document.readyState === 'complete', {
+        timeout,
+      })
+      .catch(() => null);
+  }
+
+  private async waitForNetworkIdleSafe(page: Page, timeout: number, idleTime = 800): Promise<void> {
+    await page.waitForNetworkIdle({ timeout, idleTime }).catch(() => null);
+  }
+
+  private async waitForPageSignals(
+    page: Page,
+    options?: {
+      timeout?: number;
+      includeConsentSignals?: boolean;
+    }
+  ): Promise<void> {
+    const timeout = options?.timeout ?? 5000;
+    const includeConsentSignals = options?.includeConsentSignals ?? true;
+
+    const tasks: Promise<unknown>[] = [
+      this.waitForDocumentReady(page, Math.min(timeout, 2500)),
+      this.waitForNetworkIdleSafe(page, Math.min(timeout, 4000)),
+      this.waitForTrackingObjects(page, Math.min(timeout, 3000)),
+    ];
+
+    if (includeConsentSignals) {
+      tasks.push(this.waitForConsentBanner(page, Math.min(timeout, 3500)));
+    }
+
+    await Promise.allSettled(tasks);
+  }
+
+  private async gotoAndStabilize(
+    page: Page,
+    url: string,
+    options?: {
+      navigationTimeout?: number;
+      settleTimeout?: number;
+      includeConsentSignals?: boolean;
+    }
+  ): Promise<void> {
+    const navigationTimeout = options?.navigationTimeout ?? 25000;
+
+    try {
+      await page.goto(url, {
+        waitUntil: 'domcontentloaded',
+        timeout: navigationTimeout,
+      });
+    } catch (error) {
+      if (this.shouldRetryWithHttp(error, url)) {
+        const httpUrl = url.replace(/^https:/i, 'http:');
+        await page.goto(httpUrl, {
+          waitUntil: 'domcontentloaded',
+          timeout: navigationTimeout,
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    await this.waitForPageSignals(page, {
+      timeout: options?.settleTimeout ?? 5000,
+      includeConsentSignals: options?.includeConsentSignals,
+    });
+  }
+
+  private shouldRetryWithHttp(error: unknown, url: string): boolean {
+    if (!/^https:/i.test(url)) {
+      return false;
+    }
+
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+    return (
+      message.includes('err_ssl') ||
+      message.includes('ssl protocol error') ||
+      message.includes('certificate') ||
+      message.includes('net::err_cert')
+    );
+  }
+
   // Quick-Crawl für schnellere Analyse (ohne Consent-Test, kürzere Wartezeiten)
   async crawlQuick(url: string): Promise<CrawlResult> {
     if (!this.browser) {
@@ -193,14 +276,11 @@ export class WebCrawler {
     await this.setupPage(page);
 
     try {
-      // Schnelleres Laden mit kürzerer Wartezeit
-      await page.goto(url, {
-        waitUntil: 'domcontentloaded', // Schneller als networkidle2
-        timeout: 15000, // Kürzerer Timeout
+      await this.gotoAndStabilize(page, url, {
+        navigationTimeout: 15000,
+        settleTimeout: 2500,
+        includeConsentSignals: false,
       });
-
-      // Kürzere Wartezeit
-      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const html = await page.content();
 
@@ -228,6 +308,9 @@ export class WebCrawler {
         sameSite: cookie.sameSite as string | undefined,
       }));
 
+      const finalPageUrl = page.url();
+      const finalPageDomain = new URL(finalPageUrl).hostname;
+
       return {
         html,
         scripts,
@@ -237,8 +320,8 @@ export class WebCrawler {
         windowObjects,
         consoleMessages,
         responseHeaders,
-        pageUrl: url,
-        pageDomain,
+        pageUrl: finalPageUrl,
+        pageDomain: finalPageDomain || pageDomain,
       };
     } finally {
       await page.close();
@@ -319,22 +402,11 @@ export class WebCrawler {
     });
 
     try {
-      // Seite laden und warten bis alles geladen ist
-      // Timeout reduziert auf 25 Sekunden für bessere Performance
-      await page.goto(url, {
-        waitUntil: 'networkidle2',
-        timeout: 25000,
+      await this.gotoAndStabilize(page, url, {
+        navigationTimeout: 25000,
+        settleTimeout: 6000,
+        includeConsentSignals: true,
       });
-
-      // Erweiterte Wartezeit für GTM und dynamisch geladene Pixel
-      // Erste Wartezeit: Basis-Ladung
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Zweite Prüfung: Warten auf spezifische Tracking-Objekte
-      await this.waitForTrackingObjects(page, 3000);
-      
-      // Dritte Wartezeit: Für Consent-abhängige Pixel
-      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // HTML Content (nach allen Wartezeiten für dynamisch injizierte Scripts)
       const html = await page.content();
@@ -382,6 +454,9 @@ export class WebCrawler {
         sameSite: cookie.sameSite as string | undefined,
       }));
 
+      const finalPageUrl = page.url();
+      const finalPageDomain = new URL(finalPageUrl).hostname;
+
       return {
         html,
         scripts,
@@ -392,8 +467,8 @@ export class WebCrawler {
         consoleMessages,
         responseHeaders,
         setCookieHeaders,
-        pageUrl: url,
-        pageDomain,
+        pageUrl: finalPageUrl,
+        pageDomain: finalPageDomain || pageDomain,
       };
     } finally {
       await page.close();
@@ -427,28 +502,30 @@ export class WebCrawler {
   }
 
   private async waitForTrackingObjects(page: Page, timeout: number): Promise<void> {
-    const startTime = Date.now();
-    
-    while (Date.now() - startTime < timeout) {
-      const hasTrackingObjects = await page.evaluate(() => {
-        const win = window as unknown as Record<string, unknown>;
-        // Prüfe ob wichtige Tracking-Objekte vorhanden sind
-        return (
-          typeof win.fbq === 'function' ||
-          typeof win.gtag === 'function' ||
-          typeof win.ttq === 'object' ||
-          Array.isArray(win.dataLayer)
-        );
-      });
-      
-      if (hasTrackingObjects) {
-        // Kurz warten damit alle Initialisierungen abgeschlossen sind
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return;
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
+    await page.waitForFunction(() => {
+      const win = window as unknown as Record<string, unknown> & {
+        __trackingChecker?: {
+          dataLayerPushCalls?: unknown[][];
+          consentModeCalls?: Array<{ args?: unknown[] }>;
+        };
+      };
+
+      return (
+        typeof win.fbq === 'function' ||
+        typeof win.gtag === 'function' ||
+        typeof win.ttq === 'object' ||
+        typeof win.lintrk === 'function' ||
+        typeof win.snaptr === 'function' ||
+        typeof win.pintrk === 'function' ||
+        typeof win.twq === 'function' ||
+        (Array.isArray(win.dataLayer) && win.dataLayer.length > 0) ||
+        Boolean(win.__trackingChecker?.dataLayerPushCalls?.length) ||
+        Boolean(win.__trackingChecker?.consentModeCalls?.length)
+      );
+    }, {
+      timeout,
+      polling: 200,
+    }).catch(() => null);
   }
 
   private async checkWindowObjects(page: Page): Promise<WindowObjectData> {
@@ -592,7 +669,7 @@ export class WebCrawler {
     return [page, ...frames];
   }
 
-  private async waitForConsentBanner(page: Page): Promise<void> {
+  private async waitForConsentBanner(page: Page, timeout = 4000): Promise<void> {
     const bannerSelectors = [
       // Usercentrics - erweitert
       '#usercentrics-root',
@@ -661,8 +738,9 @@ export class WebCrawler {
       '[role="alertdialog"]',
     ];
 
-    const waits: Promise<any>[] = bannerSelectors.map(selector =>
-      page.waitForSelector(selector, { timeout: 3500, visible: true }).catch(() => null)
+    const selectorTimeout = Math.max(1000, Math.min(timeout, 3500));
+    const waits: Promise<unknown>[] = bannerSelectors.map(selector =>
+      page.waitForSelector(selector, { timeout: selectorTimeout, visible: true }).catch(() => null)
     );
     
     // Warten auf CMP JavaScript APIs
@@ -683,7 +761,7 @@ export class WebCrawler {
           (win as any).BorlabsCookie ||
           (win as any).cmplz_banner
         );
-      }, { timeout: 4000 }).catch(() => null)
+      }, { timeout: Math.max(1200, Math.min(timeout, 4000)) }).catch(() => null)
     );
 
     // Zusätzlich: Warten auf sichtbare Banner-Elemente im Shadow DOM
@@ -699,16 +777,16 @@ export class WebCrawler {
           }
         }
         return false;
-      }, { timeout: 3000 }).catch(() => null)
+      }, { timeout: Math.max(1000, Math.min(timeout, 3000)) }).catch(() => null)
     );
 
     await Promise.allSettled(waits);
-    await new Promise(resolve => setTimeout(resolve, 800));
   }
 
-  private async waitForCmpApi(page: Page): Promise<void> {
+  private async waitForCmpApi(page: Page, timeout = 4000): Promise<void> {
     // Erweiterte CMP-API Erkennung mit mehreren Versuchen
     const maxAttempts = 3;
+    const delayMs = Math.max(250, Math.floor(timeout / (maxAttempts + 1)));
     
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const apiReady = await page.evaluate(() => {
@@ -761,13 +839,11 @@ export class WebCrawler {
       });
       
       if (apiReady.ready) {
-        // Zusätzliche kurze Wartezeit für vollständige Initialisierung
-        await new Promise(resolve => setTimeout(resolve, 500));
         return;
       }
       
       // Kurz warten und erneut versuchen
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
     
     // Fallback: Warten auf irgendein CMP-Zeichen
@@ -784,7 +860,7 @@ export class WebCrawler {
         win.BorlabsCookie ||
         win.cmplz_banner
       );
-    }, { timeout: 4000 }).catch(() => null);
+    }, { timeout }).catch(() => null);
   }
 
   private async tryClickSelectors(
@@ -1728,20 +1804,23 @@ export class WebCrawler {
     
     try {
       await this.clearStorage(pageAccept, url);
-      await pageAccept.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await this.gotoAndStabilize(pageAccept, url, {
+        navigationTimeout: 20000,
+        settleTimeout: 5000,
+        includeConsentSignals: true,
+      });
 
       // Cookies VOR jeder Interaktion sammeln
       result.beforeConsent.cookies = await this.collectCookies(pageAccept);
 
-      await this.waitForConsentBanner(pageAccept);
+      await this.waitForConsentBanner(pageAccept, 3500);
 
       // Akzeptieren-Button finden und klicken
       let acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
       
       // Wenn DOM-Klick fehlschlägt, versuche API-Aufruf
       if (!acceptResult.found) {
-        await this.waitForCmpApi(pageAccept);
+        await this.waitForCmpApi(pageAccept, 3000);
         const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
         if (apiResult.applied) {
           acceptResult = { found: true, clicked: true, buttonText: apiResult.method };
@@ -1797,17 +1876,20 @@ export class WebCrawler {
     
     try {
       await this.clearStorage(pageReject, url);
-      await pageReject.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await this.gotoAndStabilize(pageReject, url, {
+        navigationTimeout: 20000,
+        settleTimeout: 5000,
+        includeConsentSignals: true,
+      });
 
       // Ablehnen-Button finden und klicken
-      await this.waitForConsentBanner(pageReject);
+      await this.waitForConsentBanner(pageReject, 3500);
 
       let rejectResult = await this.findAndClickConsentButton(pageReject, 'reject');
       
       // Wenn DOM-Klick fehlschlägt, versuche API-Aufruf
       if (!rejectResult.found) {
-        await this.waitForCmpApi(pageReject);
+        await this.waitForCmpApi(pageReject, 3000);
         const apiResult = await this.applyCmpConsentViaApi(pageReject, 'reject');
         if (apiResult.applied) {
           rejectResult = { found: true, clicked: true, buttonText: apiResult.method };
@@ -1904,15 +1986,18 @@ export class WebCrawler {
 
     try {
       await this.clearStorage(pageAccept, url);
-      await pageAccept.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await this.gotoAndStabilize(pageAccept, url, {
+        navigationTimeout: 20000,
+        settleTimeout: 5000,
+        includeConsentSignals: true,
+      });
 
-      await this.waitForConsentBanner(pageAccept);
+      await this.waitForConsentBanner(pageAccept, 3500);
 
       let acceptResult = await this.findAndClickConsentButton(pageAccept, 'accept');
 
       if (!acceptResult.found) {
-        await this.waitForCmpApi(pageAccept);
+        await this.waitForCmpApi(pageAccept, 3000);
         const apiResult = await this.applyCmpConsentViaApi(pageAccept, 'accept');
         if (apiResult.applied) {
           acceptResult = { found: true, clicked: true, buttonText: apiResult.method };
@@ -2115,30 +2200,22 @@ export class WebCrawler {
   }
 
   private async waitAfterConsentClick(page: Page): Promise<void> {
-    // Warten auf initiale Cookie-Setzung nach Consent
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Warten auf möglicherweise verzögerte Script-Ausführung
+    await this.waitForPageSignals(page, {
+      timeout: 5000,
+      includeConsentSignals: false,
+    });
+
     try {
-      await page.waitForNetworkIdle({ timeout: 5000, idleTime: 1000 });
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
+      await this.waitForPageSignals(page, {
+        timeout: 5000,
+        includeConsentSignals: false,
+      });
     } catch {
-      // Timeout ist OK
-    }
-    
-    // Prüfen ob ein Reload nötig ist (manche CMPs setzen Cookies erst nach Reload)
-    
-    try {
-      await page.reload({ waitUntil: 'networkidle2', timeout: 20000 });
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      // Warten auf Tracking Scripts die nach Reload laden
-      await this.waitForTrackingObjects(page, 3000);
-      
-      // Zusätzliches Warten auf async Cookie-Setzung
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    } catch {
-      // Reload fehlgeschlagen - warte trotzdem
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await this.waitForPageSignals(page, {
+        timeout: 2500,
+        includeConsentSignals: false,
+      });
     }
   }
 
@@ -2230,9 +2307,44 @@ export class WebCrawler {
           },
         });
 
-        // Hinweis: gtag selbst wird NICHT als Stub gesetzt, um keine False Positives
-        // in der GA/GTM-Erkennung zu erzeugen. Consent Calls werden über dataLayer.push
-        // zuverlässig mitgeschnitten (gtag verwendet intern dataLayer.push(arguments)).
+        // gtag wird nur dann gewrappt, wenn die Seite es selbst setzt.
+        // Dadurch werden keine künstlichen Globals erzeugt, aber echte Calls
+        // lassen sich für GA-/Consent-Erkennung mitschneiden.
+        let gtagValue = w.gtag;
+        Object.defineProperty(w, 'gtag', {
+          configurable: true,
+          get() {
+            return gtagValue;
+          },
+          set(v) {
+            if (typeof v !== 'function') {
+              gtagValue = v;
+              return;
+            }
+
+            if ((v as any).__tcWrapped) {
+              gtagValue = v;
+              return;
+            }
+
+            const wrapped = function(this: unknown, ...args: unknown[]) {
+              try {
+                log.gtagCalls.push(args);
+                safePushConsent('gtag', args);
+              } catch {
+                // ignore
+              }
+              return v.apply(this, args as any);
+            };
+
+            Object.defineProperty(wrapped, '__tcWrapped', {
+              value: true,
+              configurable: true,
+            });
+
+            gtagValue = wrapped;
+          },
+        });
       } catch {
         // Instrumentation Fehler ignorieren
       }

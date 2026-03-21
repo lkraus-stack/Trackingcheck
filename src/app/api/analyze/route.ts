@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     try {
       // Timeout-Wrapper für Full-Scan.
       // Einige Seiten (inkl. Consent-Test) brauchen >50s, daher großzügiger Timeout.
-      const timeoutWrapper = 90000; // 90 Sekunden
+      const timeoutWrapper = 120000; // 120 Sekunden für langsame CMP-/SPA-Flows
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('TIMEOUT_PROTECTION')), timeoutWrapper)
       );
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     
     if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
       userFriendlyMessage = 'Zeitüberschreitung';
-      details = 'Die Website hat zu lange zum Laden gebraucht. Bitte versuchen Sie es erneut.';
+      details = 'Die Website hat länger als erwartet für Navigation, Consent oder dynamische Tracker gebraucht. Bitte versuchen Sie es erneut oder testen Sie die URL später noch einmal.';
     } else if (errorMessage.includes('net::ERR_NAME_NOT_RESOLVED')) {
       userFriendlyMessage = 'Website nicht erreichbar';
       details = 'Die Domain konnte nicht aufgelöst werden. Prüfen Sie die URL.';

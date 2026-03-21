@@ -52,8 +52,12 @@ export function ResultCard({ result }: ResultCardProps) {
   });
 
   const isLoggedIn = !!session?.user;
-  const plan = (session?.user as any)?.subscription?.plan
-    || (session?.user as any)?.usageLimits?.plan
+  const sessionUser = session?.user as (typeof session.user & {
+    subscription?: { plan?: string };
+    usageLimits?: { plan?: string };
+  }) | undefined;
+  const plan = sessionUser?.subscription?.plan
+    || sessionUser?.usageLimits?.plan
     || 'free';
   const showFullAnalysis = isLoggedIn;
   const canUseAI = isLoggedIn;
@@ -62,22 +66,10 @@ export function ResultCard({ result }: ResultCardProps) {
   // Cookie-Filter und Sortierung
   const [cookieFilter, setCookieFilter] = useState<string>('all');
   const [cookieSearch, setCookieSearch] = useState('');
-  const [cookieSort, setCookieSort] = useState<'name' | 'category' | 'lifetime'>('category');
+  const cookieSort: 'name' | 'category' | 'lifetime' = 'category';
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-400';
-    if (score >= 50) return 'text-yellow-400';
-    return 'text-red-400';
-  };
-
-  const getScoreBackground = (score: number) => {
-    if (score >= 80) return 'from-green-500/20 to-emerald-500/20';
-    if (score >= 50) return 'from-yellow-500/20 to-orange-500/20';
-    return 'from-red-500/20 to-rose-500/20';
   };
 
   // Gefilterte und sortierte Cookies
@@ -93,6 +85,7 @@ export function ResultCard({ result }: ResultCardProps) {
       if (cookieSort === 'lifetime') return (b.lifetimeDays || 0) - (a.lifetimeDays || 0);
       return 0;
     });
+  const trackingItems = buildTrackingItems(result);
 
   return (
     <div className="mt-2 space-y-3">
@@ -323,11 +316,7 @@ export function ResultCard({ result }: ResultCardProps) {
       <Section
         title="Tracking Tags"
         icon={<Tag className="w-4 h-4" />}
-        status={
-          result.trackingTags.googleAnalytics.detected ||
-          result.trackingTags.googleTagManager.detected ||
-          result.trackingTags.metaPixel.detected
-        }
+        status={trackingItems.some((item) => item.detected) || result.trackingTags.serverSideTracking?.detected}
         expanded={expandedSections.tracking}
         onToggle={() => toggleSection('tracking')}
         sectionName="Tracking Tags"
@@ -335,18 +324,43 @@ export function ResultCard({ result }: ResultCardProps) {
         fullAnalysis={result}
       >
         <div className="space-y-2 pt-1">
-          <TrackingItem name="GA4" detected={result.trackingTags.googleAnalytics.detected} identifier={result.trackingTags.googleAnalytics.measurementIds?.[0]} badge={result.trackingTags.googleAnalytics.version} />
-          <TrackingItem name="GTM" detected={result.trackingTags.googleTagManager.detected} identifier={result.trackingTags.googleTagManager.containerId} />
-          {result.trackingTags.googleAdsConversion?.detected && <TrackingItem name="Google Ads" detected={true} identifier={result.trackingTags.googleAdsConversion.conversionId} />}
-          <TrackingItem name="Meta Pixel" detected={result.trackingTags.metaPixel.detected} identifier={result.trackingTags.metaPixel.pixelId} />
-          {result.trackingTags.linkedInInsight.detected && <TrackingItem name="LinkedIn" detected={true} identifier={result.trackingTags.linkedInInsight.partnerId} />}
-          {result.trackingTags.tiktokPixel.detected && <TrackingItem name="TikTok" detected={true} identifier={result.trackingTags.tiktokPixel.pixelId} />}
+          {trackingItems.map((item) => (
+            <TrackingItem
+              key={item.name}
+              name={item.name}
+              detected={item.detected}
+              identifier={item.identifier}
+              badge={item.badge}
+              extraCount={item.extraCount}
+              confidence={item.confidence}
+              evidence={item.evidence}
+            />
+          ))}
           
           {result.trackingTags.serverSideTracking?.detected && (
-            <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-700/50 mt-2">
-              <span className="text-xs text-slate-400 mr-1">Server-Side:</span>
-              {result.trackingTags.serverSideTracking.summary.hasServerSideGTM && <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">sGTM</span>}
-              {result.trackingTags.serverSideTracking.summary.hasMetaCAPI && <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">CAPI</span>}
+            <div className="space-y-2 pt-2 border-t border-slate-700/50 mt-2">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-xs text-slate-400 mr-1">Server-Side:</span>
+                {result.trackingTags.serverSideTracking.summary.hasServerSideGTM && <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs">sGTM</span>}
+                {result.trackingTags.serverSideTracking.summary.hasMetaCAPI && <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs">CAPI</span>}
+                {result.trackingTags.serverSideTracking.summary.hasFirstPartyProxy && <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs">1st-Party Proxy</span>}
+              </div>
+
+              <div className="space-y-1.5">
+                {result.trackingTags.serverSideTracking.indicators.map((indicator) => (
+                  <div key={`${indicator.type}-${indicator.description}`} className="p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-slate-200">{indicator.description}</span>
+                      <ConfidenceBadge confidence={indicator.confidence} />
+                    </div>
+                    {indicator.evidence.length > 0 && (
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        Basis: {indicator.evidence.slice(0, 3).join(' | ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -749,6 +763,9 @@ function Section({
   sectionData?: unknown;
   fullAnalysis?: AnalysisResult;
 }) {
+  void sectionData;
+  void fullAnalysis;
+
   return (
     <div className="bg-slate-800/40 rounded-lg border border-slate-700/50 overflow-hidden">
       <button
@@ -784,14 +801,6 @@ function Section({
       </button>
       {expanded && <div className="px-3 pb-3 border-t border-slate-700/30">{children}</div>}
     </div>
-  );
-}
-
-function MiniStatus({ good, label }: { good: boolean; label: string }) {
-  return (
-    <span className={`px-2 py-0.5 rounded text-xs ${good ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-      {label}
-    </span>
   );
 }
 
@@ -833,34 +842,64 @@ function TrackingItem({
   identifier,
   badge,
   extraCount,
+  confidence,
+  evidence,
 }: {
   name: string;
   detected: boolean;
   identifier?: string;
   badge?: string;
   extraCount?: number;
+  confidence?: 'high' | 'medium' | 'low';
+  evidence?: string[];
 }) {
   return (
-    <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
-      <div className="flex items-center gap-1.5">
-        {detected ? (
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-        ) : (
-          <XCircle className="w-3.5 h-3.5 text-slate-500" />
-        )}
-        <span className={`text-xs ${detected ? 'text-slate-200' : 'text-slate-500'}`}>{name}</span>
-        {badge && (
-          <span className="px-1 py-0.5 bg-indigo-500/20 text-indigo-400 text-[9px] rounded">
-            {badge}
+    <div className="p-2 bg-slate-800/50 rounded-lg border border-slate-700/30">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {detected ? (
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
+          ) : (
+            <XCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          )}
+          <span className={`text-xs ${detected ? 'text-slate-200' : 'text-slate-500'}`}>{name}</span>
+          {badge && (
+            <span className="px-1 py-0.5 bg-indigo-500/20 text-indigo-400 text-[9px] rounded">
+              {badge}
+            </span>
+          )}
+          {detected && confidence && <ConfidenceBadge confidence={confidence} />}
+        </div>
+        {identifier && (
+          <span className="text-xs text-slate-400 font-mono text-right">
+            {identifier}{extraCount ? ` +${extraCount}` : ''}
           </span>
         )}
       </div>
-      {identifier && (
-        <span className="text-xs text-slate-400 font-mono">
-          {identifier}{extraCount ? ` +${extraCount}` : ''}
-        </span>
+      {detected && evidence && evidence.length > 0 && (
+        <div className="text-[11px] text-slate-500 mt-1">
+          Basis: {evidence.slice(0, 3).join(' | ')}
+        </div>
       )}
     </div>
+  );
+}
+
+function ConfidenceBadge({ confidence }: { confidence: 'high' | 'medium' | 'low' }) {
+  const tone =
+    confidence === 'high'
+      ? 'bg-green-500/15 text-green-300'
+      : confidence === 'medium'
+        ? 'bg-yellow-500/15 text-yellow-300'
+        : 'bg-slate-600/70 text-slate-300';
+
+  const label =
+    confidence === 'high' ? 'hoch' : confidence === 'medium' ? 'mittel' : 'niedrig';
+
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] ${tone}`}>
+      {`Sicherheit: ${label}`}
+    </span>
   );
 }
 
@@ -973,4 +1012,123 @@ function IssueItem({ issue }: { issue: Issue }) {
       </div>
     </div>
   );
+}
+
+type TrackingDisplayItem = {
+  name: string;
+  detected: boolean;
+  identifier?: string;
+  badge?: string;
+  extraCount?: number;
+  confidence?: 'high' | 'medium' | 'low';
+  evidence?: string[];
+};
+
+function buildTrackingItems(result: AnalysisResult): TrackingDisplayItem[] {
+  const items: TrackingDisplayItem[] = [
+    {
+      name: 'GA4',
+      detected: result.trackingTags.googleAnalytics.detected,
+      identifier: result.trackingTags.googleAnalytics.measurementIds?.[0],
+      badge: result.trackingTags.googleAnalytics.version,
+      extraCount: Math.max(0, result.trackingTags.googleAnalytics.measurementIds.length - 1) || undefined,
+      confidence: result.trackingTags.googleAnalytics.confidence,
+      evidence: result.trackingTags.googleAnalytics.evidence,
+    },
+    {
+      name: 'GTM',
+      detected: result.trackingTags.googleTagManager.detected,
+      identifier: result.trackingTags.googleTagManager.containerId,
+      extraCount: Math.max(0, result.trackingTags.googleTagManager.containerIds.length - 1) || undefined,
+      confidence: result.trackingTags.googleTagManager.confidence,
+      evidence: result.trackingTags.googleTagManager.evidence,
+    },
+    {
+      name: 'Meta Pixel',
+      detected: result.trackingTags.metaPixel.detected,
+      identifier: result.trackingTags.metaPixel.pixelId,
+      extraCount: Math.max(0, result.trackingTags.metaPixel.pixelIds.length - 1) || undefined,
+      confidence: result.trackingTags.metaPixel.confidence,
+      evidence: result.trackingTags.metaPixel.evidence,
+    },
+  ];
+
+  if (result.trackingTags.googleAdsConversion.detected) {
+    items.push({
+      name: 'Google Ads',
+      detected: true,
+      identifier: result.trackingTags.googleAdsConversion.conversionId,
+      extraCount: Math.max(0, result.trackingTags.googleAdsConversion.conversionIds.length - 1) || undefined,
+      confidence: result.trackingTags.googleAdsConversion.confidence,
+      evidence: result.trackingTags.googleAdsConversion.evidence,
+    });
+  }
+
+  const optionalItems: TrackingDisplayItem[] = [
+    {
+      name: 'LinkedIn',
+      detected: result.trackingTags.linkedInInsight.detected,
+      identifier: result.trackingTags.linkedInInsight.partnerId,
+      confidence: result.trackingTags.linkedInInsight.confidence,
+      evidence: result.trackingTags.linkedInInsight.evidence,
+    },
+    {
+      name: 'TikTok',
+      detected: result.trackingTags.tiktokPixel.detected,
+      identifier: result.trackingTags.tiktokPixel.pixelId,
+      confidence: result.trackingTags.tiktokPixel.confidence,
+      evidence: result.trackingTags.tiktokPixel.evidence,
+    },
+    {
+      name: 'Pinterest',
+      detected: result.trackingTags.pinterestTag.detected,
+      identifier: result.trackingTags.pinterestTag.tagId,
+      confidence: result.trackingTags.pinterestTag.confidence,
+      evidence: result.trackingTags.pinterestTag.evidence,
+    },
+    {
+      name: 'Snapchat',
+      detected: result.trackingTags.snapchatPixel.detected,
+      identifier: result.trackingTags.snapchatPixel.pixelId,
+      confidence: result.trackingTags.snapchatPixel.confidence,
+      evidence: result.trackingTags.snapchatPixel.evidence,
+    },
+    {
+      name: 'X/Twitter',
+      detected: result.trackingTags.twitterPixel.detected,
+      identifier: result.trackingTags.twitterPixel.pixelId,
+      confidence: result.trackingTags.twitterPixel.confidence,
+      evidence: result.trackingTags.twitterPixel.evidence,
+    },
+    {
+      name: 'Reddit',
+      detected: result.trackingTags.redditPixel.detected,
+      identifier: result.trackingTags.redditPixel.pixelId,
+      confidence: result.trackingTags.redditPixel.confidence,
+      evidence: result.trackingTags.redditPixel.evidence,
+    },
+    {
+      name: 'Bing Ads',
+      detected: result.trackingTags.bingAds.detected,
+      identifier: result.trackingTags.bingAds.tagId,
+      confidence: result.trackingTags.bingAds.confidence,
+      evidence: result.trackingTags.bingAds.evidence,
+    },
+    {
+      name: 'Criteo',
+      detected: result.trackingTags.criteo.detected,
+      identifier: result.trackingTags.criteo.accountId,
+      confidence: result.trackingTags.criteo.confidence,
+      evidence: result.trackingTags.criteo.evidence,
+    },
+    ...result.trackingTags.other.map((entry) => ({
+      name: entry.name,
+      detected: entry.detected,
+      identifier: entry.identifier,
+      confidence: entry.confidence,
+      evidence: entry.evidence,
+    })),
+  ];
+
+  return [...items, ...optionalItems.filter((item) => item.detected)];
 }

@@ -240,6 +240,22 @@ function evaluateGDPRCheck(
 ): GDPRCheck {
   let status: GDPRCheck['status'] = 'not_applicable';
   let details = '';
+  const hasTrackingSignals =
+    trackingTags.googleAnalytics.detected ||
+    trackingTags.googleTagManager.detected ||
+    trackingTags.googleAdsConversion.detected ||
+    trackingTags.metaPixel.detected ||
+    trackingTags.linkedInInsight.detected ||
+    trackingTags.tiktokPixel.detected ||
+    trackingTags.pinterestTag.detected ||
+    trackingTags.snapchatPixel.detected ||
+    trackingTags.twitterPixel.detected ||
+    trackingTags.redditPixel.detected ||
+    trackingTags.bingAds.detected ||
+    trackingTags.criteo.detected ||
+    trackingTags.other.some((entry) => entry.detected) ||
+    trackingTags.serverSideTracking.detected ||
+    cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
 
   switch (check.id) {
     case 'consent_banner':
@@ -247,11 +263,7 @@ function evaluateGDPRCheck(
         status = 'passed';
         details = `Cookie-Banner erkannt${cookieBanner.provider ? ` (${cookieBanner.provider})` : ''}.`;
       } else {
-        // Prüfe ob Tracking vorhanden ist
-        const hasTracking = trackingTags.googleAnalytics.detected || 
-                           trackingTags.metaPixel.detected ||
-                           cookies.some(c => c.category === 'marketing' || c.category === 'analytics');
-        if (hasTracking) {
+        if (hasTrackingSignals) {
           status = 'failed';
           details = 'Tracking erkannt, aber kein Cookie-Banner gefunden.';
         } else {
@@ -291,7 +303,10 @@ function evaluateGDPRCheck(
       break;
 
     case 'consent_no_preselection':
-      if (!googleConsentMode.detected && !tcf.detected) {
+      if (!hasTrackingSignals && !cookieBanner.detected) {
+        status = 'not_applicable';
+        details = 'Keine einwilligungspflichtigen Tracking-Signale erkannt.';
+      } else if (!googleConsentMode.detected && !tcf.detected) {
         status = 'warning';
         details = 'Keine Consent-Signale erkannt - Vorauswahl nicht prüfbar.';
       } else if (googleConsentMode.defaultConsent) {
@@ -320,6 +335,9 @@ function evaluateGDPRCheck(
           status = 'passed';
           details = 'Keine Tracking-Cookies vor Einwilligung erkannt.';
         }
+      } else if (!hasTrackingSignals) {
+        status = 'not_applicable';
+        details = 'Keine Tracking-Signale erkannt, Consent-Test nicht erforderlich.';
       } else {
         // Fallback: Prüfe ob Consent Mode korrekt implementiert
         if (googleConsentMode.detected && googleConsentMode.defaultConsent) {
@@ -333,7 +351,12 @@ function evaluateGDPRCheck(
       break;
 
     case 'consent_withdrawal':
-      if (cookieBanner.hasSettingsOption) {
+      if (!cookieBanner.detected) {
+        status = hasTrackingSignals ? 'warning' : 'not_applicable';
+        details = hasTrackingSignals
+          ? 'Kein Banner erkannt, Widerrufsmöglichkeit nicht prüfbar.'
+          : 'Kein Banner erkannt.';
+      } else if (cookieBanner.hasSettingsOption) {
         status = 'passed';
         details = 'Einstellungen-Option ermöglicht Widerruf.';
       } else {

@@ -1,24 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import {
   Cookie,
   Shield,
   Tag,
   Globe2,
   Scale,
-  FileCheck,
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  TrendingUp,
-  TrendingDown,
   Minus,
   Zap,
   Target,
   ShoppingCart,
   Server,
-  BarChart3,
   Sparkles,
 } from 'lucide-react';
 import { AnalysisResult } from '@/types';
@@ -30,16 +26,15 @@ interface AnalysisOverviewProps {
 export function AnalysisOverview({ result }: AnalysisOverviewProps) {
   const [animatedGdprScore, setAnimatedGdprScore] = useState(0);
   const [animatedTrackingScore, setAnimatedTrackingScore] = useState(0);
-  const [showDetails, setShowDetails] = useState(false);
 
   const gdprScore = result.scoreBreakdown?.gdpr ?? result.gdprChecklist?.score ?? 0;
   const trackingScore = result.scoreBreakdown?.tracking ?? calculateTrackingScore(result);
   const overallScore = result.scoreBreakdown?.overall ?? result.score;
   const trackingDetected = result.scoreBreakdown?.trackingDetected ?? hasAnyTracking(result);
+  const showDetails = animatedGdprScore >= gdprScore && animatedTrackingScore >= trackingScore;
 
   // Animate scores on mount
   useEffect(() => {
-    setShowDetails(false);
     const duration = 1500;
     const steps = 60;
     const gdprIncrement = gdprScore / steps;
@@ -58,7 +53,6 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
 
       if (gdprDone && trackingDone) {
         clearInterval(timer);
-        setTimeout(() => setShowDetails(true), 200);
       }
     }, duration / steps);
 
@@ -386,7 +380,7 @@ function CategoryCard({ category, delay }: {
   category: { 
     id: string; 
     name: string; 
-    icon: any; 
+    icon: ComponentType<{ className?: string }>; 
     score: number; 
     status: string; 
     details: string;
@@ -537,32 +531,68 @@ function hasAnyTracking(result: AnalysisResult): boolean {
 }
 
 function calculateTrackingScore(result: AnalysisResult): number {
-  let score = 0;
-  if (result.trackingTags.googleAnalytics.detected) score += 30;
-  if (result.trackingTags.googleTagManager.detected) score += 30;
-  if (result.trackingTags.metaPixel.detected) score += 20;
-  if (result.trackingTags.serverSideTracking?.detected) score += 20;
-  return Math.min(100, score);
+  if (!hasAnyTracking(result)) return 0;
+
+  let score = 70;
+  if (result.googleConsentMode.version === 'v2') score += 10;
+  if (result.trackingTags.serverSideTracking?.detected) score += 10;
+  if (result.cookieConsentTest?.analysis?.trackingBeforeConsent) score -= 20;
+
+  return Math.max(0, Math.min(100, score));
 }
 
 function countTrackingTags(result: AnalysisResult): number {
-  let count = 0;
-  if (result.trackingTags.googleAnalytics.detected) count++;
-  if (result.trackingTags.googleTagManager.detected) count++;
-  if (result.trackingTags.metaPixel.detected) count++;
-  if (result.trackingTags.linkedInInsight.detected) count++;
-  if (result.trackingTags.tiktokPixel.detected) count++;
-  if (result.trackingTags.googleAdsConversion?.detected) count++;
-  return count;
+  const count =
+    [
+      result.trackingTags.googleAnalytics.detected,
+      result.trackingTags.googleTagManager.detected,
+      result.trackingTags.googleAdsConversion?.detected,
+      result.trackingTags.metaPixel.detected,
+      result.trackingTags.linkedInInsight.detected,
+      result.trackingTags.tiktokPixel.detected,
+      result.trackingTags.pinterestTag.detected,
+      result.trackingTags.snapchatPixel.detected,
+      result.trackingTags.twitterPixel.detected,
+      result.trackingTags.redditPixel.detected,
+      result.trackingTags.bingAds.detected,
+      result.trackingTags.criteo.detected,
+      result.trackingTags.serverSideTracking?.detected,
+    ].filter(Boolean).length;
+
+  return count + result.trackingTags.other.length;
 }
 
 function getTrackingDetails(result: AnalysisResult): string {
   const tags: string[] = [];
   if (result.trackingTags.googleAnalytics.detected) tags.push('GA4');
   if (result.trackingTags.googleTagManager.detected) tags.push('GTM');
+  if (result.trackingTags.googleAdsConversion?.detected) tags.push('Google Ads');
   if (result.trackingTags.metaPixel.detected) tags.push('Meta');
-  if (result.trackingTags.serverSideTracking?.detected) tags.push('sGTM');
-  return tags.length > 0 ? tags.join(', ') : 'Kein Tracking';
+  if (result.trackingTags.linkedInInsight.detected) tags.push('LinkedIn');
+  if (result.trackingTags.tiktokPixel.detected) tags.push('TikTok');
+  if (result.trackingTags.pinterestTag.detected) tags.push('Pinterest');
+  if (result.trackingTags.snapchatPixel.detected) tags.push('Snapchat');
+  if (result.trackingTags.twitterPixel.detected) tags.push('X');
+  if (result.trackingTags.redditPixel.detected) tags.push('Reddit');
+  if (result.trackingTags.bingAds.detected) tags.push('Bing');
+  if (result.trackingTags.criteo.detected) tags.push('Criteo');
+  if (result.trackingTags.other.length > 0) {
+    tags.push(...result.trackingTags.other.map((entry) => entry.name));
+  }
+  if (result.trackingTags.serverSideTracking?.summary.hasServerSideGTM) tags.push('sGTM');
+  if (result.trackingTags.serverSideTracking?.summary.hasMetaCAPI) tags.push('Meta CAPI');
+  if (!result.trackingTags.serverSideTracking?.summary.hasServerSideGTM && result.trackingTags.serverSideTracking?.detected) {
+    tags.push('Server-Side');
+  }
+
+  if (tags.length === 0) {
+    return 'Keine klar bestätigten Signale';
+  }
+
+  const uniqueTags = [...new Set(tags)];
+  const visibleTags = uniqueTags.slice(0, 4);
+  const remaining = uniqueTags.length - visibleTags.length;
+  return remaining > 0 ? `${visibleTags.join(', ')} +${remaining}` : visibleTags.join(', ');
 }
 
 // Improved GDPR details to show ALL statuses including warnings

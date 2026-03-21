@@ -7,7 +7,10 @@
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "validate:fixtures": "tsx src/lib/analyzer/__tests__/run-deterministic-validation.ts",
+    "validate:smoke": "tsx src/lib/analyzer/__tests__/run-validation.ts",
+    "validate": "npm run validate:fixtures && npm run validate:smoke"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.0",
@@ -35,6 +38,7 @@
     "eslint-config-next": "16.1.1",
     "prisma": "^5.19.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

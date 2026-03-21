@@ -1,32 +1,40 @@
 /**
- * Validierungs-Script für Cookie-/Conversion-Checker
- * 
- * Führt Analysen auf Test-Websites durch und validiert die Ergebnisse.
- * 
- * Ausführen mit: npx ts-node src/lib/analyzer/__tests__/run-validation.ts
+ * Smoke-Validierung gegen öffentliche Referenzseiten.
+ *
+ * Standard: nur stabile Referenzen
+ * Mit --all: stabile + explorative Referenzen
+ *
+ * Ausführen mit:
+ *   npm run validate:smoke
+ *   npm run validate:smoke -- --all
  */
 
 import { analyzeWebsite } from '../index';
-import { TEST_WEBSITES, validateAnalysisResult, generateTestReport } from './test-fixtures';
+import { selectTestWebsites, validateAnalysisResult, generateTestReport } from './test-fixtures';
 
 async function runValidation() {
-  console.log('🔍 Starte Validierung des Cookie-/Conversion-Checkers...\n');
+  const includeExploratory = process.argv.includes('--all');
+  const expectations = selectTestWebsites(includeExploratory);
+
+  console.log(`🔍 Starte Live-Validierung (${includeExploratory ? 'stabil + explorativ' : 'nur stabile Referenzen'})...\n`);
 
   const results = new Map<string, {
     score: number;
     issues: Array<{ title: string; severity: string }>;
-    cookieBanner: { detected: boolean; provider?: string };
+    cookieBanner: { detected: boolean; provider?: string; hasRejectButton?: boolean };
     trackingTags: {
       googleAnalytics: { detected: boolean };
       googleTagManager: { detected: boolean };
       metaPixel: { detected: boolean };
       serverSideTracking: { detected: boolean };
+      other: Array<{ name: string }>;
     };
   }>();
 
-  for (const expectation of TEST_WEBSITES) {
+  for (const expectation of expectations) {
     console.log(`\n📊 Analysiere: ${expectation.name} (${expectation.url})`);
     console.log('   ' + '-'.repeat(60));
+    console.log(`   Referenz: ${expectation.tier}/${expectation.stability} | Coverage: ${expectation.coverage.join(', ')}`);
 
     try {
       const result = await analyzeWebsite(expectation.url);
@@ -38,12 +46,14 @@ async function runValidation() {
         cookieBanner: {
           detected: result.cookieBanner.detected,
           provider: result.cookieBanner.provider,
+          hasRejectButton: result.cookieBanner.hasRejectButton,
         },
         trackingTags: {
           googleAnalytics: { detected: result.trackingTags.googleAnalytics.detected },
           googleTagManager: { detected: result.trackingTags.googleTagManager.detected },
           metaPixel: { detected: result.trackingTags.metaPixel.detected },
           serverSideTracking: { detected: result.trackingTags.serverSideTracking.detected },
+          other: result.trackingTags.other.map((entry) => ({ name: entry.name })),
         },
       });
 
@@ -56,6 +66,9 @@ async function runValidation() {
       console.log(`   GA4: ${result.trackingTags.googleAnalytics.detected ? '✅' : '❌'}`);
       console.log(`   Meta Pixel: ${result.trackingTags.metaPixel.detected ? '✅' : '❌'}`);
       console.log(`   Server-Side: ${result.trackingTags.serverSideTracking.detected ? '✅' : '❌'}`);
+      if (result.trackingTags.other.length > 0) {
+        console.log(`   Weitere Tracker: ${result.trackingTags.other.map((entry) => entry.name).join(', ')}`);
+      }
 
       if (!validation.passed) {
         console.log('\n   ⚠️ VALIDIERUNG FEHLGESCHLAGEN:');
@@ -79,6 +92,10 @@ async function runValidation() {
         }
       }
 
+      if (expectation.knownVariability.length > 0) {
+        console.log(`   Hinweise: ${expectation.knownVariability.join(' | ')}`);
+      }
+
     } catch (error) {
       console.error(`   ❌ Fehler bei Analyse: ${error}`);
     }
@@ -86,7 +103,7 @@ async function runValidation() {
 
   // Gesamtreport
   console.log('\n\n');
-  console.log(generateTestReport(results));
+  console.log(generateTestReport(results, expectations));
 }
 
 // Ausführen
