@@ -1981,7 +1981,7 @@ export class WebCrawler {
       }
 
       // Cookies NACH Akzeptieren sammeln
-      result.afterAccept.cookies = await this.collectCookies(pageAccept);
+      result.afterAccept.cookies = await this.collectCookiesAfterConsentAction(pageAccept);
       result.afterAccept.consentSignals = await this.collectGoogleConsentSignals(pageAccept, acceptNetworkRequests);
 
     } finally {
@@ -2063,7 +2063,7 @@ export class WebCrawler {
           
           if (saveResult.clicked) {
             await this.waitAfterConsentClick(pageReject);
-            result.afterReject.cookies = await this.collectCookies(pageReject);
+            result.afterReject.cookies = await this.collectCookiesAfterConsentAction(pageReject);
           }
         } else {
           result.afterReject.buttonFound = rejectResult.found;
@@ -2081,7 +2081,7 @@ export class WebCrawler {
         }
 
         // Cookies NACH Ablehnen sammeln
-        result.afterReject.cookies = await this.collectCookies(pageReject);
+        result.afterReject.cookies = await this.collectCookiesAfterConsentAction(pageReject);
       }
 
     } finally {
@@ -2150,7 +2150,7 @@ export class WebCrawler {
         await this.waitAfterConsentClick(pageAccept);
       }
 
-      const cookies = await this.collectCookies(pageAccept);
+      const cookies = await this.collectCookiesAfterConsentAction(pageAccept);
       const consentSignals = await this.collectGoogleConsentSignals(pageAccept, acceptNetworkRequests);
 
       return {
@@ -2228,6 +2228,39 @@ export class WebCrawler {
       gcsOrGcdRequests,
       parameterValues: dataLayerSignals.parameterValues,
     };
+  }
+
+  private mergeCookies(...cookieGroups: CookieData[][]): CookieData[] {
+    const mergedCookies = new Map<string, CookieData>();
+
+    for (const cookies of cookieGroups) {
+      for (const cookie of cookies) {
+        const key = `${cookie.name}|${cookie.domain}|${cookie.path}`;
+        mergedCookies.set(key, cookie);
+      }
+    }
+
+    return Array.from(mergedCookies.values());
+  }
+
+  private async collectCookiesAfterConsentAction(page: Page): Promise<CookieData[]> {
+    const immediateCookies = await this.collectCookies(page);
+
+    if (!this.isServerlessRuntime()) {
+      return immediateCookies;
+    }
+
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 15000 });
+      await this.waitForPageSignals(page, {
+        timeout: 3500,
+        includeConsentSignals: false,
+      });
+      const reloadedCookies = await this.collectCookies(page);
+      return this.mergeCookies(immediateCookies, reloadedCookies);
+    } catch {
+      return immediateCookies;
+    }
   }
 
   private async collectCookies(page: Page): Promise<CookieData[]> {
