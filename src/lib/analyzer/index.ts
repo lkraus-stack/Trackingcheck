@@ -32,16 +32,18 @@ import {
   ScoreBreakdown,
 } from '@/types';
 
-/** Normalisiert Cookie-Arrays zu CookieResult[] (für CookieData[] aus acceptFallback wird crawlCookies kategorisiert). */
+/** Normalisiert Raw-Cookies oder bereits kategorisierte Cookies zu CookieResult[]. */
 function toCookieResults(
   cookiesToUse: CookieResult[] | Array<{ name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string }>,
-  crawlCookies: Array<{ name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string }>,
   pageDomain?: string
 ): CookieResult[] {
   if (Array.isArray(cookiesToUse) && cookiesToUse.length > 0 && 'category' in cookiesToUse[0]) {
     return cookiesToUse as CookieResult[];
   }
-  return categorizeCookies(crawlCookies, pageDomain);
+  return categorizeCookies(
+    cookiesToUse as Array<{ name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean; sameSite?: string }>,
+    pageDomain
+  );
 }
 
 const getErrorMessage = (error: unknown): string => {
@@ -261,7 +263,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       : acceptFallback?.cookies.length
       ? acceptFallback.cookies
       : categorizeCookies(crawlResult.cookies, crawlResult.pageDomain);
-    const cookies = toCookieResults(cookiesToUse, crawlResult.cookies, crawlResult.pageDomain);
+    const cookies = toCookieResults(cookiesToUse, crawlResult.pageDomain);
     addStep('analyze_cookies', 'completed', `${cookies.length} Cookies kategorisiert`);
 
     // NEU: Third-Party Domains analysieren

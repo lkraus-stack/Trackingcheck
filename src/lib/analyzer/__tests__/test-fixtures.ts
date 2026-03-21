@@ -376,6 +376,16 @@ export function validateAnalysisResult(
     }
   }
 
+  if (
+    result.cookieConsentTest &&
+    result.cookieConsentTest.afterAccept.cookieCount > 0 &&
+    result.cookies.totalCount === 0
+  ) {
+    failures.push(
+      `Finale Cookie-Liste ist leer, obwohl nach Accept ${result.cookieConsentTest.afterAccept.cookieCount} Cookies gefunden wurden`
+    );
+  }
+
   for (const issueTitle of expectation.issuesThatShouldNotOccur) {
     const foundIssue = result.issues.find(
       (issue) => issue.title.includes(issueTitle) && issue.severity === 'error'

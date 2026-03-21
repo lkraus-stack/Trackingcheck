@@ -6,8 +6,9 @@ const CACHE_DURATION_MS = 24 * 60 * 60 * 1000;
 const REDUCED_DATA_CACHE_DURATION_MS = 60 * 60 * 1000;
 const HISTORY_MAX_ITEMS = 50;
 // Cache-Version (bump, wenn sich Analyse-Logik verändert)
-// v2 invalidiert alte Ergebnisse aus der Zeit vor der robusteren Cookie-Recovery.
-const CACHE_VERSION = 'full-scan-only-v2';
+// v3 invalidiert Ergebnisse, bei denen Consent-Cookies korrekt gefunden,
+// aber im finalen Ergebnis versehentlich wieder durch Pre-Consent-Cookies ersetzt wurden.
+const CACHE_VERSION = 'full-scan-only-v3';
 
 // Server-Side Cache (In-Memory für Vercel Serverless)
 const memoryCache: Map<string, CachedAnalysis> = new Map();
