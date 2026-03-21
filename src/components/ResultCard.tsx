@@ -52,7 +52,7 @@ export function ResultCard({ result }: ResultCardProps) {
   });
 
   const isLoggedIn = !!session?.user;
-  const sessionUser = session?.user as (typeof session.user & {
+  const sessionUser = session?.user as (NonNullable<typeof session>['user'] & {
     subscription?: { plan?: string };
     usageLimits?: { plan?: string };
   }) | undefined;
@@ -66,7 +66,7 @@ export function ResultCard({ result }: ResultCardProps) {
   // Cookie-Filter und Sortierung
   const [cookieFilter, setCookieFilter] = useState<string>('all');
   const [cookieSearch, setCookieSearch] = useState('');
-  const cookieSort: 'name' | 'category' | 'lifetime' = 'category';
+  const cookieSort = 'category' as 'name' | 'category' | 'lifetime';
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));

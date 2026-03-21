@@ -214,7 +214,7 @@ function buildFindings(result: AnalysisResult): PublicAnalysisFinding[] {
 
   // Fallback: Top-Issues aus der Vollanalyse ergänzen
   const existing = new Set(findings.map((f) => f.id));
-  const fromIssues = topIssues(result.issues).map((issue, idx) => ({
+  const fromIssues = topIssues(result.issues).map<PublicAnalysisFinding>((issue, idx) => ({
     id: `issue_${idx}_${issue.category}_${slugify(issue.title)}`,
     severity: issue.severity,
     kind: mapIssueKind(issue),
