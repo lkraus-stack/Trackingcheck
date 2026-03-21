@@ -10,7 +10,12 @@
  */
 
 import { analyzeWebsite } from '../index';
-import { selectTestWebsites, validateAnalysisResult, generateTestReport } from './test-fixtures';
+import {
+  selectTestWebsites,
+  validateAnalysisResult,
+  generateTestReport,
+  type ValidationSnapshot,
+} from './test-fixtures';
 
 async function runValidation() {
   const includeExploratory = process.argv.includes('--all');
@@ -18,18 +23,7 @@ async function runValidation() {
 
   console.log(`🔍 Starte Live-Validierung (${includeExploratory ? 'stabil + explorativ' : 'nur stabile Referenzen'})...\n`);
 
-  const results = new Map<string, {
-    score: number;
-    issues: Array<{ title: string; severity: string }>;
-    cookieBanner: { detected: boolean; provider?: string; hasRejectButton?: boolean };
-    trackingTags: {
-      googleAnalytics: { detected: boolean };
-      googleTagManager: { detected: boolean };
-      metaPixel: { detected: boolean };
-      serverSideTracking: { detected: boolean };
-      other: Array<{ name: string }>;
-    };
-  }>();
+  const results = new Map<string, ValidationSnapshot>();
 
   for (const expectation of expectations) {
     console.log(`\n📊 Analysiere: ${expectation.name} (${expectation.url})`);
@@ -55,6 +49,16 @@ async function runValidation() {
           serverSideTracking: { detected: result.trackingTags.serverSideTracking.detected },
           other: result.trackingTags.other.map((entry) => ({ name: entry.name })),
         },
+        cookies: {
+          totalCount: result.cookies.length,
+        },
+        cookieConsentTest: result.cookieConsentTest
+          ? {
+              beforeConsent: { cookieCount: result.cookieConsentTest.beforeConsent.cookieCount },
+              afterAccept: { cookieCount: result.cookieConsentTest.afterAccept.cookieCount },
+              afterReject: { cookieCount: result.cookieConsentTest.afterReject.cookieCount },
+            }
+          : undefined,
       });
 
       // Sofortige Validierung
@@ -66,6 +70,12 @@ async function runValidation() {
       console.log(`   GA4: ${result.trackingTags.googleAnalytics.detected ? '✅' : '❌'}`);
       console.log(`   Meta Pixel: ${result.trackingTags.metaPixel.detected ? '✅' : '❌'}`);
       console.log(`   Server-Side: ${result.trackingTags.serverSideTracking.detected ? '✅' : '❌'}`);
+      console.log(`   Cookies gesamt: ${result.cookies.length}`);
+      if (result.cookieConsentTest) {
+        console.log(
+          `   Consent-Cookies: vor=${result.cookieConsentTest.beforeConsent.cookieCount} | accept=${result.cookieConsentTest.afterAccept.cookieCount} | reject=${result.cookieConsentTest.afterReject.cookieCount}`
+        );
+      }
       if (result.trackingTags.other.length > 0) {
         console.log(`   Weitere Tracker: ${result.trackingTags.other.map((entry) => entry.name).join(', ')}`);
       }

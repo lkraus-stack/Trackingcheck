@@ -34,6 +34,11 @@ export interface TestExpectation {
     expectedOtherTracking?: string[];
   };
 
+  consentFlow?: {
+    maxBeforeConsentCookieCount?: number;
+    minAfterAcceptCookieCount?: number;
+  };
+
   scoring: {
     minScore: number;
     maxScore: number;
@@ -42,6 +47,27 @@ export interface TestExpectation {
 
   issuesThatShouldNotOccur: string[];
   issuesThatShouldOccur?: string[];
+}
+
+export interface ValidationSnapshot {
+  score: number;
+  issues: Array<{ title: string; severity: string }>;
+  cookieBanner: { detected: boolean; provider?: string; hasRejectButton?: boolean };
+  trackingTags: {
+    googleAnalytics: { detected: boolean };
+    googleTagManager: { detected: boolean };
+    metaPixel: { detected: boolean };
+    serverSideTracking: { detected: boolean };
+    other: Array<{ name: string }>;
+  };
+  cookies: {
+    totalCount: number;
+  };
+  cookieConsentTest?: {
+    beforeConsent: { cookieCount: number };
+    afterAccept: { cookieCount: number };
+    afterReject: { cookieCount: number };
+  };
 }
 
 export const TEST_WEBSITES: TestExpectation[] = [
@@ -107,6 +133,41 @@ export const TEST_WEBSITES: TestExpectation[] = [
       shouldNotBePenalizedFor: [],
     },
     issuesThatShouldNotOccur: [],
+  },
+  {
+    url: 'https://ads.franco-consulting.com/',
+    name: 'Franco Consulting Ads',
+    description: 'Landingpage mit Consent-gesteuerten Cookies als Regression für Banner- und Accept-Flow.',
+    tier: 'stable',
+    stability: 'moderate',
+    coverage: ['cookie-banner', 'consent-flow', 'gtm'],
+    knownVariability: [
+      'Einzelne Tracker können consent- oder timingabhängig erst nach Akzeptieren sichtbar werden.',
+      'Cookie-Zahlen können leicht schwanken, sollten aber nach Accept nicht bei 0 bleiben.',
+    ],
+    cookieBanner: {
+      expected: 'yes',
+      shouldHaveRejectButton: 'yes',
+    },
+    tracking: {
+      expectClientSideTracking: 'yes',
+      expectServerSideIndicators: 'optional',
+      expectGTM: 'yes',
+      expectGA4: 'optional',
+      expectMetaPixel: 'optional',
+    },
+    consentFlow: {
+      maxBeforeConsentCookieCount: 0,
+      minAfterAcceptCookieCount: 1,
+    },
+    scoring: {
+      minScore: 50,
+      maxScore: 100,
+      shouldNotBePenalizedFor: [],
+    },
+    issuesThatShouldNotOccur: [
+      'Kein Cookie-Banner erkannt',
+    ],
   },
   {
     url: 'https://vantero.chat/',
@@ -223,18 +284,7 @@ function describeExpectation(expected: SignalExpectation): string {
  * Validiert ein Analyse-Ergebnis gegen die Erwartungen.
  */
 export function validateAnalysisResult(
-  result: {
-    score: number;
-    issues: Array<{ title: string; severity: string }>;
-    cookieBanner: { detected: boolean; provider?: string; hasRejectButton?: boolean };
-    trackingTags: {
-      googleAnalytics: { detected: boolean };
-      googleTagManager: { detected: boolean };
-      metaPixel: { detected: boolean };
-      serverSideTracking: { detected: boolean };
-      other: Array<{ name: string }>;
-    };
-  },
+  result: ValidationSnapshot,
   expectation: TestExpectation
 ): { passed: boolean; failures: string[] } {
   const failures: string[] = [];
@@ -302,6 +352,30 @@ export function validateAnalysisResult(
     }
   }
 
+  if (expectation.consentFlow) {
+    if (!result.cookieConsentTest) {
+      failures.push('Consent-Test Ergebnis fehlt, obwohl Cookie-Flow validiert werden soll');
+    } else {
+      if (
+        typeof expectation.consentFlow.maxBeforeConsentCookieCount === 'number' &&
+        result.cookieConsentTest.beforeConsent.cookieCount > expectation.consentFlow.maxBeforeConsentCookieCount
+      ) {
+        failures.push(
+          `Vor Consent wurden ${result.cookieConsentTest.beforeConsent.cookieCount} Cookies gefunden, erlaubt sind maximal ${expectation.consentFlow.maxBeforeConsentCookieCount}`
+        );
+      }
+
+      if (
+        typeof expectation.consentFlow.minAfterAcceptCookieCount === 'number' &&
+        result.cookieConsentTest.afterAccept.cookieCount < expectation.consentFlow.minAfterAcceptCookieCount
+      ) {
+        failures.push(
+          `Nach Accept wurden nur ${result.cookieConsentTest.afterAccept.cookieCount} Cookies gefunden, erwartet sind mindestens ${expectation.consentFlow.minAfterAcceptCookieCount}`
+        );
+      }
+    }
+  }
+
   for (const issueTitle of expectation.issuesThatShouldNotOccur) {
     const foundIssue = result.issues.find(
       (issue) => issue.title.includes(issueTitle) && issue.severity === 'error'
@@ -321,18 +395,7 @@ export function validateAnalysisResult(
  * Führt alle Tests aus und gibt einen Report zurück.
  */
 export function generateTestReport(
-  results: Map<string, {
-    score: number;
-    issues: Array<{ title: string; severity: string }>;
-    cookieBanner: { detected: boolean; provider?: string; hasRejectButton?: boolean };
-    trackingTags: {
-      googleAnalytics: { detected: boolean };
-      googleTagManager: { detected: boolean };
-      metaPixel: { detected: boolean };
-      serverSideTracking: { detected: boolean };
-      other: Array<{ name: string }>;
-    };
-  }>,
+  results: Map<string, ValidationSnapshot>,
   expectations: TestExpectation[] = TEST_WEBSITES
 ): string {
   const lines: string[] = [

@@ -70,6 +70,25 @@ const isTargetClosedError = (error: unknown): boolean => {
   );
 };
 
+const hasLikelyTrackingSignals = (trackingTags: AnalysisResult['trackingTags']): boolean => {
+  return (
+    trackingTags.googleAnalytics.detected ||
+    trackingTags.googleTagManager.detected ||
+    trackingTags.googleAdsConversion.detected ||
+    trackingTags.metaPixel.detected ||
+    trackingTags.linkedInInsight.detected ||
+    trackingTags.tiktokPixel.detected ||
+    trackingTags.pinterestTag.detected ||
+    trackingTags.snapchatPixel.detected ||
+    trackingTags.twitterPixel.detected ||
+    trackingTags.redditPixel.detected ||
+    trackingTags.bingAds.detected ||
+    trackingTags.criteo.detected ||
+    trackingTags.other.length > 0 ||
+    trackingTags.serverSideTracking.detected
+  );
+};
+
 export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
   const crawler = new WebCrawler();
   const analysisSteps: AnalysisStep[] = [];
@@ -198,6 +217,40 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       } catch (error) {
         console.error('Consent fallback error:', error);
         addStep('consent_fallback', 'error', 'Fallback fehlgeschlagen', getErrorMessage(error));
+      }
+    }
+
+    // Zusätzlicher Plausibilitäts-Check:
+    // Wenn Banner + Tracking erkannt wurden, aber nach Consent immer noch 0 Cookies sichtbar sind,
+    // ist das oft ein Timing-/CMP-Flake. Ein zweiter frischer Accept-Run reduziert False Negatives.
+    if (
+      cookieBanner.detected &&
+      hasLikelyTrackingSignals(trackingTags) &&
+      crawlResult.cookies.length === 0 &&
+      (!cookieConsentTest || cookieConsentTest.afterAccept.cookieCount === 0) &&
+      (!acceptFallback || acceptFallback.cookies.length === 0)
+    ) {
+      addStep(
+        'consent_fallback_retry',
+        'running',
+        'Plausibilitäts-Check für Consent-Cookies läuft...',
+        'Banner und Tracking erkannt, aber noch keine Cookies nach Accept sichtbar'
+      );
+      try {
+        const retryFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
+        if (retryFallback.cookies.length > 0) {
+          acceptFallback = retryFallback;
+          addStep('consent_fallback_retry', 'completed', `${retryFallback.cookies.length} Cookies im Retry gefunden`);
+          googleConsentMode = enrichConsentModeWithPostConsentSignals(
+            googleConsentMode,
+            retryFallback.consentSignals
+          );
+        } else {
+          addStep('consent_fallback_retry', 'completed', 'Retry abgeschlossen, weiterhin keine Cookies gefunden');
+        }
+      } catch (error) {
+        console.error('Consent fallback retry error:', error);
+        addStep('consent_fallback_retry', 'error', 'Retry fehlgeschlagen', getErrorMessage(error));
       }
     }
     
