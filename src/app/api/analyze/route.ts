@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeWebsite } from '@/lib/analyzer';
 import { AnalysisRequest } from '@/types';
-import { getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
+import { clearCache, getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
+import { getSuspiciousAnalysisReason, withAnalysisMeta } from '@/lib/analysisResultMeta';
 import { auth } from '@/lib/auth/config';
 import { checkUsageLimits, incrementUsage } from '@/lib/auth/usage';
 
@@ -58,18 +59,24 @@ export async function POST(request: NextRequest) {
 
     // Cache prüfen (wenn nicht explizit übersprungen)
     const skipCache = body.options?.skipCache === true;
+    let cacheBypassReason: string | undefined;
     
     if (!skipCache) {
       const cachedResult = getCachedAnalysis(url);
       if (cachedResult) {
-        return NextResponse.json({
-          ...cachedResult,
-          fromCache: true,
-          cacheInfo: {
-            cached: true,
-            message: 'Ergebnis aus Cache (max. 24h alt)',
-          },
-        });
+        const suspiciousReason = getSuspiciousAnalysisReason(cachedResult);
+        if (!suspiciousReason) {
+          return NextResponse.json(
+            withAnalysisMeta(cachedResult, {
+              cached: true,
+              requestedFreshScan: skipCache,
+            })
+          );
+        }
+
+        clearCache(url);
+        cacheBypassReason = suspiciousReason;
+        console.warn(`Suspicious cached analysis ignored for ${url}: ${suspiciousReason}`);
       }
     }
 
@@ -95,8 +102,13 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Ergebnis cachen
-    setCachedAnalysis(url, result);
+    // Ergebnis nur cachen, wenn es nicht nach einem instabilen 0-Cookie-Run aussieht.
+    const suspiciousFreshReason = getSuspiciousAnalysisReason(result);
+    if (!suspiciousFreshReason) {
+      setCachedAnalysis(url, result);
+    } else {
+      console.warn(`Skipping cache for ${url}: ${suspiciousFreshReason}`);
+    }
 
     // Usage Stats für eingeloggte User inkrementieren
     if (session?.user?.id) {
@@ -106,10 +118,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      ...result,
-      fromCache: false,
-    });
+    return NextResponse.json(
+      withAnalysisMeta(result, {
+        cached: false,
+        requestedFreshScan: skipCache,
+        bypassReason: cacheBypassReason,
+      })
+    );
   } catch (error) {
     console.error('Analyse-Fehler:', error);
     

@@ -33,6 +33,13 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+  const debugPills = [
+    result.cacheInfo?.message,
+    result.debugInfo?.environment ? `Umgebung: ${result.debugInfo.environment}` : undefined,
+    result.debugInfo?.runtime ? `Runtime: ${result.debugInfo.runtime}` : undefined,
+    result.debugInfo?.buildId ? `Build: ${result.debugInfo.buildId}` : undefined,
+    result.cacheInfo?.version ? `Cache: ${result.cacheInfo.version}` : undefined,
+  ].filter((entry): entry is string => Boolean(entry));
 
   return (
     <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-4 sm:p-5">
@@ -46,6 +53,23 @@ export function LiteResultSummary({ result }: { result: PublicAnalysisResult }) 
             <div className="text-[11px] text-slate-500 mt-2">
               Stand: {scanTimestamp}{result.fromCache ? ' · Ergebnis aus Cache' : ' · frisch berechnet'}
             </div>
+            {debugPills.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {debugPills.map((pill) => (
+                  <span
+                    key={pill}
+                    className="px-2 py-1 rounded-full bg-slate-900/70 border border-slate-700 text-[10px] text-slate-300"
+                  >
+                    {pill}
+                  </span>
+                ))}
+              </div>
+            )}
+            {result.cacheInfo?.bypassReason && (
+              <div className="text-[11px] text-amber-300 mt-2">
+                Verdächtiger Cache wurde ignoriert: {result.cacheInfo.bypassReason}
+              </div>
+            )}
           </div>
         </div>
       </div>

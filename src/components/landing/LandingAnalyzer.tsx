@@ -11,10 +11,27 @@ interface LandingAnalyzerProps {
   autoFocus?: boolean;
 }
 
+function normalizeComparableUrl(value?: string | null): string | null {
+  if (!value) return null;
+
+  try {
+    let candidate = value.trim();
+    if (!candidate.startsWith('http://') && !candidate.startsWith('https://')) {
+      candidate = `https://${candidate}`;
+    }
+
+    const url = new URL(candidate);
+    return `${url.hostname.toLowerCase()}${url.pathname}`.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
 export function LandingAnalyzer({ autoFocus = false }: LandingAnalyzerProps) {
   const { showError } = useToast();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [forceFreshScan, setForceFreshScan] = useState(false);
   const [result, setResult] = useState<PublicAnalysisResult | null>(null);
 
   const normalizedUrl = useMemo(() => normalizeUrl(input), [input]);
@@ -25,14 +42,22 @@ export function LandingAnalyzer({ autoFocus = false }: LandingAnalyzerProps) {
     e.preventDefault();
     if (!canSubmit) return;
 
+    const requestedUrl = normalizeComparableUrl(normalizedUrl.url);
+    const currentUrl = normalizeComparableUrl(result?.url);
+    const effectiveSkipCache = !!requestedUrl && requestedUrl === currentUrl;
+
     setIsLoading(true);
+    setForceFreshScan(effectiveSkipCache);
     setResult(null);
 
     try {
       const res = await fetch('/api/public/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: normalizedUrl.url }),
+        body: JSON.stringify({
+          url: normalizedUrl.url,
+          options: { skipCache: effectiveSkipCache },
+        }),
       });
 
       const data = await res.json().catch(() => null);
@@ -93,7 +118,9 @@ export function LandingAnalyzer({ autoFocus = false }: LandingAnalyzerProps) {
             <div>
               <div className="text-sm text-slate-200 font-medium">Analyse läuft…</div>
               <div className="text-xs text-slate-500 mt-0.5">
-                Das dauert meistens ~60 Sekunden (je nach Website).
+                {forceFreshScan
+                  ? 'Frischscan ohne Cache läuft. Das dauert meistens ~60 Sekunden.'
+                  : 'Das dauert meistens ~60 Sekunden (je nach Website).'}
               </div>
             </div>
           </div>

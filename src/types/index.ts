@@ -4,6 +4,9 @@ export interface AnalysisResult {
   url: string;
   timestamp: string;
   status: 'success' | 'error' | 'pending' | 'partial';
+  fromCache?: boolean;
+  cacheInfo?: AnalysisCacheInfo;
+  debugInfo?: AnalysisDebugInfo;
   
   // Cookie Banner / CMP
   cookieBanner: CookieBannerResult;
@@ -61,6 +64,21 @@ export interface ScoreBreakdown {
   gdpr: number;
   tracking: number;
   trackingDetected: boolean;
+}
+
+export interface AnalysisCacheInfo {
+  cached: boolean;
+  message: string;
+  version: string;
+  requestedFreshScan?: boolean;
+  bypassReason?: string;
+}
+
+export interface AnalysisDebugInfo {
+  environment: string;
+  runtime: string;
+  buildId: string;
+  cacheVersion: string;
 }
 
 // Analyse-Schritte für KI-ähnliche Gedankengänge in der UI

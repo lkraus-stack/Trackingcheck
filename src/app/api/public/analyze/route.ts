@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeWebsite } from '@/lib/analyzer';
-import { getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
+import { clearCache, getCachedAnalysis, setCachedAnalysis } from '@/lib/cache/analysisCache';
+import { getSuspiciousAnalysisReason, withAnalysisMeta } from '@/lib/analysisResultMeta';
 import type { AnalysisRequest, AnalysisResult, Issue } from '@/types';
 import type { PublicAnalysisFinding, PublicAnalysisResult } from '@/types/public-analysis';
 
@@ -28,11 +29,24 @@ export async function POST(request: NextRequest) {
     }
 
     const skipCache = body.options?.skipCache === true;
+    let cacheBypassReason: string | undefined;
     if (!skipCache) {
       const cached = getCachedAnalysis(url);
       if (cached) {
-        const publicResult = redactAnalysis(cached);
-        return NextResponse.json({ ...publicResult, fromCache: true } satisfies PublicAnalysisResult);
+        const suspiciousReason = getSuspiciousAnalysisReason(cached);
+        if (!suspiciousReason) {
+          const publicResult = redactAnalysis(
+            withAnalysisMeta(cached, {
+              cached: true,
+              requestedFreshScan: skipCache,
+            })
+          );
+          return NextResponse.json(publicResult satisfies PublicAnalysisResult);
+        }
+
+        clearCache(url);
+        cacheBypassReason = suspiciousReason;
+        console.warn(`Suspicious public cached analysis ignored for ${url}: ${suspiciousReason}`);
       }
     }
 
@@ -47,9 +61,20 @@ export async function POST(request: NextRequest) {
       timeoutPromise,
     ])) as AnalysisResult;
 
-    setCachedAnalysis(url, fullResult);
+    const suspiciousFreshReason = getSuspiciousAnalysisReason(fullResult);
+    if (!suspiciousFreshReason) {
+      setCachedAnalysis(url, fullResult);
+    } else {
+      console.warn(`Skipping public cache for ${url}: ${suspiciousFreshReason}`);
+    }
 
-    const publicResult = redactAnalysis(fullResult);
+    const publicResult = redactAnalysis(
+      withAnalysisMeta(fullResult, {
+        cached: false,
+        requestedFreshScan: skipCache,
+        bypassReason: cacheBypassReason,
+      })
+    );
     return NextResponse.json(publicResult satisfies PublicAnalysisResult);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
@@ -83,6 +108,9 @@ function redactAnalysis(result: AnalysisResult): PublicAnalysisResult {
     timestamp: result.timestamp,
     score,
     findings,
+    fromCache: result.fromCache,
+    cacheInfo: result.cacheInfo,
+    debugInfo: result.debugInfo,
     summary: {
       cookieBannerDetected: !!result.cookieBanner?.detected,
       cookieBannerHasRejectButton: !!result.cookieBanner?.hasRejectButton,

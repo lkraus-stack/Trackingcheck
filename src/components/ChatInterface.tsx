@@ -36,6 +36,22 @@ interface ChatInterfaceProps {
   autoFocus?: boolean;
 }
 
+function normalizeComparableUrl(value?: string | null): string | null {
+  if (!value) return null;
+
+  try {
+    let candidate = value.trim();
+    if (!candidate.startsWith('http://') && !candidate.startsWith('https://')) {
+      candidate = `https://${candidate}`;
+    }
+
+    const url = new URL(candidate);
+    return `${url.hostname.toLowerCase()}${url.pathname}`.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
 export function ChatInterface({ embedded = false, autoFocus = false }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -105,6 +121,9 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   const handleSubmit = async (e: React.FormEvent, urlOverride?: string, skipCache?: boolean) => {
     e?.preventDefault?.();
     const urlToAnalyze = urlOverride || input;
+    const requestedUrl = normalizeComparableUrl(urlToAnalyze);
+    const currentUrl = normalizeComparableUrl(currentAnalysis?.url);
+    const effectiveSkipCache = skipCache === true || (!!requestedUrl && requestedUrl === currentUrl);
     
     if (!urlToAnalyze.trim() || isLoading) return;
 
@@ -140,7 +159,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       {
         id: loadingId,
         role: 'assistant',
-        content: '🔧 Analyse wird vorbereitet...',
+        content: effectiveSkipCache ? '🔄 Frischer Scan wird vorbereitet...' : '🔧 Analyse wird vorbereitet...',
         timestamp: new Date(),
         isLoading: true,
       },
@@ -157,7 +176,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         },
         body: JSON.stringify({ 
           url: urlToAnalyze.trim(),
-          options: { skipCache },
+          options: { skipCache: effectiveSkipCache },
         }),
       });
 
@@ -230,8 +249,12 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
           msg.id === loadingId
             ? {
                 ...msg,
-                content: data.fromCache 
+                content: data.fromCache
                   ? `✅ Analyse für ${data.url} (aus Cache)`
+                  : data.cacheInfo?.bypassReason
+                  ? `✅ Frische Analyse für ${data.url} abgeschlossen (Cache ignoriert)!`
+                  : data.cacheInfo?.requestedFreshScan
+                  ? `✅ Frische Analyse für ${data.url} abgeschlossen!`
                   : `✅ Analyse für ${data.url} abgeschlossen!`,
                 isLoading: false,
                 analysisResult: data as AnalysisResult,

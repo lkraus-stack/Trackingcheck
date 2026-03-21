@@ -158,6 +158,13 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
       icon: ShoppingCart,
     },
   ];
+  const debugPills = [
+    result.cacheInfo?.message || (result.fromCache ? 'Cache' : 'Frisch berechnet'),
+    result.debugInfo?.environment ? `Umgebung: ${result.debugInfo.environment}` : null,
+    result.debugInfo?.runtime ? `Runtime: ${result.debugInfo.runtime}` : null,
+    result.debugInfo?.buildId ? `Build: ${result.debugInfo.buildId}` : null,
+    result.cacheInfo?.version ? `Cache: ${result.cacheInfo.version}` : null,
+  ].filter((entry): entry is string => Boolean(entry));
 
   return (
     <div className="mb-6 space-y-4">
@@ -345,6 +352,26 @@ export function AnalysisOverview({ result }: AnalysisOverviewProps) {
                   </div>
                 ))}
               </div>
+
+              {debugPills.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4 justify-center lg:justify-start">
+                  {debugPills.map((pill) => (
+                    <div
+                      key={pill}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-950/50 text-slate-300 border border-slate-700/50"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-indigo-300" />
+                      <span>{pill}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {result.cacheInfo?.bypassReason && (
+                <div className="mt-3 px-3 py-2 rounded-lg border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200">
+                  Verdächtiger Cache wurde ignoriert: {result.cacheInfo.bypassReason}
+                </div>
+              )}
             </div>
           </div>
         </div>

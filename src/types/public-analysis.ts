@@ -1,3 +1,5 @@
+import type { AnalysisCacheInfo, AnalysisDebugInfo } from '@/types';
+
 export type PublicFindingSeverity = 'error' | 'warning' | 'info';
 export type PublicFindingKind = 'compliance' | 'data_quality' | 'optimization' | 'technical';
 export type PublicFindingConfidence = 'high' | 'medium' | 'low';
@@ -33,5 +35,7 @@ export interface PublicAnalysisResult {
   findings: PublicAnalysisFinding[];
   summary: PublicAnalysisSummary;
   fromCache?: boolean;
+  cacheInfo?: AnalysisCacheInfo;
+  debugInfo?: AnalysisDebugInfo;
 }
 

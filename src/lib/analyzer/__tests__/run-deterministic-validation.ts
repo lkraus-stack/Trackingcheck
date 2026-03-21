@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { analyzeCookieBanner } from '../cookieBannerAnalyzer';
 import { analyzeGoogleConsentMode } from '../googleConsentModeAnalyzer';
 import { analyzeTrackingTags } from '../trackingTagsAnalyzer';
+import { getSuspiciousAnalysisReason } from '@/lib/analysisResultMeta';
 import {
   consentModeV2Fixture,
   gaViaDataLayerFixture,
@@ -84,6 +85,79 @@ const cases: ValidationCase[] = [
       assert.equal(result.provider, 'Usercentrics');
       assert.equal(result.hasAcceptButton, true);
       assert.equal(result.hasRejectButton, true);
+    },
+  },
+  {
+    name: 'Verdächtiges 0-Cookie-Cache-Ergebnis wird erkannt',
+    run: () => {
+      const reason = getSuspiciousAnalysisReason({
+        cookieBanner: {
+          detected: true,
+          hasAcceptButton: true,
+          hasRejectButton: true,
+          hasSettingsOption: true,
+          blocksContent: true,
+        },
+        trackingTags: {
+          googleAnalytics: { detected: true },
+          googleTagManager: { detected: true },
+          googleAdsConversion: { detected: false },
+          metaPixel: { detected: false },
+          linkedInInsight: { detected: false },
+          tiktokPixel: { detected: false },
+          pinterestTag: { detected: false },
+          snapchatPixel: { detected: false },
+          twitterPixel: { detected: false },
+          redditPixel: { detected: false },
+          bingAds: { detected: false },
+          criteo: { detected: false },
+          other: [],
+          serverSideTracking: { detected: false },
+        } as never,
+        cookies: [],
+        cookieConsentTest: {
+          afterAccept: { cookieCount: 12 },
+        },
+      } as any);
+
+      assert.equal(typeof reason, 'string');
+      assert.match(reason as string, /12/);
+    },
+  },
+  {
+    name: 'Konsistente Cookie-Ergebnisse werden nicht als verdächtig markiert',
+    run: () => {
+      const reason = getSuspiciousAnalysisReason({
+        cookieBanner: {
+          detected: true,
+          hasAcceptButton: true,
+          hasRejectButton: true,
+          hasSettingsOption: true,
+          blocksContent: true,
+        },
+        trackingTags: {
+          googleAnalytics: { detected: true },
+          googleTagManager: { detected: false },
+          googleAdsConversion: { detected: false },
+          metaPixel: { detected: false },
+          linkedInInsight: { detected: false },
+          tiktokPixel: { detected: false },
+          pinterestTag: { detected: false },
+          snapchatPixel: { detected: false },
+          twitterPixel: { detected: false },
+          redditPixel: { detected: false },
+          bingAds: { detected: false },
+          criteo: { detected: false },
+          other: [],
+          serverSideTracking: { detected: false },
+        } as never,
+        cookies: [{ name: '_ga' }],
+        cookieConsentTest: {
+          afterAccept: { cookieCount: 1 },
+        },
+      } as any);
+
+      assert.equal(reason, null);
     },
   },
 ];

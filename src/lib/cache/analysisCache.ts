@@ -10,6 +10,10 @@ const HISTORY_MAX_ITEMS = 50;
 // aber im finalen Ergebnis versehentlich wieder durch Pre-Consent-Cookies ersetzt wurden.
 const CACHE_VERSION = 'full-scan-only-v3';
 
+export function getCacheVersion(): string {
+  return CACHE_VERSION;
+}
+
 // Server-Side Cache (In-Memory für Vercel Serverless)
 const memoryCache: Map<string, CachedAnalysis> = new Map();
 // Cache für reduzierte KI-Daten (zur Token-Einsparung)
