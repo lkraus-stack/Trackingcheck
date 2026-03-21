@@ -60,15 +60,18 @@ const getErrorMessage = (error: unknown): string => {
   }
 };
 
-const isTargetClosedError = (error: unknown): boolean => {
+const isRecoverableBrowserError = (error: unknown): boolean => {
   const message = getErrorMessage(error).toLowerCase();
   return (
     message.includes('targetcloseerror') ||
     message.includes('target closed') ||
     message.includes('protocol error (target.createtarget)') ||
+    message.includes('connection closed') ||
+    message.includes('connection disposed') ||
     message.includes('session closed') ||
     message.includes('execution context was destroyed') ||
-    message.includes('browser has disconnected')
+    message.includes('browser has disconnected') ||
+    message.includes('browser disconnected')
   );
 };
 
@@ -171,8 +174,16 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
           break;
         } catch (error) {
           lastError = error;
-          if (isTargetClosedError(error) && attempt < maxAttempts) {
-            addStep('consent_test', 'running', `Consent-Test wird wiederholt (${attempt + 1}/${maxAttempts})`, 'Browser-Target wurde geschlossen');
+          if (isRecoverableBrowserError(error) && attempt < maxAttempts) {
+            await crawler.restartBrowser().catch((restartError) => {
+              console.error('Browser restart for consent test failed:', restartError);
+            });
+            addStep(
+              'consent_test',
+              'running',
+              `Consent-Test wird wiederholt (${attempt + 1}/${maxAttempts})`,
+              'Browser-Verbindung wurde geschlossen und neu initialisiert'
+            );
             continue;
           }
           break;
@@ -190,8 +201,6 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
             ? 'WARNUNG: Tracking vor Consent erkannt!'
             : 'Consent-Test abgeschlossen'
         );
-      } else if (lastError && isTargetClosedError(lastError)) {
-        addStep('consent_test', 'completed', 'Consent-Test übersprungen', 'Browser-Target wurde geschlossen');
       } else if (lastError) {
         console.error('Cookie consent test error:', lastError);
         addStep('consent_test', 'error', 'Consent-Test fehlgeschlagen', getErrorMessage(lastError));
@@ -205,20 +214,43 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       crawlResult.cookies.length === 0
     ) {
       addStep('consent_fallback', 'running', 'Fallback: Accept-only Test läuft...');
-      try {
-        acceptFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
-        if (acceptFallback.cookies.length > 0) {
-          addStep('consent_fallback', 'completed', `${acceptFallback.cookies.length} Cookies nach Accept gefunden`);
-          googleConsentMode = enrichConsentModeWithPostConsentSignals(
-            googleConsentMode,
-            acceptFallback.consentSignals
-          );
-        } else {
-          addStep('consent_fallback', 'completed', 'Fallback abgeschlossen, keine Cookies gefunden');
+      const maxAttempts = 2;
+      let fallbackError: unknown;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          acceptFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
+          if (acceptFallback.cookies.length > 0) {
+            addStep('consent_fallback', 'completed', `${acceptFallback.cookies.length} Cookies nach Accept gefunden`);
+            googleConsentMode = enrichConsentModeWithPostConsentSignals(
+              googleConsentMode,
+              acceptFallback.consentSignals
+            );
+          } else {
+            addStep('consent_fallback', 'completed', 'Fallback abgeschlossen, keine Cookies gefunden');
+          }
+          fallbackError = undefined;
+          break;
+        } catch (error) {
+          fallbackError = error;
+          if (isRecoverableBrowserError(error) && attempt < maxAttempts) {
+            await crawler.restartBrowser().catch((restartError) => {
+              console.error('Browser restart for consent fallback failed:', restartError);
+            });
+            addStep(
+              'consent_fallback',
+              'running',
+              `Fallback wird wiederholt (${attempt + 1}/${maxAttempts})`,
+              'Browser-Verbindung wurde geschlossen und neu initialisiert'
+            );
+            continue;
+          }
+          break;
         }
-      } catch (error) {
-        console.error('Consent fallback error:', error);
-        addStep('consent_fallback', 'error', 'Fallback fehlgeschlagen', getErrorMessage(error));
+      }
+
+      if (fallbackError) {
+        console.error('Consent fallback error:', fallbackError);
+        addStep('consent_fallback', 'error', 'Fallback fehlgeschlagen', getErrorMessage(fallbackError));
       }
     }
 
@@ -238,21 +270,44 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
         'Plausibilitäts-Check für Consent-Cookies läuft...',
         'Banner und Tracking erkannt, aber noch keine Cookies nach Accept sichtbar'
       );
-      try {
-        const retryFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
-        if (retryFallback.cookies.length > 0) {
-          acceptFallback = retryFallback;
-          addStep('consent_fallback_retry', 'completed', `${retryFallback.cookies.length} Cookies im Retry gefunden`);
-          googleConsentMode = enrichConsentModeWithPostConsentSignals(
-            googleConsentMode,
-            retryFallback.consentSignals
-          );
-        } else {
-          addStep('consent_fallback_retry', 'completed', 'Retry abgeschlossen, weiterhin keine Cookies gefunden');
+      const maxAttempts = 2;
+      let retryError: unknown;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const retryFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
+          if (retryFallback.cookies.length > 0) {
+            acceptFallback = retryFallback;
+            addStep('consent_fallback_retry', 'completed', `${retryFallback.cookies.length} Cookies im Retry gefunden`);
+            googleConsentMode = enrichConsentModeWithPostConsentSignals(
+              googleConsentMode,
+              retryFallback.consentSignals
+            );
+          } else {
+            addStep('consent_fallback_retry', 'completed', 'Retry abgeschlossen, weiterhin keine Cookies gefunden');
+          }
+          retryError = undefined;
+          break;
+        } catch (error) {
+          retryError = error;
+          if (isRecoverableBrowserError(error) && attempt < maxAttempts) {
+            await crawler.restartBrowser().catch((restartError) => {
+              console.error('Browser restart for consent retry failed:', restartError);
+            });
+            addStep(
+              'consent_fallback_retry',
+              'running',
+              `Retry wird wiederholt (${attempt + 1}/${maxAttempts})`,
+              'Browser-Verbindung wurde geschlossen und neu initialisiert'
+            );
+            continue;
+          }
+          break;
         }
-      } catch (error) {
-        console.error('Consent fallback retry error:', error);
-        addStep('consent_fallback_retry', 'error', 'Retry fehlgeschlagen', getErrorMessage(error));
+      }
+
+      if (retryError) {
+        console.error('Consent fallback retry error:', retryError);
+        addStep('consent_fallback_retry', 'error', 'Retry fehlgeschlagen', getErrorMessage(retryError));
       }
     }
     

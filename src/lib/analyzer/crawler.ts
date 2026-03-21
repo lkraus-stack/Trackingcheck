@@ -217,7 +217,77 @@ export class WebCrawler {
   private browser: Browser | null = null;
 
   async init(): Promise<void> {
-    this.browser = await getBrowser();
+    await this.ensureBrowser();
+  }
+
+  private isServerlessRuntime(): boolean {
+    return getAnalyzerBrowserRuntime() === 'serverless-chromium';
+  }
+
+  private attachBrowserLifecycle(browser: Browser): void {
+    const browserWithEvents = browser as unknown as {
+      on?: (event: string, handler: () => void) => void;
+    };
+
+    browserWithEvents.on?.('disconnected', () => {
+      if (this.browser === browser) {
+        this.browser = null;
+      }
+    });
+  }
+
+  private isBrowserHealthy(): boolean {
+    if (!this.browser) {
+      return false;
+    }
+
+    const browserState = this.browser as unknown as {
+      connected?: boolean;
+      isConnected?: () => boolean;
+    };
+
+    if (typeof browserState.isConnected === 'function') {
+      return browserState.isConnected();
+    }
+
+    if (typeof browserState.connected === 'boolean') {
+      return browserState.connected;
+    }
+
+    return true;
+  }
+
+  private async ensureBrowser(): Promise<Browser> {
+    if (this.isBrowserHealthy() && this.browser) {
+      return this.browser;
+    }
+
+    await this.safeCloseBrowser();
+
+    const browser = await getBrowser();
+    this.browser = browser;
+    this.attachBrowserLifecycle(browser);
+    return browser;
+  }
+
+  async restartBrowser(): Promise<void> {
+    await this.safeCloseBrowser();
+    await this.ensureBrowser();
+  }
+
+  private async safeCloseBrowser(): Promise<void> {
+    const browser = this.browser;
+    this.browser = null;
+
+    if (!browser) {
+      return;
+    }
+
+    try {
+      await browser.close();
+    } catch {
+      // Browser ist bereits geschlossen oder nicht mehr erreichbar
+    }
   }
 
   private async waitForDocumentReady(page: Page, timeout: number): Promise<void> {
@@ -305,11 +375,8 @@ export class WebCrawler {
 
   // Quick-Crawl für schnellere Analyse (ohne Consent-Test, kürzere Wartezeiten)
   async crawlQuick(url: string): Promise<CrawlResult> {
-    if (!this.browser) {
-      await this.init();
-    }
-
-    const page = await this.browser!.newPage();
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
     const urlObj = new URL(url);
     const pageDomain = urlObj.hostname;
     
@@ -387,11 +454,8 @@ export class WebCrawler {
   }
 
   async crawl(url: string): Promise<CrawlResult> {
-    if (!this.browser) {
-      await this.init();
-    }
-
-    const page = await this.browser!.newPage();
+    const browser = await this.ensureBrowser();
+    const page = await browser.newPage();
     await this.setupPage(page);
     
     // URL und Domain extrahieren
@@ -685,8 +749,12 @@ export class WebCrawler {
   }
 
   private async createIsolatedContext(): Promise<BrowserContext | null> {
-    if (!this.browser) return null;
-    const browserAny = this.browser as unknown as {
+    if (this.isServerlessRuntime()) {
+      return null;
+    }
+
+    const browser = await this.ensureBrowser();
+    const browserAny = browser as unknown as {
       createBrowserContext?: () => Promise<BrowserContext>;
       createIncognitoBrowserContext?: () => Promise<BrowserContext>;
     };
@@ -1838,9 +1906,7 @@ export class WebCrawler {
 
   // Cookie-Consent-Test durchführen
   async performCookieConsentTest(url: string): Promise<CookieConsentTestData> {
-    if (!this.browser) {
-      await this.init();
-    }
+    const browser = await this.ensureBrowser();
 
     const result: CookieConsentTestData = {
       pageDomain: new URL(url).hostname,
@@ -1851,7 +1917,7 @@ export class WebCrawler {
 
     // Test 1: Cookies vor Consent + Akzeptieren
     const acceptContext = await this.createIsolatedContext();
-    const pageAccept = acceptContext ? await acceptContext.newPage() : await this.browser!.newPage();
+    const pageAccept = acceptContext ? await acceptContext.newPage() : await browser.newPage();
     const acceptNetworkRequests: string[] = [];
     pageAccept.on('request', (request) => {
       acceptNetworkRequests.push(request.url());
@@ -1926,8 +1992,9 @@ export class WebCrawler {
     result.acceptNetworkRequests = acceptNetworkRequests;
 
     // Test 2: Ablehnen in neuem, sauberen Tab
+    const rejectBrowser = await this.ensureBrowser();
     const rejectContext = await this.createIsolatedContext();
-    const pageReject = rejectContext ? await rejectContext.newPage() : await this.browser!.newPage();
+    const pageReject = rejectContext ? await rejectContext.newPage() : await rejectBrowser.newPage();
     await this.setupPage(pageReject);
     
     try {
@@ -2027,12 +2094,10 @@ export class WebCrawler {
 
   // Fallback: Nur Accept ausführen und Cookies sammeln
   async performAcceptOnlyTest(url: string): Promise<AcceptOnlyTestResult> {
-    if (!this.browser) {
-      await this.init();
-    }
+    const browser = await this.ensureBrowser();
 
     const acceptContext = await this.createIsolatedContext();
-    const pageAccept = acceptContext ? await acceptContext.newPage() : await this.browser!.newPage();
+    const pageAccept = acceptContext ? await acceptContext.newPage() : await browser.newPage();
     const acceptNetworkRequests: string[] = [];
     pageAccept.on('request', (request) => {
       acceptNetworkRequests.push(request.url());
@@ -2261,6 +2326,15 @@ export class WebCrawler {
       includeConsentSignals: false,
     });
 
+    if (this.isServerlessRuntime()) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await this.waitForPageSignals(page, {
+        timeout: 3000,
+        includeConsentSignals: false,
+      });
+      return;
+    }
+
     try {
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
       await this.waitForPageSignals(page, {
@@ -2427,10 +2501,7 @@ export class WebCrawler {
   }
 
   async close(): Promise<void> {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-    }
+    await this.safeCloseBrowser();
   }
 }
 
