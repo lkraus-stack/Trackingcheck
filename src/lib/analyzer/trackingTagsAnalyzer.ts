@@ -332,6 +332,89 @@ const SERVER_SIDE_PATTERNS = {
   },
 };
 
+const TRANSPORT_RESOURCE_TYPES = new Set(['fetch', 'xhr', 'image', 'beacon', 'ping', 'other']);
+const TRACKING_SUBDOMAIN_PATTERN = /^(gtm|sgtm|tag|tagging|tracking|analytics|data)\./i;
+const META_FIRST_PARTY_PROXY_PATTERNS = [
+  /^\/tr(?:\/|$)/i,
+  /^\/(?:fb|facebook|meta)(?:\/(?:events?|tr|pixel))?(?:\/|$)/i,
+  /\/(?:fb|facebook|meta)\/(?:events?|tr|pixel)(?:\/|$)/i,
+];
+
+function pushUnique(target: string[], value: string): void {
+  if (!target.includes(value)) {
+    target.push(value);
+  }
+}
+
+function getComparableBaseDomain(hostname: string): string {
+  const parts = hostname.toLowerCase().split('.').filter(Boolean);
+  return parts.length > 1 ? parts.slice(-2).join('.') : hostname.toLowerCase();
+}
+
+function isSameSiteOrSubdomain(hostname: string, pageDomain: string): boolean {
+  const normalizedHost = hostname.toLowerCase();
+  const normalizedPageDomain = pageDomain.toLowerCase();
+  const baseDomain = getComparableBaseDomain(normalizedPageDomain);
+
+  return (
+    normalizedHost === normalizedPageDomain ||
+    normalizedHost.endsWith(`.${normalizedPageDomain}`) ||
+    normalizedHost === baseDomain ||
+    normalizedHost.endsWith(`.${baseDomain}`)
+  );
+}
+
+function hasAnySearchParam(reqUrl: URL, params: string[]): boolean {
+  return params.some(param => reqUrl.searchParams.has(param));
+}
+
+function isDedicatedTrackingSubdomain(hostname: string, pageDomain: string): boolean {
+  return hostname.toLowerCase() !== pageDomain.toLowerCase() &&
+    isSameSiteOrSubdomain(hostname, pageDomain) &&
+    TRACKING_SUBDOMAIN_PATTERN.test(hostname);
+}
+
+function isLikelyServerSideGtmRequest(req: NetworkRequest, reqUrl: URL): boolean {
+  const pathLower = reqUrl.pathname.toLowerCase();
+  const resourceType = req.resourceType.toLowerCase();
+  const containerId = reqUrl.searchParams.get('id') || '';
+
+  if ((pathLower === '/gtm.js' || pathLower === '/gtag/js') &&
+      /^(GTM|GT|G|AW|DC)-[A-Z0-9]+$/i.test(containerId)) {
+    return true;
+  }
+
+  if (pathLower === '/g/collect') {
+    return true;
+  }
+
+  if (pathLower === '/collect' && TRANSPORT_RESOURCE_TYPES.has(resourceType)) {
+    return hasAnySearchParam(reqUrl, ['tid', 'measurement_id', 'cid', 'en', 'v']);
+  }
+
+  return false;
+}
+
+function isLikelyMetaFirstPartyProxy(req: NetworkRequest, reqUrl: URL): boolean {
+  const pathLower = reqUrl.pathname.toLowerCase();
+  if (!META_FIRST_PARTY_PROXY_PATTERNS.some(pattern => pattern.test(pathLower))) {
+    return false;
+  }
+
+  const resourceType = req.resourceType.toLowerCase();
+  const hasMetaQuerySignals = hasAnySearchParam(reqUrl, [
+    'id',
+    'ev',
+    'event_name',
+    'event_id',
+    'dl',
+    'rl',
+    'if',
+  ]);
+
+  return hasMetaQuerySignals || TRANSPORT_RESOURCE_TYPES.has(resourceType);
+}
+
 export function analyzeTrackingTags(crawlResult: CrawlResult): TrackingTagsResult {
   const { 
     scripts, 
@@ -683,58 +766,24 @@ function detectServerSideGTM(
   responseHeaders: ResponseHeaderData[],
   pageDomain: string
 ): ServerSideGTMResult {
-  const indicators: string[] = [];
-  let endpoint: string | undefined;
-  let isFirstParty = false;
+  const detection = detectServerSideGTMIndicators(requests, extendedRequests, responseHeaders, pageDomain);
   let sgtmDomain: string | undefined;
-  let transportUrl: string | undefined;
-  const firstPartyCookies: string[] = [];
 
-  for (const req of requests) {
-    const url = req.url.toLowerCase();
-    
+  if (detection.endpoint) {
     try {
-      const reqUrl = new URL(req.url);
-      const reqDomain = reqUrl.hostname;
-      
-      const isSubdomain = reqDomain.endsWith(pageDomain) || pageDomain.endsWith(reqDomain.split('.').slice(-2).join('.'));
-      
-      if (isSubdomain) {
-        for (const pattern of SERVER_SIDE_PATTERNS.sgtm.endpoints) {
-          if (pattern.test(url) || pattern.test(reqUrl.pathname)) {
-            isFirstParty = true;
-            endpoint = req.url;
-            sgtmDomain = reqDomain;
-            transportUrl = req.url;
-            indicators.push(`First-Party Endpoint: ${reqDomain}${reqUrl.pathname}`);
-            break;
-          }
-        }
-      }
+      sgtmDomain = new URL(detection.endpoint).hostname;
     } catch {
       // URL parsing failed
     }
   }
 
-  for (const resp of responseHeaders) {
-    for (const headerPattern of SERVER_SIDE_PATTERNS.sgtm.headers) {
-      const hasHeader = Object.keys(resp.headers).some(h => 
-        h.toLowerCase().includes(headerPattern.toLowerCase())
-      );
-      if (hasHeader) {
-        indicators.push(`Server-Side GTM Header gefunden: ${headerPattern}`);
-        isFirstParty = true;
-      }
-    }
-  }
-
   return {
-    detected: indicators.length > 0,
-    endpoint,
-    isFirstParty,
+    detected: detection.detected,
+    endpoint: detection.endpoint,
+    isFirstParty: detection.detected,
     domain: sgtmDomain,
-    transportUrl,
-    firstPartyCookies,
+    transportUrl: detection.endpoint,
+    firstPartyCookies: [],
   };
 }
 
@@ -868,7 +917,7 @@ function detectMetaServerSide(
     
     if (SERVER_SIDE_PATTERNS.metaCAPI.networkPatterns.some(p => url.includes(p.toLowerCase()))) {
       hasConversionsAPI = true;
-      indicators.push('Facebook Graph API Aufruf erkannt');
+      pushUnique(indicators, 'Facebook Graph API Aufruf erkannt');
     }
 
     if (url.includes('event_id=')) {
@@ -888,11 +937,9 @@ function detectMetaServerSide(
 
     try {
       const reqUrl = new URL(req.url);
-      if (reqUrl.hostname.includes(pageDomain) || pageDomain.includes(reqUrl.hostname.split('.').slice(-2).join('.'))) {
-        if (url.includes('/tr') || url.includes('/pixel') || url.includes('/fb')) {
-          indicators.push(`First-Party Pixel Proxy: ${reqUrl.hostname}`);
-          hasConversionsAPI = true;
-        }
+      if (isSameSiteOrSubdomain(reqUrl.hostname, pageDomain) && isLikelyMetaFirstPartyProxy(req, reqUrl)) {
+        pushUnique(indicators, `First-Party Pixel Proxy: ${reqUrl.hostname}${reqUrl.pathname}`);
+        hasConversionsAPI = true;
       }
     } catch {
       // URL parsing failed
@@ -901,7 +948,7 @@ function detectMetaServerSide(
 
   for (const pattern of SERVER_SIDE_PATTERNS.metaCAPI.patterns) {
     if (pattern.test(content)) {
-      indicators.push('CAPI-typisches Pattern im Code gefunden');
+      pushUnique(indicators, 'CAPI-typisches Pattern im Code gefunden');
     }
   }
 
@@ -1511,25 +1558,15 @@ function detectServerSideGTMIndicators(
     try {
       const reqUrl = new URL(req.url);
       const reqDomain = reqUrl.hostname;
-      
-      const isFirstParty = reqDomain.endsWith(pageDomain) || 
-        pageDomain.endsWith(reqDomain.split('.').slice(-2).join('.')) ||
-        reqDomain.includes(pageDomain.split('.')[0]);
 
-      if (isFirstParty) {
-        const pathLower = reqUrl.pathname.toLowerCase();
-        
-        if (pathLower.includes('/gtm') || pathLower.includes('/g/collect') || 
-            pathLower.includes('/collect') || pathLower.includes('/gtag')) {
-          evidence.push(`First-Party GTM Endpoint: ${reqDomain}${reqUrl.pathname}`);
-          endpoint = req.url;
-          confidence = 'high';
-        }
-        
-        if (reqDomain.match(/^(gtm|sgtm|tag|tagging|tracking|analytics|data)\./)) {
-          evidence.push(`sGTM-typische Subdomain: ${reqDomain}`);
-          confidence = confidence === 'high' ? 'high' : 'medium';
-        }
+      if (!isSameSiteOrSubdomain(reqDomain, pageDomain)) {
+        continue;
+      }
+
+      if (isLikelyServerSideGtmRequest(req, reqUrl)) {
+        pushUnique(evidence, `First-Party GTM Endpoint: ${reqDomain}${reqUrl.pathname}`);
+        endpoint = endpoint || req.url;
+        confidence = isDedicatedTrackingSubdomain(reqDomain, pageDomain) ? 'high' : 'medium';
       }
     } catch {
       // URL parsing failed
@@ -1539,7 +1576,8 @@ function detectServerSideGTMIndicators(
   for (const resp of responseHeaders) {
     const headers = Object.keys(resp.headers).map(h => h.toLowerCase());
     if (headers.some(h => h.includes('x-gtm') || h.includes('x-sgtm'))) {
-      evidence.push('sGTM-spezifische Response Header erkannt');
+      pushUnique(evidence, 'sGTM-spezifische Response Header erkannt');
+      endpoint = endpoint || resp.url;
       confidence = 'high';
     }
   }
@@ -1562,7 +1600,7 @@ function detectMetaCAPIIndicators(
 
   for (const req of requests) {
     if (req.url.includes('graph.facebook.com') && req.url.includes('/events')) {
-      evidence.push('Facebook Graph API /events Aufruf erkannt');
+      pushUnique(evidence, 'Facebook Graph API /events Aufruf erkannt');
       confidence = 'high';
     }
   }
@@ -1571,24 +1609,21 @@ function detectMetaCAPIIndicators(
     req.url.includes('event_id=') && req.url.includes('facebook')
   );
   if (hasEventId) {
-    evidence.push('Event ID für Browser/Server Deduplizierung gefunden');
+    pushUnique(evidence, 'Event ID für Browser/Server Deduplizierung gefunden');
     confidence = confidence === 'high' ? 'high' : 'medium';
   }
 
   if (content.includes('action_source') && content.includes('server')) {
-    evidence.push('Server-Side action_source Parameter im Code');
+    pushUnique(evidence, 'Server-Side action_source Parameter im Code');
     confidence = 'medium';
   }
 
   for (const req of requests) {
     try {
       const reqUrl = new URL(req.url);
-      const isFirstParty = reqUrl.hostname.includes(pageDomain) || 
-        pageDomain.includes(reqUrl.hostname.split('.').slice(-2).join('.'));
-      
-      if (isFirstParty && (req.url.includes('/tr') || req.url.includes('/pixel') || req.url.includes('/fb'))) {
-        evidence.push(`First-Party Facebook Pixel Proxy: ${reqUrl.hostname}`);
-        confidence = 'high';
+      if (isSameSiteOrSubdomain(reqUrl.hostname, pageDomain) && isLikelyMetaFirstPartyProxy(req, reqUrl)) {
+        pushUnique(evidence, `First-Party Facebook Pixel Proxy: ${reqUrl.hostname}${reqUrl.pathname}`);
+        confidence = confidence === 'high' ? 'high' : 'medium';
       }
     } catch {
       // URL parsing failed

@@ -87,6 +87,33 @@ export const metaServerSideFixture = createCrawlResult({
   }),
 });
 
+export const firstPartySgtmFixture = createCrawlResult({
+  pageUrl: 'https://www.example.com/',
+  pageDomain: 'www.example.com',
+  networkRequests: [
+    createRequest('https://sgtm.example.com/gtm.js?id=GTM-TEST123', 'script'),
+    createRequest('https://sgtm.example.com/g/collect?v=2&tid=G-TEST123456&cid=123.456&en=page_view', 'fetch'),
+  ],
+  responseHeaders: [
+    {
+      url: 'https://sgtm.example.com/gtm.js?id=GTM-TEST123',
+      headers: {
+        'x-gtm-server-preview': 'env-1',
+      },
+    },
+  ],
+});
+
+export const falsePositiveFirstPartyTrackingAssetFixture = createCrawlResult({
+  pageUrl: 'https://finlers.de/',
+  pageDomain: 'finlers.de',
+  networkRequests: [
+    createRequest('https://finlers.de/wp-content/uploads/borlabs-cookie/GTM-P5TJM62.js?ver=e34o9cin', 'script'),
+    createRequest('https://finlers.de/wp-content/plugins/the-events-calendar/build/css/tribe-events-single-skeleton.css?ver=6.15.16.1', 'stylesheet'),
+    createRequest('https://finlers.de/wp-content/plugins/the-events-calendar/build/css/tribe-events-single-full.css?ver=6.15.16.1', 'stylesheet'),
+  ],
+});
+
 export const posthogFixture = createCrawlResult({
   html: `<script>
     posthog.init('project_123', { api_host: 'https://us.i.posthog.com' });

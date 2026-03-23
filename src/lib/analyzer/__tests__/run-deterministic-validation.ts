@@ -14,6 +14,8 @@ import { getSuspiciousAnalysisReason } from '@/lib/analysisResultMeta';
 import type { AnalysisResult } from '@/types';
 import {
   consentModeV2Fixture,
+  falsePositiveFirstPartyTrackingAssetFixture,
+  firstPartySgtmFixture,
   gaViaDataLayerFixture,
   genericDataLayerOnlyFixture,
   metaServerSideFixture,
@@ -172,6 +174,25 @@ const cases: ValidationCase[] = [
       assert.equal(result.metaPixel.confidence, 'high');
       assert.equal(result.serverSideTracking.detected, true);
       assert.equal(result.serverSideTracking.summary.hasMetaCAPI, true);
+    },
+  },
+  {
+    name: 'Explizite First-Party sGTM Endpunkte bleiben erkannt',
+    run: () => {
+      const result = analyzeTrackingTags(firstPartySgtmFixture);
+      assert.equal(result.serverSideTracking.detected, true);
+      assert.equal(result.serverSideTracking.summary.hasServerSideGTM, true);
+      assert.equal(result.googleTagManager.serverSideGTM.detected, true);
+    },
+  },
+  {
+    name: 'Lokale GTM-Datei und tribe-events CSS erzeugen kein Server-Side False Positive',
+    run: () => {
+      const result = analyzeTrackingTags(falsePositiveFirstPartyTrackingAssetFixture);
+      assert.equal(result.serverSideTracking.detected, false);
+      assert.equal(result.serverSideTracking.summary.hasServerSideGTM, false);
+      assert.equal(result.serverSideTracking.summary.hasMetaCAPI, false);
+      assert.equal(result.metaPixel.serverSide?.detected, false);
     },
   },
   {
