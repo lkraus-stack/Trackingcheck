@@ -9,6 +9,9 @@ import { checkFeatureAccess, incrementUsage } from '@/lib/auth/usage';
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
+const CHAT_HISTORY_LIMIT = 8;
+const MAX_HISTORY_ENTRY_CHARS = 1500;
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -54,7 +57,11 @@ export async function POST(request: NextRequest) {
             typeof entry.content === 'string' &&
             entry.content.trim().length > 0
           )
-          .slice(-6)
+          .map((entry) => ({
+            role: entry.role,
+            content: entry.content.trim().slice(0, MAX_HISTORY_ENTRY_CHARS),
+          }))
+          .slice(-CHAT_HISTORY_LIMIT)
       : [];
 
     const client = getVanteroClient();

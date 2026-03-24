@@ -7,6 +7,231 @@ import type { AnalysisResult } from '@/types';
 const MAX_COOKIES = 20;
 const MAX_THIRD_PARTY_DOMAINS = 30;
 const MAX_ISSUES = 30;
+const MAX_CHAT_ISSUES = 20;
+
+type SectionName =
+  | 'cookie-banner'
+  | 'consent-mode'
+  | 'tcf'
+  | 'tracking-tags'
+  | 'datalayer'
+  | 'third-party'
+  | 'gdpr'
+  | 'performance';
+
+const SECTION_KEYWORDS: Record<SectionName, string[]> = {
+  'cookie-banner': [
+    'cookie',
+    'banner',
+    'cmp',
+    'einwilligung',
+    'zustimmung',
+    'ablehnen',
+    'akzeptieren',
+    'essenzielle',
+    'consent banner',
+  ],
+  'consent-mode': [
+    'consent mode',
+    'google consent',
+    'gcm',
+    'ad_storage',
+    'analytics_storage',
+    'ad_user_data',
+    'ad_personalization',
+    'google-signale',
+  ],
+  tcf: [
+    'tcf',
+    'iab',
+    'tc string',
+    'tcf 2.2',
+    'vendor',
+    'vendors',
+    'transparency',
+  ],
+  'tracking-tags': [
+    'tracking',
+    'tag',
+    'tags',
+    'pixel',
+    'ga4',
+    'gtm',
+    'google ads',
+    'meta pixel',
+    'tiktok',
+    'linkedin',
+    'bing',
+    'server-side',
+    'serverside',
+  ],
+  datalayer: [
+    'datalayer',
+    'data layer',
+    'event',
+    'events',
+    'purchase',
+    'add_to_cart',
+    'checkout',
+    'ecommerce',
+    'funnel',
+  ],
+  'third-party': [
+    'third',
+    'third-party',
+    'drittanbieter',
+    'domain',
+    'domains',
+    'request',
+    'requests',
+    'server',
+    'usa',
+  ],
+  gdpr: [
+    'gdpr',
+    'dsgvo',
+    'compliance',
+    'datenschutz',
+    'rechtlich',
+    'risiko',
+    'compliant',
+  ],
+  performance: [
+    'performance',
+    'marketing',
+    'conversion',
+    'conversions',
+    'attribution',
+    'roas',
+    'kampagne',
+    'remarketing',
+  ],
+};
+
+const BROAD_QUESTION_KEYWORDS = [
+  'größte',
+  'wichtigste',
+  'zusammenfassung',
+  'überblick',
+  'insgesamt',
+  'gesamt',
+  'risiko',
+  'risiken',
+  'problem',
+  'probleme',
+  'empfehl',
+  'nächste schritte',
+  'naechste schritte',
+  'zuerst',
+  'priorität',
+  'prioritaet',
+  'fazit',
+  'bewertung',
+];
+
+function includesAny(text: string, keywords: string[]): boolean {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeUnknownValues(target: unknown, source: unknown): unknown {
+  if (source === undefined) return target;
+  if (target === undefined) return source;
+
+  if (Array.isArray(target) && Array.isArray(source)) {
+    const seen = new Set<string>();
+    return [...target, ...source].filter((item) => {
+      const key =
+        typeof item === 'object' && item !== null
+          ? JSON.stringify(item)
+          : String(item);
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  }
+
+  if (isPlainObject(target) && isPlainObject(source)) {
+    const merged: Record<string, unknown> = { ...target };
+
+    Object.entries(source).forEach(([key, value]) => {
+      merged[key] = key in merged
+        ? mergeUnknownValues(merged[key], value)
+        : value;
+    });
+
+    return merged;
+  }
+
+  return source;
+}
+
+function mergeReducedData(
+  target: ReducedAnalysisData,
+  source: ReducedAnalysisData
+): ReducedAnalysisData {
+  const merged: ReducedAnalysisData = { ...target };
+
+  Object.entries(source).forEach(([key, value]) => {
+    if (value === undefined) return;
+
+    merged[key] = key in merged
+      ? mergeUnknownValues(merged[key], value)
+      : value;
+  });
+
+  return merged;
+}
+
+function getReducedCookieConsentTest(data: AnalysisResult): ReducedAnalysisData['cookieConsentTest'] {
+  if (!data.cookieConsentTest) return undefined;
+
+  return {
+    analysis: data.cookieConsentTest.analysis,
+    beforeConsent: {
+      cookieCount: data.cookieConsentTest.beforeConsent.cookieCount,
+      trackingCookiesFound: data.cookieConsentTest.beforeConsent.trackingCookiesFound,
+    },
+    afterAccept: {
+      cookieCount: data.cookieConsentTest.afterAccept.cookieCount,
+      clickSuccessful: data.cookieConsentTest.afterAccept.clickSuccessful,
+      buttonFound: data.cookieConsentTest.afterAccept.buttonFound,
+    },
+    afterReject: {
+      cookieCount: data.cookieConsentTest.afterReject.cookieCount,
+      clickSuccessful: data.cookieConsentTest.afterReject.clickSuccessful,
+      buttonFound: data.cookieConsentTest.afterReject.buttonFound,
+    },
+  };
+}
+
+function getCookieSummary(data: AnalysisResult): ReducedAnalysisData['cookieSummary'] {
+  if (!data.cookies || !Array.isArray(data.cookies)) return undefined;
+
+  const cookiesByCategory = data.cookies.reduce((acc, cookie) => {
+    const category = cookie.category || 'unknown';
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(cookie);
+    return acc;
+  }, {} as Record<string, typeof data.cookies>);
+
+  return {
+    total: data.cookies.length,
+    byCategory: Object.keys(cookiesByCategory).reduce((acc, cat) => {
+      acc[cat] = cookiesByCategory[cat].length;
+      return acc;
+    }, {} as Record<string, number>),
+    thirdParty: data.cookies.filter((cookie) => cookie.isThirdParty).length,
+    longLived: data.cookies.filter((cookie) => cookie.isLongLived).length,
+  };
+}
 
 export type ReducedAnalysisData = Record<string, unknown>;
 
@@ -63,37 +288,12 @@ export function reduceAnalysisResultForAI(data: AnalysisResult): ReducedAnalysis
     });
 
     reduced.cookies = topCookies.slice(0, MAX_COOKIES);
-    reduced.cookieSummary = {
-      total: data.cookies.length,
-      byCategory: Object.keys(cookiesByCategory).reduce((acc, cat) => {
-        acc[cat] = cookiesByCategory[cat].length;
-        return acc;
-      }, {} as Record<string, number>),
-      thirdParty: data.cookies.filter(c => c.isThirdParty).length,
-      longLived: data.cookies.filter(c => c.isLongLived).length,
-    };
+    reduced.cookieSummary = getCookieSummary(data);
   }
 
   // Cookie Consent Test - reduziert (nur Zusammenfassung)
   if (data.cookieConsentTest) {
-    reduced.cookieConsentTest = {
-      analysis: data.cookieConsentTest.analysis,
-      beforeConsent: {
-        cookieCount: data.cookieConsentTest.beforeConsent.cookieCount,
-        trackingCookiesFound: data.cookieConsentTest.beforeConsent.trackingCookiesFound,
-        // Cookies nicht mitsenden
-      },
-      afterAccept: {
-        cookieCount: data.cookieConsentTest.afterAccept.cookieCount,
-        clickSuccessful: data.cookieConsentTest.afterAccept.clickSuccessful,
-        buttonFound: data.cookieConsentTest.afterAccept.buttonFound,
-      },
-      afterReject: {
-        cookieCount: data.cookieConsentTest.afterReject.cookieCount,
-        clickSuccessful: data.cookieConsentTest.afterReject.clickSuccessful,
-        buttonFound: data.cookieConsentTest.afterReject.buttonFound,
-      },
-    };
+    reduced.cookieConsentTest = getReducedCookieConsentTest(data);
   }
 
   // DataLayer - reduziert (kein rawDataLayer, nur Events)
@@ -283,9 +483,9 @@ export function reduceForSection(
       return {
         ...base,
         cookieBanner: data.cookieBanner,
-        // cookieConsentTest nicht inkludiert - würde große Arrays benötigen
-        // Nur die Zusammenfassung ist verfügbar über cookieBanner-Ergebnisse
+        cookieConsentTest: getReducedCookieConsentTest(data),
         cookies: data.cookies?.slice(0, 20),
+        cookieSummary: getCookieSummary(data),
       };
 
     case 'consent-mode':
@@ -295,6 +495,12 @@ export function reduceForSection(
         ...base,
         googleConsentMode: data.googleConsentMode,
         cookieBanner: data.cookieBanner,
+        cookieConsentTest: getReducedCookieConsentTest(data),
+        trackingTags: {
+          googleAnalytics: data.trackingTags?.googleAnalytics,
+          googleTagManager: data.trackingTags?.googleTagManager,
+          googleAdsConversion: data.trackingTags?.googleAdsConversion,
+        },
       };
 
     case 'tcf':
@@ -302,6 +508,7 @@ export function reduceForSection(
         ...base,
         tcf: data.tcf,
         cookieBanner: data.cookieBanner,
+        cookieConsentTest: getReducedCookieConsentTest(data),
       };
 
     case 'tracking-tags':
@@ -347,6 +554,14 @@ export function reduceForSection(
         ...base,
         gdprChecklist: data.gdprChecklist,
         issues: data.issues?.slice(0, 20),
+        cookieBanner: data.cookieBanner,
+        googleConsentMode: data.googleConsentMode,
+        thirdPartyDomains: data.thirdPartyDomains
+          ? {
+              totalCount: data.thirdPartyDomains.totalCount,
+              riskAssessment: data.thirdPartyDomains.riskAssessment,
+            }
+          : undefined,
       };
 
     case 'performance':
@@ -357,6 +572,7 @@ export function reduceForSection(
         funnelValidation: data.funnelValidation,
         conversionTrackingAudit: data.conversionTrackingAudit,
         campaignAttribution: data.campaignAttribution,
+        trackingTags: data.trackingTags,
       };
 
     default:
@@ -374,56 +590,36 @@ export function reduceForQuestion(
   question: string
 ): ReducedAnalysisData {
   const questionLower = question.toLowerCase();
+  const relevantSections = (Object.entries(SECTION_KEYWORDS) as Array<[SectionName, string[]]>)
+    .filter(([, keywords]) => includesAny(questionLower, keywords))
+    .map(([section]) => section);
+  const isBroadQuestion = includesAny(questionLower, BROAD_QUESTION_KEYWORDS);
 
-  // Identifiziere relevante Themen aus der Frage
-  const relevantSections: string[] = [];
-
-  if (questionLower.includes('cookie') || questionLower.includes('banner')) {
-    relevantSections.push('cookie-banner');
-  }
-  if (questionLower.includes('consent') || questionLower.includes('consent mode')) {
-    relevantSections.push('consent-mode');
-  }
-  if (questionLower.includes('tcf')) {
-    relevantSections.push('tcf');
-  }
-  if (questionLower.includes('tracking') || questionLower.includes('tag') || questionLower.includes('pixel')) {
-    relevantSections.push('tracking-tags');
-  }
-  if (questionLower.includes('datalayer') || questionLower.includes('data layer')) {
-    relevantSections.push('datalayer');
-  }
-  if (questionLower.includes('third') || questionLower.includes('domain')) {
-    relevantSections.push('third-party');
-  }
-  if (questionLower.includes('gdpr') || questionLower.includes('dsgvo') || questionLower.includes('compliance')) {
-    relevantSections.push('gdpr');
-  }
-  if (questionLower.includes('performance') || questionLower.includes('marketing') || questionLower.includes('conversion')) {
-    relevantSections.push('performance');
+  // Bei breiten Risiko-/Zusammenfassungsfragen lieber mehr Kontext geben.
+  if (relevantSections.length === 0 || isBroadQuestion) {
+    return {
+      ...reduceAnalysisResultForAI(data),
+      focusAreas: relevantSections,
+      questionType: isBroadQuestion ? 'broad' : 'general',
+    };
   }
 
-  // Wenn keine spezifischen Themen erkannt, verwende reduzierte Version
-  if (relevantSections.length === 0) {
-    return reduceAnalysisResultForAI(data);
-  }
-
-  // Kombiniere relevante Sektionen
-  const reduced: ReducedAnalysisData = {
+  let reduced: ReducedAnalysisData = {
     url: data.url,
     timestamp: data.timestamp,
     status: data.status,
     score: data.score,
+    focusAreas: relevantSections,
+    questionType: 'targeted',
   };
 
-  relevantSections.forEach(section => {
+  relevantSections.forEach((section) => {
     const sectionData = reduceForSection(data, section);
-    Object.assign(reduced, sectionData);
+    reduced = mergeReducedData(reduced, sectionData);
   });
 
-  // Füge immer Issues hinzu (können in jeder Frage relevant sein)
   if (data.issues) {
-    reduced.issues = data.issues.slice(0, 20);
+    reduced.issues = data.issues.slice(0, MAX_CHAT_ISSUES);
   }
 
   return reduced;

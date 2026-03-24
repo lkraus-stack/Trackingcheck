@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send, Globe, Loader2, History, RefreshCw, Brain, XCircle, Clock, LayoutDashboard, BookOpen, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
@@ -55,6 +56,9 @@ type ChatHistoryMessage = {
   content: string;
 };
 
+const CHAT_HISTORY_LIMIT = 8;
+const MAX_HISTORY_MESSAGE_LENGTH = 1200;
+
 type ChatApiResponse = {
   success?: boolean;
   answer?: string;
@@ -103,10 +107,10 @@ function getChatHistoryFromMessages(messages: Message[]): ChatHistoryMessage[] {
       !message.error &&
       (message.role === 'user' || message.role === 'assistant')
     )
-    .slice(-6)
+    .slice(-CHAT_HISTORY_LIMIT)
     .map((message) => ({
       role: message.role as ChatHistoryMessage['role'],
-      content: message.content,
+      content: message.content.trim().slice(0, MAX_HISTORY_MESSAGE_LENGTH),
     }));
 }
 
@@ -142,14 +146,15 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
     : 'Allgemeiner KI-Assistent ohne Website-Kontext';
   const examplePrompts = activeContext
     ? [
-        'Was sind hier die 3 kritischsten Probleme?',
-        'Wie würde ich Consent Mode V2 korrekt umsetzen?',
+        'Was sind hier die 3 groessten Risiken?',
+        'Welche 3 Schritte sollte ich zuerst umsetzen?',
+        'Wie wuerdest du Consent Mode V2 hier konkret verbessern?',
         activeContext.url,
       ]
     : [
         'https://example.com',
-        'Was ist Google Consent Mode V2?',
-        'Wann brauche ich TCF 2.2?',
+        'Erklaere mir strukturiert, was Google Consent Mode V2 ist.',
+        'Wann brauche ich TCF 2.2 und woran erkenne ich das?',
       ];
 
   // History laden
@@ -622,8 +627,50 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                         )}
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm">{message.content}</p>
+                    <div className="flex items-start gap-2">
+                      {message.kind === 'chat' && message.role === 'assistant' ? (
+                        <div className="prose prose-invert prose-sm max-w-none text-sm text-slate-200">
+                          <ReactMarkdown
+                            components={{
+                              h3: ({ children }) => (
+                                <h3 className="mb-2 mt-4 text-sm font-semibold text-white first:mt-0">
+                                  {children}
+                                </h3>
+                              ),
+                              p: ({ children }) => (
+                                <p className="mb-2 last:mb-0 text-sm leading-relaxed text-slate-200">
+                                  {children}
+                                </p>
+                              ),
+                              ul: ({ children }) => (
+                                <ul className="mb-2 list-disc space-y-1 pl-5 text-sm text-slate-200">
+                                  {children}
+                                </ul>
+                              ),
+                              ol: ({ children }) => (
+                                <ol className="mb-2 list-decimal space-y-1 pl-5 text-sm text-slate-200">
+                                  {children}
+                                </ol>
+                              ),
+                              li: ({ children }) => (
+                                <li className="text-sm leading-relaxed text-slate-200">{children}</li>
+                              ),
+                              strong: ({ children }) => (
+                                <strong className="font-semibold text-white">{children}</strong>
+                              ),
+                              code: ({ children }) => (
+                                <code className="rounded bg-slate-900/70 px-1.5 py-0.5 text-xs text-purple-300">
+                                  {children}
+                                </code>
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm">{message.content}</p>
+                      )}
                       {message.fromCache && (
                         <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full flex items-center gap-1">
                           <Clock className="w-3 h-3" />

@@ -41,6 +41,59 @@ interface AnswerQuestionOptions {
   history?: QuestionHistoryEntry[];
 }
 
+const CHAT_HISTORY_LIMIT = 8;
+const MAX_HISTORY_ENTRY_CHARS = 1500;
+
+function normalizeQuestion(question: string): string {
+  return question.trim().replace(/\s+/g, ' ');
+}
+
+function sanitizeHistoryEntries(history: QuestionHistoryEntry[]): QuestionHistoryEntry[] {
+  return history
+    .filter((entry) => entry.role === 'user' || entry.role === 'assistant')
+    .map((entry) => ({
+      role: entry.role,
+      content: entry.content.trim().slice(0, MAX_HISTORY_ENTRY_CHARS),
+    }))
+    .filter((entry) => entry.content.length > 0)
+    .slice(-CHAT_HISTORY_LIMIT);
+}
+
+function isDetailedQuestion(question: string): boolean {
+  const questionLower = question.toLowerCase();
+
+  return question.length > 120 || [
+    'wie',
+    'warum',
+    'schritt',
+    'konkret',
+    'beheben',
+    'umsetzen',
+    'priorität',
+    'prioritaet',
+    'risiko',
+    'empfehl',
+    'analyse',
+    'verbessern',
+  ].some((keyword) => questionLower.includes(keyword));
+}
+
+function getChatSettings(mode: 'general' | 'analysis', question: string) {
+  const detailedQuestion = isDetailedQuestion(question);
+
+  if (mode === 'analysis') {
+    return {
+      temperature: detailedQuestion ? 0.2 : 0.15,
+      maxTokens: detailedQuestion ? 2600 : 2100,
+    };
+  }
+
+  return {
+    temperature: detailedQuestion ? 0.35 : 0.3,
+    maxTokens: detailedQuestion ? 2100 : 1700,
+  };
+}
+
 export class VanteroClient {
   private apiKey: string;
   private apiUrl: string;
@@ -299,40 +352,71 @@ Sei ausführlich, erkläre Fachbegriffe und gib konkrete, umsetzbare Handlungsem
     mode = 'general',
     history = [],
   }: AnswerQuestionOptions): Promise<string> {
-    const hasAnalysisContext = mode === 'analysis' && !!context;
+    const normalizedQuestion = normalizeQuestion(question);
+    const safeMode = mode === 'analysis' ? 'analysis' : 'general';
+    const safeHistory = sanitizeHistoryEntries(history);
+    const hasAnalysisContext = safeMode === 'analysis' && !!context;
     const reducedContext = hasAnalysisContext
-      ? reduceForQuestion(context as AnalysisResult, question)
+      ? reduceForQuestion(context as AnalysisResult, normalizedQuestion)
       : null;
+    const settings = getChatSettings(safeMode, normalizedQuestion);
 
     const systemPrompt = hasAnalysisContext
-      ? `Du bist ein Experte fuer Web-Tracking und DSGVO-Compliance.
-Dir liegen Analyse-Ergebnisse einer konkreten Website vor. Beantworte Fragen primaer auf Basis dieser Daten.
-Wenn die Frage nicht eindeutig aus dem Analyse-Kontext beantwortbar ist, sage das klar und markiere Annahmen explizit.
-Antworte praezise, hilfreich und immer auf Deutsch.`
-      : `Du bist ein Experte fuer Web-Tracking, Consent Management, CMPs, GTM, Google Consent Mode, DSGVO und Datenschutz-Audits.
-Beantworte allgemeine Fachfragen verstaendlich, praxisnah und immer auf Deutsch.
-Wenn etwas vom konkreten Setup einer Website abhaengt, weise kurz darauf hin.`;
+      ? `Du bist ein Senior-Experte fuer Web-Tracking, Consent Management und DSGVO-nahe Audits.
+Dir liegt das Analyse-Ergebnis einer konkreten Website vor.
+
+Ziel:
+- antworte praezise, fachlich sauber und klar strukturiert
+- beziehe dich auf konkrete Befunde aus dem Analyse-Kontext
+- priorisiere Risiken und naechste Schritte
+
+Verbindliche Regeln:
+- Antworte immer auf Deutsch.
+- Erfinde keine Fakten. Wenn etwas im Kontext nicht enthalten ist, sage das klar.
+- Formuliere rechtliche Aussagen als fachliche Einschaetzung, nicht als verbindliche Rechtsberatung.
+- Beziehe dich bei konkreten Aussagen moeglichst sichtbar auf den Check, z. B. "Im vorliegenden Check..." oder "In den Analyse-Daten...".
+- Wenn nach Prioritaeten gefragt wird, nenne maximal die 3 wichtigsten Punkte zuerst.
+
+Verwende fuer Antworten diese Struktur:
+### Kurzantwort
+### Bezug zur Analyse
+### Konkrete Empfehlung
+
+Fuege ### Offene Punkte nur dann hinzu, wenn relevante Unsicherheiten, fehlende Daten oder manuelle Pruefungen wichtig sind.`
+      : `Du bist ein Senior-Experte fuer Web-Tracking, CMPs, GTM, Google Consent Mode, DSGVO-nahes Tracking und Datenschutz-Audits.
+
+Ziel:
+- antworte fachlich sauber, verstaendlich und strukturiert
+- erklaere Dinge knapp, aber nicht oberflaechlich
+- gib praktische Empfehlungen statt nur Definitionen
+
+Verbindliche Regeln:
+- Antworte immer auf Deutsch.
+- Gib zuerst eine direkte Antwort in 1-2 Saetzen.
+- Erfinde keine Fakten und tue fehlenden Kontext nicht als sicher ab.
+- Formuliere rechtliche Aussagen als fachliche Einschaetzung, nicht als verbindliche Rechtsberatung.
+- Nutze die History nur, wenn sie fuer die aktuelle Frage relevant ist.
+
+Verwende fuer Antworten diese Struktur:
+### Kurzantwort
+### Einordnung
+### Praxisempfehlung
+
+Fuege ### Offene Punkte nur dann hinzu, wenn Annahmen, Grenzen oder zusaetzliche Pruefschritte relevant sind.`;
 
     const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
 
     if (reducedContext) {
       messages.push({
-        role: 'user',
-        content: `Kontext zur zuletzt analysierten Website:
+        role: 'system',
+        content: `Aktiver Analyse-Kontext fuer Rueckfragen zur Website ${context?.url ?? 'unbekannt'}:
 ${JSON.stringify(reducedContext)}
 
-Nutze diesen Kontext fuer Rueckfragen zur Analyse.`,
-      });
-      messages.push({
-        role: 'assistant',
-        content: 'Verstanden. Ich nutze die Analyse-Daten als Kontext fuer die folgenden Rueckfragen.',
+Nutze diesen Kontext fuer konkrete Aussagen zur Website. Wenn Details fehlen, kennzeichne sie als offen.`,
       });
     }
 
-    history
-      .filter((entry) => entry.role === 'user' || entry.role === 'assistant')
-      .slice(-6)
-      .forEach((entry) => {
+    safeHistory.forEach((entry) => {
         messages.push({
           role: entry.role,
           content: entry.content,
@@ -342,13 +426,19 @@ Nutze diesen Kontext fuer Rueckfragen zur Analyse.`,
     messages.push({
       role: 'user',
       content: hasAnalysisContext
-        ? `Frage zur analysierten Website: ${question}`
-        : question,
+        ? `Aktuelle Rueckfrage zur analysierten Website:
+${normalizedQuestion}
+
+Bitte antworte klar strukturiert und nenne Unsicherheiten explizit.`
+        : `Aktuelle Fachfrage:
+${normalizedQuestion}
+
+Bitte antworte klar strukturiert und praxisnah.`,
     });
 
     return this.chat(messages, {
-      temperature: hasAnalysisContext ? 0.5 : 0.7,
-      maxTokens: 1800,
+      temperature: settings.temperature,
+      maxTokens: settings.maxTokens,
     });
   }
 
