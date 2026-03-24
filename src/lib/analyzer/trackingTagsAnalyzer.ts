@@ -212,16 +212,17 @@ const TRACKING_DEFINITIONS = {
     scriptPatterns: [
       'bat.bing.com',
       'bing.com/bat',
-      'UET',
-      'uetq',
+      'window.uetq',
+      'uetq.push(',
+      'new uet(',
     ],
     networkPatterns: [
       'bat.bing.com',
       'bing.com/bat',
     ],
     idPatterns: {
-      TAG: /uetq.*push.*['"]([0-9]+)['"]/gi,
-      TAG_ALT: /ti:\s*['"]?(\d+)['"]?/gi,
+      TAG: /uetq[\s\S]{0,300}?push[\s\S]{0,300}?['"](\d{4,})['"]/gi,
+      TAG_ALT: /\bti\s*:\s*['"]?(\d{4,})['"]?/gi,
     },
   },
   criteo: {
@@ -1253,28 +1254,58 @@ function analyzeBingAds(
   gtmDetected: boolean
 ): TrackingTagsResult['bingAds'] {
   const def = TRACKING_DEFINITIONS.bingAds;
+  const contentLower = content.toLowerCase();
 
   const scriptDetected = def.scriptPatterns.some(pattern => 
-    content.toLowerCase().includes(pattern.toLowerCase())
+    contentLower.includes(pattern.toLowerCase())
   );
 
   const networkDetected = requests.some(req => 
     def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))
   );
 
-  const detected = scriptDetected || networkDetected;
+  const windowDetected = !!windowObjects.additionalTrackingObjects.uetq;
+  const detected = scriptDetected || networkDetected || windowDetected;
 
-  let tagId: string | undefined;
-  const tagMatch = content.match(/ti:\s*['"]?(\d+)['"]?/i);
-  if (tagMatch) {
-    tagId = tagMatch[1];
+  const tagIds: string[] = [];
+  const pushMatches = content.matchAll(def.idPatterns.TAG);
+  for (const match of pushMatches) {
+    if (match[1] && !tagIds.includes(match[1])) {
+      tagIds.push(match[1]);
+    }
   }
 
-  const loadedViaGTM = gtmDetected && detected && !content.includes('bat.bing.com');
+  const configMatches = content.matchAll(def.idPatterns.TAG_ALT);
+  for (const match of configMatches) {
+    if (match[1] && !tagIds.includes(match[1])) {
+      tagIds.push(match[1]);
+    }
+  }
+
+  for (const req of requests) {
+    if (!def.networkPatterns.some(pattern => req.url.toLowerCase().includes(pattern.toLowerCase()))) {
+      continue;
+    }
+
+    try {
+      const reqUrl = new URL(req.url);
+      const maybeTi = reqUrl.searchParams.get('ti');
+      if (maybeTi && !tagIds.includes(maybeTi)) {
+        tagIds.push(maybeTi);
+      }
+    } catch {
+      // URL parsing failed
+    }
+  }
+
+  const tagId = tagIds[0];
+  const hasDirectBingUrl = contentLower.includes('bat.bing.com') || contentLower.includes('bing.com/bat');
+  const loadedViaGTM = gtmDetected && detected && !networkDetected && !hasDirectBingUrl;
   const detection = buildDetectionMetadata({
     scriptDetected,
     networkDetected,
-    identifiers: tagId ? [tagId] : [],
+    windowDetected,
+    identifiers: tagIds,
     identifierLabel: 'Tag-ID',
     loadedViaGTM,
   });
@@ -1349,9 +1380,7 @@ function analyzeOtherTracking(
     );
 
     if (scriptDetected || networkDetected) {
-      const likelyViaGTM = gtmDetected && !service.patterns.some(p => 
-        scriptContent.includes(p) && !contentLower.includes('gtm')
-      );
+      const likelyViaGTM = gtmDetected && networkDetected && !scriptDetected;
       const detection = buildDetectionMetadata({
         scriptDetected,
         networkDetected,

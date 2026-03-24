@@ -127,6 +127,88 @@ export const posthogFixture = createCrawlResult({
   ],
 });
 
+export const bingFalsePositiveTextFixture = createCrawlResult({
+  html: `
+    <html>
+      <head>
+        <script src="https://www.googletagmanager.com/gtm.js?id=GTM-TEST123"></script>
+      </head>
+      <body>
+        <img src="/content/cache/location/3/7bc/47c49b1aa628877d/berghuette_baerenfalle_galerie_c_01.jpg" alt="Berghuette">
+      </body>
+    </html>
+  `,
+  scripts: [
+    'https://www.googletagmanager.com/gtm.js?id=GTM-TEST123',
+  ],
+  networkRequests: [
+    createRequest('https://www.googletagmanager.com/gtm.js?id=GTM-TEST123'),
+  ],
+});
+
+export const bingUetFixture = createCrawlResult({
+  html: `<script>
+    (function(w,d,t,r,u){
+      var f,n,i;
+      w[u]=w[u]||[];
+      f=function(){
+        var o={ti:"12345678"};
+        o.q=w[u];
+        w[u]=new UET(o);
+        w[u].push("pageLoad");
+      };
+      n=d.createElement(t);
+      n.src=r;
+      n.async=1;
+      n.onload=n.onreadystatechange=function(){
+        var s=this.readyState;
+        if(!s||s==="loaded"||s==="complete"){
+          f();
+          n.onload=n.onreadystatechange=null;
+        }
+      };
+      i=d.getElementsByTagName(t)[0];
+      i.parentNode.insertBefore(n,i);
+    })(window,document,"script","https://bat.bing.com/bat.js","uetq");
+  </script>`,
+  scripts: [
+    `(function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[];f=function(){var o={ti:"12345678"};o.q=w[u];w[u]=new UET(o);w[u].push("pageLoad");};n=d.createElement(t);n.src=r;n.async=1;i=d.getElementsByTagName(t)[0];i.parentNode.insertBefore(n,i);})(window,document,"script","https://bat.bing.com/bat.js","uetq");`,
+  ],
+  networkRequests: [
+    createRequest('https://bat.bing.com/bat.js?ti=12345678'),
+  ],
+  windowObjects: createWindowObjects({
+    additionalTrackingObjects: { uetq: true },
+  }),
+});
+
+export const matomoInlineSnippetFixture = createCrawlResult({
+  html: `
+    <script src="https://www.googletagmanager.com/gtm.js?id=GTM-TEST123"></script>
+    <script>
+      var _paq = window._paq = window._paq || [];
+      _paq.push(['trackPageView']);
+      _paq.push(['enableLinkTracking']);
+      (function() {
+        var u = "https://stats.example.com/";
+        _paq.push(['setTrackerUrl', u + 'matomo.php']);
+        _paq.push(['setSiteId', '12']);
+        var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0];
+        g.async = true;
+        g.src = u + 'matomo.js';
+        s.parentNode.insertBefore(g, s);
+      })();
+    </script>
+  `,
+  scripts: [
+    'https://www.googletagmanager.com/gtm.js?id=GTM-TEST123',
+    `var _paq = window._paq = window._paq || []; _paq.push(['trackPageView']); _paq.push(['enableLinkTracking']); (function(){ var u = "https://stats.example.com/"; _paq.push(['setTrackerUrl', u + 'matomo.php']); _paq.push(['setSiteId', '12']); var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0]; g.async = true; g.src = u + 'matomo.js'; s.parentNode.insertBefore(g, s); })();`,
+  ],
+  networkRequests: [
+    createRequest('https://www.googletagmanager.com/gtm.js?id=GTM-TEST123'),
+  ],
+});
+
 export const consentModeV2Fixture = createCrawlResult({
   html: '<script>window.dataLayer = window.dataLayer || [];</script>',
   networkRequests: [

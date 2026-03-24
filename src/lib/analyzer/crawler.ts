@@ -103,6 +103,7 @@ export interface WindowObjectData {
     ttq?: boolean;
     lintrk?: boolean;
     _linkedin_data_partner_ids?: unknown;
+    uetq?: boolean;
     snaptr?: boolean;
     pintrk?: boolean;
     twq?: boolean;
@@ -669,6 +670,7 @@ export class WebCrawler {
           ttq: typeof win.ttq === 'object',
           lintrk: typeof win.lintrk === 'function',
           _linkedin_data_partner_ids: win._linkedin_data_partner_ids,
+          uetq: Array.isArray(win.uetq) || (typeof win.uetq === 'object' && win.uetq !== null),
           snaptr: typeof win.snaptr === 'function',
           pintrk: typeof win.pintrk === 'function',
           twq: typeof win.twq === 'function',
