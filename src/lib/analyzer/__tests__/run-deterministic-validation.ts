@@ -13,11 +13,14 @@ import { analyzeTrackingTags } from '../trackingTagsAnalyzer';
 import { getSuspiciousAnalysisReason } from '@/lib/analysisResultMeta';
 import type { AnalysisResult } from '@/types';
 import {
+  bingFalsePositiveTextFixture,
+  bingUetFixture,
   consentModeV2Fixture,
   falsePositiveFirstPartyTrackingAssetFixture,
   firstPartySgtmFixture,
   gaViaDataLayerFixture,
   genericDataLayerOnlyFixture,
+  matomoInlineSnippetFixture,
   metaServerSideFixture,
   posthogFixture,
   usercentricsBannerFixture,
@@ -182,7 +185,8 @@ const cases: ValidationCase[] = [
       const result = analyzeTrackingTags(firstPartySgtmFixture);
       assert.equal(result.serverSideTracking.detected, true);
       assert.equal(result.serverSideTracking.summary.hasServerSideGTM, true);
-      assert.equal(result.googleTagManager.serverSideGTM.detected, true);
+      assert.ok(result.googleTagManager.serverSideGTM);
+      assert.equal(result.googleTagManager.serverSideGTM?.detected, true);
     },
   },
   {
@@ -204,6 +208,38 @@ const cases: ValidationCase[] = [
       assert.equal(posthog?.confidence, 'high');
       assert.ok(posthog?.detectionMethod.includes('script'));
       assert.ok(posthog?.detectionMethod.includes('network'));
+    },
+  },
+  {
+    name: 'Berghuette-Substring erzeugt kein Bing False Positive',
+    run: () => {
+      const result = analyzeTrackingTags(bingFalsePositiveTextFixture);
+      assert.equal(result.bingAds.detected, false);
+      assert.equal(result.bingAds.loadedViaGTM, false);
+      assert.equal(result.bingAds.confidence, 'low');
+    },
+  },
+  {
+    name: 'Echte Bing UET Signale bleiben erkannt',
+    run: () => {
+      const result = analyzeTrackingTags(bingUetFixture);
+      assert.equal(result.bingAds.detected, true);
+      assert.equal(result.bingAds.tagId, '12345678');
+      assert.ok(result.bingAds.detectionMethod.includes('script'));
+      assert.ok(result.bingAds.detectionMethod.includes('network'));
+      assert.ok(result.bingAds.detectionMethod.includes('window'));
+      assert.equal(result.bingAds.confidence, 'high');
+    },
+  },
+  {
+    name: 'Direktes Matomo Snippet wird nicht als GTM geladen markiert',
+    run: () => {
+      const result = analyzeTrackingTags(matomoInlineSnippetFixture);
+      const matomo = result.other.find((entry) => entry.name === 'Matomo/Piwik');
+      assert.ok(matomo);
+      assert.equal(matomo?.detected, true);
+      assert.equal(matomo?.loadedViaGTM, false);
+      assert.ok(matomo?.detectionMethod.includes('script'));
     },
   },
   {
