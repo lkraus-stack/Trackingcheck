@@ -3,6 +3,7 @@ import { reduceAnalysisResultForAI, reduceForQuestion } from './dataReducer';
 import type { ReducedAnalysisData } from './dataReducer';
 import { getCachedReducedData, setCachedReducedData } from '@/lib/cache/analysisCache';
 import { AnalysisResult } from '@/types';
+import { SHARED_CHAT_POLICY_PROMPT } from './chatPolicy';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -248,7 +249,12 @@ Deine Berichte sind:
 
 Antworte immer auf Deutsch und strukturiere deine Antwort klar mit Überschriften (##), Unterüberschriften (###), Aufzählungen und nummerierten Listen.`;
 
-    const userPrompt = `Hier sind die Analyse-Ergebnisse einer Website:
+    const userPrompt = `Wichtige Grenzen:
+- Gib keine Rechtsberatung.
+- Nenne keine Bußgelder, Abmahnungen, Haftungs- oder Zulässigkeitsaussagen.
+- Konzentriere dich auf fachliche Einordnung, operative Risiken und sinnvolle Maßnahmen.
+
+Hier sind die Analyse-Ergebnisse einer Website:
 
 ${JSON.stringify(reducedData)}
 
@@ -382,7 +388,9 @@ Verwende fuer Antworten diese Struktur:
 ### Bezug zur Analyse
 ### Konkrete Empfehlung
 
-Fuege ### Offene Punkte nur dann hinzu, wenn relevante Unsicherheiten, fehlende Daten oder manuelle Pruefungen wichtig sind.`
+Fuege ### Offene Punkte nur dann hinzu, wenn relevante Unsicherheiten, fehlende Daten oder manuelle Pruefungen wichtig sind.
+
+${SHARED_CHAT_POLICY_PROMPT}`
       : `Du bist ein Senior-Experte fuer Web-Tracking, CMPs, GTM, Google Consent Mode, DSGVO-nahes Tracking und Datenschutz-Audits.
 
 Ziel:
@@ -402,7 +410,9 @@ Verwende fuer Antworten diese Struktur:
 ### Einordnung
 ### Praxisempfehlung
 
-Fuege ### Offene Punkte nur dann hinzu, wenn Annahmen, Grenzen oder zusaetzliche Pruefschritte relevant sind.`;
+Fuege ### Offene Punkte nur dann hinzu, wenn Annahmen, Grenzen oder zusaetzliche Pruefschritte relevant sind.
+
+${SHARED_CHAT_POLICY_PROMPT}`;
 
     const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
 
@@ -466,7 +476,9 @@ Du bist:
 - Konstruktiv aber kritisch
 - Praxisorientiert mit Fokus auf umsetzbare Verbesserungen
 
-Antworte auf Deutsch mit klarer Struktur.`;
+Antworte auf Deutsch mit klarer Struktur.
+
+${SHARED_CHAT_POLICY_PROMPT}`;
 
     const userPrompt = `Hier sind die reduzierten Analyse-Ergebnisse einer Website (für Kontext):
 

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Globe, Loader2, History, RefreshCw, Brain, XCircle, Clock, LayoutDashboard, BookOpen, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
+import { StructuredChatResponse } from '@/lib/ai/chatPolicy';
 import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
 import { SetupWizard } from './SetupWizard';
@@ -34,6 +35,7 @@ interface Message {
   requiresLogin?: boolean;
   chatMode?: 'general' | 'analysis';
   contextUrl?: string;
+  response?: StructuredChatResponse;
 }
 
 interface ChatInterfaceProps {
@@ -62,11 +64,30 @@ const MAX_HISTORY_MESSAGE_LENGTH = 1200;
 type ChatApiResponse = {
   success?: boolean;
   answer?: string;
+  response?: StructuredChatResponse;
+  intent?: string;
   error?: string;
   details?: string;
   upgradeRequired?: boolean;
   requiresLogin?: boolean;
 };
+
+function getResponseKindLabel(kind?: StructuredChatResponse['kind']): string {
+  switch (kind) {
+    case 'offer':
+      return 'Angebotsantwort';
+    case 'company':
+      return 'Firmeninfo';
+    case 'analysis':
+      return 'Analyse-Antwort';
+    case 'guardrail':
+      return 'Begrenzte Antwort';
+    case 'handoff':
+      return 'Weiterleitung';
+    default:
+      return 'Allgemeine KI-Antwort';
+  }
+}
 
 function normalizeComparableUrl(value?: string | null): string | null {
   if (!value) return null;
@@ -455,10 +476,11 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
           message.id === loadingId
             ? {
                 ...message,
-                content: data.answer || 'Keine Antwort erhalten.',
+                content: data.response?.markdown || data.answer || 'Keine Antwort erhalten.',
                 isLoading: false,
                 chatMode: mode,
                 contextUrl,
+                response: data.response,
               }
             : message
         )
@@ -618,18 +640,73 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                     {message.kind === 'chat' && message.role === 'assistant' && (
                       <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
                         <span className="px-2 py-0.5 rounded-full bg-slate-700/70 text-slate-300">
-                          {message.chatMode === 'analysis' ? 'Analyse-Kontext' : 'Allgemeine KI-Antwort'}
+                          {getResponseKindLabel(message.response?.kind ?? (message.chatMode === 'analysis' ? 'analysis' : 'general'))}
                         </span>
                         {message.contextUrl && (
                           <span className="truncate max-w-full text-slate-500">
                             Bezug: {message.contextUrl}
                           </span>
                         )}
+                        {message.response?.chips?.map((chip) => (
+                          <span
+                            key={`${message.id}-${chip}`}
+                            className="px-2 py-0.5 rounded-full bg-slate-900/70 text-slate-400"
+                          >
+                            {chip}
+                          </span>
+                        ))}
                       </div>
                     )}
                     <div className="flex items-start gap-2">
                       {message.kind === 'chat' && message.role === 'assistant' ? (
-                        <div className="prose prose-invert prose-sm max-w-none text-sm text-slate-200">
+                        <div className="w-full space-y-3">
+                          {message.response?.title && (
+                            <div className="rounded-xl border border-slate-700/80 bg-slate-900/40 px-3 py-2">
+                              <p className="text-sm font-semibold text-white">
+                                {message.response.title}
+                              </p>
+                            </div>
+                          )}
+                          {message.response?.cards && message.response.cards.length > 0 && (
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {message.response.cards.map((card) => (
+                                <div
+                                  key={`${message.id}-${card.title}`}
+                                  className="rounded-xl border border-slate-700 bg-slate-900/50 p-3"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-white">{card.title}</p>
+                                      {card.badge && (
+                                        <p className="mt-1 text-xs text-indigo-300">{card.badge}</p>
+                                      )}
+                                    </div>
+                                    {card.priceLabel && (
+                                      <span className="shrink-0 rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs text-indigo-300">
+                                        {card.priceLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {card.description && (
+                                    <p className="mt-2 text-sm text-slate-300">{card.description}</p>
+                                  )}
+                                  {card.setupTimeLabel && (
+                                    <p className="mt-2 text-xs text-slate-400">
+                                      Aufwand: {card.setupTimeLabel}
+                                    </p>
+                                  )}
+                                  {card.bullets && card.bullets.length > 0 && (
+                                    <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-300">
+                                      {card.bullets.map((bullet) => (
+                                        <li key={`${card.title}-${bullet}`}>{bullet}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="prose prose-invert prose-sm max-w-none text-sm text-slate-200">
                           <ReactMarkdown
                             components={{
                               h3: ({ children }) => (
@@ -667,6 +744,31 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                           >
                             {message.content}
                           </ReactMarkdown>
+                          </div>
+                          {(message.response?.ctaHref || message.response?.suggestedPrompts?.length) && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {message.response?.ctaHref && message.response?.ctaLabel && (
+                                <a
+                                  href={message.response.ctaHref}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500 transition-colors"
+                                >
+                                  {message.response.ctaLabel}
+                                </a>
+                              )}
+                              {message.response?.suggestedPrompts?.map((prompt) => (
+                                <button
+                                  key={`${message.id}-${prompt}`}
+                                  type="button"
+                                  onClick={() => setInput(prompt)}
+                                  className="rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs text-slate-300 hover:border-indigo-500/60 hover:text-white transition-colors"
+                                >
+                                  {prompt}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <p className="text-sm">{message.content}</p>

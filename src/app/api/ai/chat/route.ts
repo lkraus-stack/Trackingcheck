@@ -3,6 +3,14 @@ import { getVanteroClient } from '@/lib/ai';
 import { AnalysisResult } from '@/types';
 import { auth } from '@/lib/auth/config';
 import { checkFeatureAccess, incrementUsage } from '@/lib/auth/usage';
+import { buildCompanyChatResponse } from '@/lib/ai/companyKnowledge';
+import { buildOfferCostResponse } from '@/lib/ai/offerChat';
+import {
+  StructuredChatResponse,
+  classifyChatIntent,
+  createPolicyResponseForIntent,
+  sanitizeStructuredChatResponse,
+} from '@/lib/ai/chatPolicy';
 
 // Vercel Serverless Konfiguration
 // Vercel Pro: max 300 Sekunden, Hobby: max 60 Sekunden
@@ -11,6 +19,30 @@ export const dynamic = 'force-dynamic';
 
 const CHAT_HISTORY_LIMIT = 8;
 const MAX_HISTORY_ENTRY_CHARS = 1500;
+
+function buildLlmStructuredResponse(
+  mode: 'general' | 'analysis',
+  answer: string,
+  context: AnalysisResult | null
+): StructuredChatResponse {
+  return {
+    kind: mode === 'analysis' ? 'analysis' : 'general',
+    title: mode === 'analysis' ? 'Antwort zur aktuellen Analyse' : 'Fachliche Einordnung',
+    markdown: answer,
+    chips: mode === 'analysis'
+      ? ['Analyse', context?.url ?? 'Website-Kontext']
+      : ['Allgemeine Fachfrage'],
+    suggestedPrompts: mode === 'analysis'
+      ? [
+          'Welche 3 Maßnahmen sollte ich zuerst umsetzen?',
+          'Was treibt hier Aufwand und Kosten am stärksten?',
+        ]
+      : [
+          'Erkläre mir Consent Mode V2 in einfachen Worten.',
+          'Wann brauche ich TCF 2.2?',
+        ],
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,29 +96,60 @@ export async function POST(request: NextRequest) {
           .slice(-CHAT_HISTORY_LIMIT)
       : [];
 
-    const client = getVanteroClient();
+    const trimmedQuestion = question.trim();
+    const safeContext = context || null;
+    const intent = classifyChatIntent(trimmedQuestion, {
+      hasAnalysisContext: Boolean(safeContext),
+    });
 
-    if (!client.isConfigured()) {
-      return NextResponse.json(
-        { error: 'KI-API ist nicht konfiguriert', configured: false },
-        { status: 503 }
-      );
+    let responsePayload: StructuredChatResponse;
+
+    if (intent === 'offer_cost') {
+      responsePayload = buildOfferCostResponse(safeContext);
+    } else if (intent === 'company_public') {
+      responsePayload =
+        buildCompanyChatResponse(trimmedQuestion) ??
+        createPolicyResponseForIntent('company_unknown');
+    } else if (
+      intent === 'company_unknown' ||
+      intent === 'off_topic' ||
+      intent === 'unethical_tracking' ||
+      intent === 'internal_or_secret' ||
+      intent === 'competitor_claim' ||
+      intent === 'guarantee_or_legal_sensitive' ||
+      intent === 'needs_human'
+    ) {
+      responsePayload = createPolicyResponseForIntent(intent);
+    } else {
+      const client = getVanteroClient();
+
+      if (!client.isConfigured()) {
+        return NextResponse.json(
+          { error: 'KI-API ist nicht konfiguriert', configured: false },
+          { status: 503 }
+        );
+      }
+
+      const answer = await client.answerQuestion({
+        question: trimmedQuestion,
+        context: safeContext,
+        mode: safeMode,
+        history: safeHistory,
+      });
+
+      responsePayload = buildLlmStructuredResponse(safeMode, answer, safeContext);
     }
 
-    // Frage beantworten
-    const answer = await client.answerQuestion({
-      question: question.trim(),
-      context: context || null,
-      mode: safeMode,
-      history: safeHistory,
-    });
+    responsePayload = sanitizeStructuredChatResponse(responsePayload);
 
     await incrementUsage(session.user.id, 'aiRequests');
 
     return NextResponse.json({
       success: true,
-      answer,
+      answer: responsePayload.markdown,
+      response: responsePayload,
       mode: safeMode,
+      intent,
     });
   } catch (error) {
     console.error('KI-Chat Fehler:', error);
