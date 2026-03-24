@@ -28,17 +28,34 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { question, context } = body as { 
-      question: string; 
-      context: AnalysisResult;
+    const { question, context, mode, history } = body as {
+      question: string;
+      context?: AnalysisResult | null;
+      mode?: 'general' | 'analysis';
+      history?: Array<{
+        role: 'user' | 'assistant';
+        content: string;
+      }>;
     };
 
-    if (!question) {
+    if (!question?.trim()) {
       return NextResponse.json(
         { error: 'Frage ist erforderlich' },
         { status: 400 }
       );
     }
+
+    const safeMode = mode === 'analysis' ? 'analysis' : 'general';
+    const safeHistory = Array.isArray(history)
+      ? history
+          .filter((entry) =>
+            entry &&
+            (entry.role === 'user' || entry.role === 'assistant') &&
+            typeof entry.content === 'string' &&
+            entry.content.trim().length > 0
+          )
+          .slice(-6)
+      : [];
 
     const client = getVanteroClient();
 
@@ -50,13 +67,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Frage beantworten
-    const answer = await client.answerQuestion(question, context || {});
+    const answer = await client.answerQuestion({
+      question: question.trim(),
+      context: context || null,
+      mode: safeMode,
+      history: safeHistory,
+    });
 
     await incrementUsage(session.user.id, 'aiRequests');
 
     return NextResponse.json({
       success: true,
       answer,
+      mode: safeMode,
     });
   } catch (error) {
     console.error('KI-Chat Fehler:', error);

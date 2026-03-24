@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, MessageSquare, Send, Bot, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Sparkles, Loader2, Bot, AlertCircle, AlertTriangle } from 'lucide-react';
 import { AnalysisResult } from '@/types';
 import ReactMarkdown from 'react-markdown';
 
@@ -14,12 +14,6 @@ interface AnalyzeAiResponse {
   analysis?: string;
   validation?: string | null;
   configured?: boolean;
-  details?: string;
-  error?: string;
-}
-
-interface ChatAiResponse {
-  answer?: string;
   details?: string;
   error?: string;
 }
@@ -50,10 +44,6 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
   const [validation, setValidation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showChat, setShowChat] = useState(false);
-  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const generateAnalysis = async () => {
     setIsLoading(true);
@@ -89,39 +79,8 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
     }
   };
 
-  const sendChatMessage = async () => {
-    if (!chatInput.trim() || isChatLoading) return;
-
-    const userMessage = chatInput.trim();
-    setChatInput('');
-    setChatMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
-    setIsChatLoading(true);
-
-    try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userMessage, context: result }),
-      });
-
-      const data = await readJsonResponse<ChatAiResponse>(response);
-
-      if (!response.ok) {
-        throw new Error(data.details || data.error || 'Antwort fehlgeschlagen');
-      }
-
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: data.answer || 'Keine Antwort erhalten.' },
-      ]);
-    } catch (err) {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: `Fehler: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}` },
-      ]);
-    } finally {
-      setIsChatLoading(false);
-    }
+  const focusMainChat = () => {
+    window.dispatchEvent(new CustomEvent('tracking-chat-focus'));
   };
 
   return (
@@ -246,17 +205,6 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
                 {aiAnalysis}
               </ReactMarkdown>
             </div>
-
-            {/* Chat Toggle */}
-            <div className="px-4 py-3 border-t border-purple-500/30 bg-purple-500/5">
-              <button
-                onClick={() => setShowChat(!showChat)}
-                className="flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
-              >
-                <MessageSquare className="w-4 h-4" />
-                {showChat ? 'Chat ausblenden' : 'Rückfragen zum Bericht stellen'}
-              </button>
-            </div>
           </div>
 
           {/* Validierungs-Ergebnisse */}
@@ -336,71 +284,20 @@ export function AIAnalysis({ result, onAnalysisGenerated }: AIAnalysisProps) {
               </div>
             </div>
           )}
-        </>
-      )}
 
-      {/* Chat Interface */}
-      {showChat && aiAnalysis && (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700">
-            <p className="text-sm text-slate-400">Stelle Fragen zur Analyse</p>
-          </div>
-
-          {/* Chat Messages */}
-          {chatMessages.length > 0 && (
-            <div className="max-h-60 overflow-y-auto p-4 space-y-3">
-              {chatMessages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                      msg.role === 'user'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-700 text-slate-200'
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {isChatLoading && (
-                <div className="flex items-center gap-2 text-slate-400 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Denkt nach...</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Chat Input */}
-          <div className="p-3 border-t border-slate-700">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendChatMessage();
-              }}
-              className="flex gap-2"
+          <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+            <p className="text-sm text-slate-200">Rückfragen zur Analyse stellst du direkt im Hauptchat.</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Dort kannst du weitere URLs prüfen oder konkrete Fragen zu dieser Website stellen.
+            </p>
+            <button
+              onClick={focusMainChat}
+              className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
             >
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="z.B. Was bedeutet TCF 2.2?"
-                className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                disabled={isChatLoading}
-              />
-              <button
-                type="submit"
-                disabled={!chatInput.trim() || isChatLoading}
-                className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
+              Zum Hauptchat springen
+            </button>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

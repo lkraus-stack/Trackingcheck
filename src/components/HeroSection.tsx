@@ -35,12 +35,12 @@ export function HeroSection() {
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 sm:mb-5 leading-tight">
           <span className="text-slate-100">Prüfe dein Tracking</span>
           <br className="hidden sm:block" />
-          <span className="gradient-text">direkt im Chat</span>
+          <span className="gradient-text">und frage direkt nach</span>
         </h1>
 
         <p className="text-base sm:text-lg text-slate-400 mb-6 sm:mb-7 max-w-2xl mx-auto">
-          Gib deine URL ein und erhalte in wenigen Sekunden einen klaren Check zu Cookie-Banner,
-          Consent Mode v2, Tracking-Tags und DSGVO-Risiken.
+          Gib deine URL ein oder stelle direkt Fachfragen. Du erhältst in wenigen Sekunden
+          einen klaren Check zu Cookie-Banner, Consent Mode v2, Tracking-Tags und DSGVO-Risiken.
         </p>
 
         <div className="flex flex-col items-center gap-3">
@@ -72,6 +72,7 @@ export function HeroSection() {
           <InfoPill text="Cookie-Banner" />
           <InfoPill text="Consent Mode v2" />
           <InfoPill text="GA4, Meta, TikTok" />
+          <InfoPill text="Fragen direkt im Chat" />
           <InfoPill text="DSGVO-Check" />
         </div>
       </div>

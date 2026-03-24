@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Globe, Loader2, History, RefreshCw, Brain, XCircle, Clock, LayoutDashboard, BookOpen } from 'lucide-react';
+import { Send, Globe, Loader2, History, RefreshCw, Brain, XCircle, Clock, LayoutDashboard, BookOpen, Sparkles } from 'lucide-react';
 import { AnalysisResult, AnalysisStep, AnalysisHistoryItem } from '@/types';
 import { ResultCard } from './ResultCard';
 import { Dashboard } from './Dashboard';
@@ -16,6 +16,7 @@ interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  kind?: 'analysis' | 'chat';
   analysisResult?: AnalysisResult;
   isLoading?: boolean;
   analysisSteps?: AnalysisStep[];
@@ -29,6 +30,9 @@ interface Message {
   currentUsage?: number;
   limit?: number;
   resetDate?: string;
+  requiresLogin?: boolean;
+  chatMode?: 'general' | 'analysis';
+  contextUrl?: string;
 }
 
 interface ChatInterfaceProps {
@@ -44,6 +48,20 @@ type AnalyzeApiResponse = AnalysisResult & {
   currentUsage?: number;
   limit?: number;
   resetDate?: string;
+};
+
+type ChatHistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+type ChatApiResponse = {
+  success?: boolean;
+  answer?: string;
+  error?: string;
+  details?: string;
+  upgradeRequired?: boolean;
+  requiresLogin?: boolean;
 };
 
 function normalizeComparableUrl(value?: string | null): string | null {
@@ -62,12 +80,42 @@ function normalizeComparableUrl(value?: string | null): string | null {
   }
 }
 
+function isLikelyUrlInput(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) return false;
+
+  try {
+    const candidate = trimmed.startsWith('http://') || trimmed.startsWith('https://')
+      ? trimmed
+      : `https://${trimmed}`;
+    const url = new URL(candidate);
+    return Boolean(url.hostname && url.hostname.includes('.'));
+  } catch {
+    return false;
+  }
+}
+
+function getChatHistoryFromMessages(messages: Message[]): ChatHistoryMessage[] {
+  return messages
+    .filter((message) =>
+      message.kind === 'chat' &&
+      !message.isLoading &&
+      !message.error &&
+      (message.role === 'user' || message.role === 'assistant')
+    )
+    .slice(-6)
+    .map((message) => ({
+      role: message.role as ChatHistoryMessage['role'],
+      content: message.content,
+    }));
+}
+
 export function ChatInterface({ embedded = false, autoFocus = false }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'system',
-      content: 'Willkommen beim Tracking Checker! 👋 Geben Sie eine Website-URL ein, und ich analysiere das Tracking-Setup, den Cookie-Banner, die Einwilligungssignale und die DSGVO/DMA-Compliance für Sie.',
+      content: 'Willkommen beim Tracking Checker. Gib eine Website-URL ein oder stelle direkt eine Frage zu Tracking, Consent Mode, DSGVO, CMPs oder GTM.',
       timestamp: new Date(),
     },
   ]);
@@ -78,34 +126,51 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
+  const [activeContext, setActiveContext] = useState<AnalysisResult | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Prüfe ob ein fertiger Bericht vorhanden ist
-  const hasCompletedAnalysis = messages.some(msg => msg.analysisResult && !msg.isLoading);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const hasConversation = messages.some((message) => message.role !== 'system');
   const hasOnlyWelcomeMessage =
     embedded &&
-    !hasCompletedAnalysis &&
+    !hasConversation &&
     messages.length === 1 &&
     messages[0]?.role === 'system';
+  const inputLooksLikeUrl = isLikelyUrlInput(input);
+  const activeContextLabel = activeContext
+    ? `Antworten beziehen sich aktuell auf ${activeContext.url}`
+    : 'Allgemeiner KI-Assistent ohne Website-Kontext';
+  const examplePrompts = activeContext
+    ? [
+        'Was sind hier die 3 kritischsten Probleme?',
+        'Wie würde ich Consent Mode V2 korrekt umsetzen?',
+        activeContext.url,
+      ]
+    : [
+        'https://example.com',
+        'Was ist Google Consent Mode V2?',
+        'Wann brauche ich TCF 2.2?',
+      ];
 
   // History laden
   useEffect(() => {
     setHistory(getAnalysisHistory());
   }, []);
 
+  useEffect(() => {
+    const handleFocus = () => {
+      inputRef.current?.focus();
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    window.addEventListener('tracking-chat-focus', handleFocus);
+    return () => window.removeEventListener('tracking-chat-focus', handleFocus);
+  }, []);
+
   // KEIN automatisches Scrollen - der User scrollt selbst wenn gewünscht
 
   const isValidUrl = (string: string) => {
-    try {
-      let url = string.trim();
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
+    return isLikelyUrlInput(string);
   };
 
   const simulateAnalysisSteps = (loadingId: string) => {
@@ -133,9 +198,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent, urlOverride?: string, skipCache?: boolean) => {
-    e?.preventDefault?.();
-    const urlToAnalyze = urlOverride || input;
+  const handleAnalyze = async (urlToAnalyze: string, skipCache?: boolean) => {
     const requestedUrl = normalizeComparableUrl(urlToAnalyze);
     const currentUrl = normalizeComparableUrl(currentAnalysis?.url);
     const effectiveSkipCache = skipCache === true || (!!requestedUrl && requestedUrl === currentUrl);
@@ -147,10 +210,11 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       role: 'user',
       content: urlToAnalyze,
       timestamp: new Date(),
+      kind: 'analysis',
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    if (!urlOverride) setInput('');
+    setInput('');
 
     if (!isValidUrl(urlToAnalyze)) {
       const errorMessage: Message = {
@@ -177,6 +241,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         content: effectiveSkipCache ? '🔄 Frischer Scan wird vorbereitet...' : '🔧 Analyse wird vorbereitet...',
         timestamp: new Date(),
         isLoading: true,
+        kind: 'analysis',
       },
     ]);
 
@@ -249,6 +314,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         addToHistory(data);
         setHistory(getAnalysisHistory());
         setCurrentAnalysis(data as AnalysisResult);
+        setActiveContext(data as AnalysisResult);
         
         // Automatisch in IndexedDB speichern für Vergleichsfunktion
         try {
@@ -272,6 +338,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                   ? `✅ Frische Analyse für ${data.url} abgeschlossen!`
                   : `✅ Analyse für ${data.url} abgeschlossen!`,
                 isLoading: false,
+                kind: 'analysis',
                 analysisResult: data as AnalysisResult,
                 analysisSteps: data.analysisSteps,
                 fromCache: data.fromCache,
@@ -315,20 +382,142 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
     }
   };
 
+  const handleQuestion = async (question: string) => {
+    if (!question.trim() || isLoading) return;
+
+    const contextSnapshot = activeContext;
+    const contextUrl = contextSnapshot?.url;
+    const mode = contextSnapshot ? 'analysis' : 'general';
+    const conversationHistory = getChatHistoryFromMessages(messages);
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: question,
+      timestamp: new Date(),
+      kind: 'chat',
+      chatMode: mode,
+      contextUrl,
+    };
+
+    const loadingId = (Date.now() + 1).toString();
+
+    setMessages((prev) => [
+      ...prev,
+      userMessage,
+      {
+        id: loadingId,
+        role: 'assistant',
+        content: mode === 'analysis'
+          ? `Ich bereite eine Antwort zur Analyse von ${contextUrl} vor...`
+          : 'Ich bereite eine Antwort vor...',
+        timestamp: new Date(),
+        isLoading: true,
+        kind: 'chat',
+        chatMode: mode,
+        contextUrl,
+      },
+    ]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: question.trim(),
+          mode,
+          context: contextSnapshot ?? undefined,
+          history: conversationHistory,
+        }),
+      });
+
+      const data = await response.json() as ChatApiResponse;
+
+      if (!response.ok) {
+        throw {
+          type: data.error || 'Antwort fehlgeschlagen',
+          message: data.details || data.error || 'Die Frage konnte nicht beantwortet werden.',
+          upgradeRequired: data.upgradeRequired,
+          requiresLogin: data.requiresLogin,
+        };
+      }
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === loadingId
+            ? {
+                ...message,
+                content: data.answer || 'Keine Antwort erhalten.',
+                isLoading: false,
+                chatMode: mode,
+                contextUrl,
+              }
+            : message
+        )
+      );
+    } catch (error) {
+      const errorInfo = error as {
+        type?: string;
+        message?: string;
+        upgradeRequired?: boolean;
+        requiresLogin?: boolean;
+      };
+
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === loadingId
+            ? {
+                ...message,
+                content: `❌ ${errorInfo.type || 'Fehler beim KI-Chat'}`,
+                isLoading: false,
+                error: {
+                  type: errorInfo.type || 'error',
+                  message: errorInfo.requiresLogin
+                    ? 'Für den KI-Chat musst du eingeloggt sein.'
+                    : errorInfo.message || 'Unbekannter Fehler',
+                },
+                upgradeRequired: errorInfo.upgradeRequired,
+                requiresLogin: errorInfo.requiresLogin,
+                chatMode: mode,
+                contextUrl,
+              }
+            : message
+        )
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextInput = input.trim();
+
+    if (!nextInput || isLoading) return;
+
+    if (isLikelyUrlInput(nextInput)) {
+      await handleAnalyze(nextInput);
+      return;
+    }
+
+    await handleQuestion(nextInput);
+  };
+
   const handleHistoryClick = (item: AnalysisHistoryItem) => {
     setShowHistory(false);
-    handleSubmit({ preventDefault: () => {} } as React.FormEvent, item.url);
+    void handleAnalyze(item.url);
   };
 
   const handleRefresh = (url: string) => {
-    handleSubmit({ preventDefault: () => {} } as React.FormEvent, url, true);
+    void handleAnalyze(url, true);
   };
 
   return (
     <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 ${
-      hasCompletedAnalysis 
-        ? '' // Keine feste Höhe wenn Bericht fertig ist
-        : hasOnlyWelcomeMessage
+      hasOnlyWelcomeMessage
         ? ''
         : embedded 
         ? 'min-h-[420px] sm:min-h-[460px] h-[56vh] sm:h-[58vh] max-h-[760px]' 
@@ -338,19 +527,12 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       <div 
         ref={messagesContainerRef} 
         className={`${
-          hasCompletedAnalysis 
-            ? 'py-3 sm:py-4 space-y-3 sm:space-y-4' // Normales Scrollen der Seite
-            : hasOnlyWelcomeMessage
+          hasOnlyWelcomeMessage
             ? 'py-2 sm:py-3 space-y-2'
             : 'flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0' // Scrollbarer Container
         }`}
       >
         {messages.map((message) => {
-          // Wenn Bericht fertig ist, verstecke alle Chat-Nachrichten außer dem Bericht
-          if (hasCompletedAnalysis && !message.analysisResult) {
-            return null;
-          }
-          
           return (
           <div
             key={message.id}
@@ -358,7 +540,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
           >
             <div
               className={`${
-                hasCompletedAnalysis && message.analysisResult
+                message.analysisResult
                   ? 'w-full' // Volle Breite für Bericht
                   : 'w-full sm:max-w-[90%] lg:max-w-[85%]'
               } rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
@@ -366,7 +548,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ml-auto max-w-[85%] sm:max-w-[70%]'
                   : message.role === 'system'
                   ? 'bg-slate-800/50 text-slate-200 border border-slate-700'
-                  : hasCompletedAnalysis && message.analysisResult
+                  : message.analysisResult
                   ? 'bg-transparent' // Transparent für Bericht
                   : 'bg-slate-800 text-slate-200'
               }`}
@@ -386,7 +568,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                 <div className="space-y-3">
                   {message.upgradeRequired ? (
                     <UpgradePrompt
-                      type="limit-reached"
+                      type={message.kind === 'chat' ? 'feature-unavailable' : 'limit-reached'}
                       message={message.error.message}
                       currentUsage={message.currentUsage}
                       limit={message.limit}
@@ -405,19 +587,41 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                           {message.error.details}
                         </p>
                       )}
-                      <button
-                        onClick={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent, messages[messages.length - 2]?.content)}
-                        className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        Erneut versuchen
-                      </button>
+                      {message.kind !== 'chat' && (
+                        <button
+                          onClick={() => {
+                            const previousAnalysisInput = [...messages]
+                              .reverse()
+                              .find((item) => item.role === 'user' && item.kind === 'analysis')?.content;
+
+                            if (previousAnalysisInput) {
+                              void handleAnalyze(previousAnalysisInput);
+                            }
+                          }}
+                          className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Erneut versuchen
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
               ) : (
                 <>
-                  {!hasCompletedAnalysis || message.analysisResult ? (
+                  <div className="flex flex-col gap-2">
+                    {message.kind === 'chat' && message.role === 'assistant' && (
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-700/70 text-slate-300">
+                          {message.chatMode === 'analysis' ? 'Analyse-Kontext' : 'Allgemeine KI-Antwort'}
+                        </span>
+                        {message.contextUrl && (
+                          <span className="truncate max-w-full text-slate-500">
+                            Bezug: {message.contextUrl}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <p className="text-sm">{message.content}</p>
                       {message.fromCache && (
@@ -427,9 +631,9 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                         </span>
                       )}
                     </div>
-                  ) : null}
+                  </div>
                   {message.analysisResult && (
-                    <div className={hasCompletedAnalysis ? 'mt-0 -mx-3 sm:-mx-4 lg:-mx-6' : 'mt-3'}>
+                    <div className="mt-3 -mx-3 sm:-mx-4 lg:-mx-6">
                       {message.fromCache && (
                         <button
                           onClick={() => handleRefresh(message.analysisResult!.url)}
@@ -446,18 +650,35 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                   )}
                 </>
               )}
-              {!hasCompletedAnalysis || !message.analysisResult ? (
-                <span className="text-xs opacity-50 mt-2 block">
-                  {message.timestamp.toLocaleTimeString('de-DE', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              ) : null}
+              <span className="text-xs opacity-50 mt-2 block">
+                {message.timestamp.toLocaleTimeString('de-DE', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
             </div>
           </div>
           );
         })}
+        {!hasConversation && (
+          <div className="grid gap-2 pt-2 sm:grid-cols-3">
+            {examplePrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => setInput(prompt)}
+                className="flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-3 text-left text-sm text-slate-300 hover:border-indigo-500/50 hover:bg-slate-800/80 transition-colors"
+              >
+                {isLikelyUrlInput(prompt) ? (
+                  <Globe className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
+                ) : (
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+                )}
+                <span>{prompt}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* History Panel */}
@@ -525,8 +746,25 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       <div className={`border-t border-slate-800 bg-slate-900/50 backdrop-blur ${
         hasOnlyWelcomeMessage ? 'py-2.5 sm:py-3' : 'py-3 sm:py-4'
       } ${
-        hasCompletedAnalysis ? 'sticky bottom-0 z-10' : 'shrink-0'
+        currentAnalysis ? 'sticky bottom-0 z-10' : 'shrink-0'
       }`}>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <Brain className="h-4 w-4 text-purple-400" />
+            <span className={activeContext ? 'text-slate-300' : 'text-slate-400'}>
+              {activeContextLabel}
+            </span>
+          </div>
+          {activeContext && (
+            <button
+              type="button"
+              onClick={() => setActiveContext(null)}
+              className="self-start text-xs text-slate-400 hover:text-slate-200"
+            >
+              Kontext zurücksetzen
+            </button>
+          )}
+        </div>
         <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3">
           {/* Action Buttons */}
           <div className="hidden min-[480px]:flex gap-2 sm:gap-3">
@@ -562,12 +800,21 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
           
           {/* Input Field */}
           <div className="relative flex-1 min-w-0">
-            <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
+            {inputLooksLikeUrl ? (
+              <Globe className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
+            ) : (
+              <Brain className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
+            )}
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Website-URL eingeben (z.B. www.example.com)"
+              placeholder={
+                activeContext
+                  ? `URL eingeben oder Rückfrage zu ${activeContext.url} stellen`
+                  : 'Website-URL eingeben oder Frage stellen'
+              }
               className="w-full pl-9 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-slate-800 border border-slate-700 rounded-lg sm:rounded-xl text-sm sm:text-base text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               disabled={isLoading}
               autoFocus={autoFocus}
@@ -585,7 +832,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
             ) : (
               <Send className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
-            <span className="hidden sm:inline">Analysieren</span>
+            <span className="hidden sm:inline">{inputLooksLikeUrl ? 'Prüfen' : 'Senden'}</span>
           </button>
         </form>
       </div>

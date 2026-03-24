@@ -145,10 +145,10 @@ export default function Home() {
                 Tracking-Check Chat
               </div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-100 mt-3 mb-2">
-                Starte deine Analyse
+                Starte deine Analyse oder stelle eine Frage
               </h2>
               <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
-                URL eingeben, prüfen lassen und direkt konkrete Hinweise erhalten.
+                URL eingeben, Tracking prüfen lassen und direkt Rückfragen oder Fachfragen im Chat stellen.
               </p>
             </div>
 

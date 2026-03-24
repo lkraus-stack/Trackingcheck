@@ -29,6 +29,18 @@ interface ChatCompletionResponse {
   };
 }
 
+interface QuestionHistoryEntry {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface AnswerQuestionOptions {
+  question: string;
+  context?: AnalysisResult | null;
+  mode?: 'general' | 'analysis';
+  history?: QuestionHistoryEntry[];
+}
+
 export class VanteroClient {
   private apiKey: string;
   private apiUrl: string;
@@ -281,25 +293,62 @@ Sei ausführlich, erkläre Fachbegriffe und gib konkrete, umsetzbare Handlungsem
     });
   }
 
-  async answerQuestion(question: string, context: unknown): Promise<string> {
-    // Reduziere Kontext basierend auf der Frage (nur relevante Teile)
-    const reducedContext = reduceForQuestion(context as AnalysisResult, question);
+  async answerQuestion({
+    question,
+    context,
+    mode = 'general',
+    history = [],
+  }: AnswerQuestionOptions): Promise<string> {
+    const hasAnalysisContext = mode === 'analysis' && !!context;
+    const reducedContext = hasAnalysisContext
+      ? reduceForQuestion(context as AnalysisResult, question)
+      : null;
 
-    const systemPrompt = `Du bist ein Experte für Web-Tracking und DSGVO-Compliance.
-Dir liegen Analyse-Ergebnisse einer Website vor. Beantworte Fragen basierend auf diesen Daten.
-Antworte präzise, hilfreich und auf Deutsch.`;
+    const systemPrompt = hasAnalysisContext
+      ? `Du bist ein Experte fuer Web-Tracking und DSGVO-Compliance.
+Dir liegen Analyse-Ergebnisse einer konkreten Website vor. Beantworte Fragen primaer auf Basis dieser Daten.
+Wenn die Frage nicht eindeutig aus dem Analyse-Kontext beantwortbar ist, sage das klar und markiere Annahmen explizit.
+Antworte praezise, hilfreich und immer auf Deutsch.`
+      : `Du bist ein Experte fuer Web-Tracking, Consent Management, CMPs, GTM, Google Consent Mode, DSGVO und Datenschutz-Audits.
+Beantworte allgemeine Fachfragen verstaendlich, praxisnah und immer auf Deutsch.
+Wenn etwas vom konkreten Setup einer Website abhaengt, weise kurz darauf hin.`;
 
-    const userPrompt = `Analyse-Kontext:
+    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
+
+    if (reducedContext) {
+      messages.push({
+        role: 'user',
+        content: `Kontext zur zuletzt analysierten Website:
 ${JSON.stringify(reducedContext)}
 
-Frage des Nutzers: ${question}`;
+Nutze diesen Kontext fuer Rueckfragen zur Analyse.`,
+      });
+      messages.push({
+        role: 'assistant',
+        content: 'Verstanden. Ich nutze die Analyse-Daten als Kontext fuer die folgenden Rueckfragen.',
+      });
+    }
 
-    return this.chat([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ], {
-      temperature: 0.7,
-      maxTokens: 1500,
+    history
+      .filter((entry) => entry.role === 'user' || entry.role === 'assistant')
+      .slice(-6)
+      .forEach((entry) => {
+        messages.push({
+          role: entry.role,
+          content: entry.content,
+        });
+      });
+
+    messages.push({
+      role: 'user',
+      content: hasAnalysisContext
+        ? `Frage zur analysierten Website: ${question}`
+        : question,
+    });
+
+    return this.chat(messages, {
+      temperature: hasAnalysisContext ? 0.5 : 0.7,
+      maxTokens: 1800,
     });
   }
 
