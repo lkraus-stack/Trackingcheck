@@ -82,6 +82,11 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   
   // Prüfe ob ein fertiger Bericht vorhanden ist
   const hasCompletedAnalysis = messages.some(msg => msg.analysisResult && !msg.isLoading);
+  const hasOnlyWelcomeMessage =
+    embedded &&
+    !hasCompletedAnalysis &&
+    messages.length === 1 &&
+    messages[0]?.role === 'system';
 
   // History laden
   useEffect(() => {
@@ -323,8 +328,10 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
     <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 ${
       hasCompletedAnalysis 
         ? '' // Keine feste Höhe wenn Bericht fertig ist
+        : hasOnlyWelcomeMessage
+        ? ''
         : embedded 
-        ? 'min-h-[600px] h-[70vh] max-h-[900px]' 
+        ? 'min-h-[420px] sm:min-h-[460px] h-[56vh] sm:h-[58vh] max-h-[760px]' 
         : 'h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)]'
     }`}>
       {/* Messages Area */}
@@ -333,6 +340,8 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         className={`${
           hasCompletedAnalysis 
             ? 'py-3 sm:py-4 space-y-3 sm:space-y-4' // Normales Scrollen der Seite
+            : hasOnlyWelcomeMessage
+            ? 'py-2 sm:py-3 space-y-2'
             : 'flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0' // Scrollbarer Container
         }`}
       >
@@ -513,7 +522,9 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       )}
 
       {/* Input Area */}
-      <div className={`border-t border-slate-800 py-3 sm:py-4 bg-slate-900/50 backdrop-blur ${
+      <div className={`border-t border-slate-800 bg-slate-900/50 backdrop-blur ${
+        hasOnlyWelcomeMessage ? 'py-2.5 sm:py-3' : 'py-3 sm:py-4'
+      } ${
         hasCompletedAnalysis ? 'sticky bottom-0 z-10' : 'shrink-0'
       }`}>
         <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3">

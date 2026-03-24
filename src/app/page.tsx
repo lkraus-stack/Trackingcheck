@@ -135,21 +135,25 @@ export default function Home() {
         {/* Analysis Section */}
         <section 
           id="analysis-section" 
-          className="py-12 sm:py-16 px-4"
+          className="scroll-mt-24 px-4 pt-4 pb-10 sm:pt-6 sm:pb-12"
         >
           <div className="max-w-[1400px] mx-auto">
             {/* Section Header */}
-            <div className="text-center mb-8">
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 mb-3">
-                Website analysieren
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-800 bg-slate-900/60 text-xs sm:text-sm text-slate-300">
+                <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                Tracking-Check Chat
+              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-100 mt-3 mb-2">
+                Starte deine Analyse
               </h2>
-              <p className="text-slate-400 max-w-xl mx-auto">
-                Gib deine URL ein und erhalte eine detaillierte Analyse deines Tracking-Setups.
+              <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto">
+                URL eingeben, prüfen lassen und direkt konkrete Hinweise erhalten.
               </p>
             </div>
 
             {/* Chat Interface */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-6 backdrop-blur-sm">
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-3 sm:p-5 backdrop-blur-sm">
               <ChatInterface embedded />
             </div>
           </div>
