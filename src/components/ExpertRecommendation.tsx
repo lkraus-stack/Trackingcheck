@@ -16,7 +16,6 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  Target,
   X,
 } from 'lucide-react';
 import { AnalysisResult } from '@/types';
@@ -221,6 +220,7 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
             title: selectedOffer.title,
             priceLabel: selectedOffer.priceLabel,
             badge: selectedOffer.badge,
+            setupTimeLabel: selectedOffer.setupTimeLabel,
             rationale: selectedOffer.rationale,
             includes: selectedOffer.includes,
             bestFor: selectedOffer.bestFor,
@@ -354,12 +354,32 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
         {expanded && (
           <div className="p-4 sm:p-5 space-y-5">
             {submittedRequest && (
-              <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4">
+              <div
+                className={`rounded-xl border p-4 ${
+                  submittedRequest.deliveryConfigured
+                    ? 'border-green-500/30 bg-green-500/10'
+                    : 'border-amber-500/30 bg-amber-500/10'
+                }`}
+              >
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                  <CheckCircle2
+                    className={`w-5 h-5 shrink-0 mt-0.5 ${
+                      submittedRequest.deliveryConfigured
+                        ? 'text-green-400'
+                        : 'text-amber-300'
+                    }`}
+                  />
                   <div>
-                    <p className="text-sm font-semibold text-green-300">
-                      Anfrage versendet
+                    <p
+                      className={`text-sm font-semibold ${
+                        submittedRequest.deliveryConfigured
+                          ? 'text-green-300'
+                          : 'text-amber-200'
+                      }`}
+                    >
+                      {submittedRequest.deliveryConfigured
+                        ? 'Anfrage versendet'
+                        : 'Anfrage vorbereitet'}
                     </p>
                     <p className="text-sm text-slate-300 mt-1">
                       {submittedRequest.deliveryConfigured ? (
@@ -391,28 +411,6 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
                 </span>
               ))}
             </div>
-
-            {recommendationSet.topIssues.length > 0 && (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Target className="w-4 h-4 text-amber-300" />
-                  <p className="text-sm font-medium text-slate-200">
-                    Diese Analyse treibt die Angebotsempfehlung
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {recommendationSet.topIssues.slice(0, 4).map((issue) => (
-                    <div
-                      key={issue}
-                      className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/60 p-2.5"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-indigo-300 shrink-0" />
-                      <span className="text-sm text-slate-300">{issue}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div
               className={`grid gap-4 ${
@@ -463,7 +461,7 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
                     Auf Basis dieser Analyse ein unverbindliches Angebot anfordern
                   </p>
                   <p className="text-sm text-slate-300 mt-1">
-                    Wir schicken eine erste Aufwandseinschätzung für{' '}
+                    Wir schicken eine erste Einschätzung für{' '}
                     <span className="text-slate-100">{hostLabel}</span> und melden uns
                     bei Rückfragen direkt.
                   </p>
@@ -551,26 +549,26 @@ function OfferCardView({
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <Sparkles className="w-3.5 h-3.5" />
-            Preisrahmen
+            Ab Preis
           </div>
           <p className="text-sm font-semibold text-slate-100">{card.priceLabel}</p>
         </div>
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <Clock className="w-3.5 h-3.5" />
-            Aufwand
+            Einrichtungszeit
           </div>
-          <p className="text-sm font-semibold text-slate-100">{card.timelineLabel}</p>
+          <p className="text-sm font-semibold text-slate-100">{card.setupTimeLabel}</p>
         </div>
       </div>
 
       <div className="space-y-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-            Warum dieses Paket
+            Warum es sich lohnt
           </p>
           <div className="space-y-2">
-            {card.rationale.map((entry) => (
+            {card.rationale.slice(0, 2).map((entry) => (
               <div key={entry} className="flex items-start gap-2">
                 <CheckCircle2 className={`w-4 h-4 ${accent.iconText} shrink-0 mt-0.5`} />
                 <span className="text-sm text-slate-300">{entry}</span>
@@ -581,22 +579,20 @@ function OfferCardView({
 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-            Leistungsumfang
+            Enthalten
           </p>
-          <div className="grid grid-cols-1 gap-2">
-            {card.includes.map((entry) => (
-              <div
-                key={entry}
-                className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2 text-sm text-slate-300"
-              >
-                {entry}
+          <div className="space-y-2">
+            {card.includes.slice(0, 3).map((entry) => (
+              <div key={entry} className="flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                <span className="text-sm text-slate-300">{entry}</span>
               </div>
             ))}
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-          <p className="text-xs text-slate-500 mb-1">Besonders passend für</p>
+          <p className="text-xs text-slate-500 mb-1">Sinnvoll wenn</p>
           <p className="text-sm text-slate-200">{card.bestFor}</p>
         </div>
       </div>
@@ -702,7 +698,7 @@ function OfferRequestModal({
               Unverbindliches Angebot anfragen
             </p>
             <p className="text-xs text-slate-500 mt-1">
-              Franco Consulting meldet sich mit einer ersten Aufwandseinschätzung.
+              Franco Consulting meldet sich mit einer ersten Einschätzung.
             </p>
           </div>
           <button
@@ -734,15 +730,15 @@ function OfferRequestModal({
                 </div>
                 <div className="grid grid-cols-2 gap-2 min-w-[240px]">
                   <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                    <p className="text-xs text-slate-500 mb-1">Preisrahmen</p>
+                    <p className="text-xs text-slate-500 mb-1">Ab Preis</p>
                     <p className="text-sm font-semibold text-slate-100">
                       {selectedOffer.priceLabel}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                    <p className="text-xs text-slate-500 mb-1">Aufwand</p>
+                    <p className="text-xs text-slate-500 mb-1">Einrichtungszeit</p>
                     <p className="text-sm font-semibold text-slate-100">
-                      {selectedOffer.timelineLabel}
+                      {selectedOffer.setupTimeLabel}
                     </p>
                   </div>
                 </div>
@@ -899,7 +895,7 @@ function OfferRequestModal({
           <div className="px-4 py-3 border-t border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
             <p className="text-xs text-slate-500">
               Du erhältst eine Bestätigung per E-Mail. Danach meldet sich Franco Consulting
-              mit der unverbindlichen Ersteinschätzung.
+              mit einer unverbindlichen Ersteinschätzung.
             </p>
             <div className="flex gap-3">
               <button

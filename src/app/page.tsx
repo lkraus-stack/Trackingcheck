@@ -26,12 +26,12 @@ export default function Home() {
   const { data: session } = useSession();
   const { showOnboarding, completeOnboarding, openOnboarding } = useOnboarding();
 
-  // Hash aus URL entfernen falls vorhanden, aber KEIN automatisches Scrollen
+  // Landingpage immer in der Hero-Sektion starten.
   useEffect(() => {
     if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
-    // KEIN window.scrollTo - der User bleibt wo er ist
   }, []);
 
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function Home() {
 
             {/* Chat Interface */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-6 backdrop-blur-sm">
-              <ChatInterface embedded autoFocus />
+              <ChatInterface embedded />
             </div>
           </div>
         </section>

@@ -17,7 +17,7 @@ export interface OfferCard {
   accent: OfferAccent;
   description: string;
   priceLabel: string;
-  timelineLabel: string;
+  setupTimeLabel: string;
   bestFor: string;
   rationale: string[];
   includes: string[];
@@ -186,57 +186,61 @@ function needsServerSideOffer(result: AnalysisResult): boolean {
     result.trackingTags.metaPixel.detected ||
     result.trackingTags.googleAdsConversion.detected ||
     result.trackingTags.tiktokPixel.detected ||
-    result.trackingTags.linkedInInsight.detected;
+    result.trackingTags.linkedInInsight.detected ||
+    result.trackingTags.bingAds.detected ||
+    result.trackingTags.pinterestTag.detected ||
+    result.trackingTags.snapchatPixel.detected ||
+    result.trackingTags.redditPixel.detected;
+
+  const hasCommercialTracking = hasAdsPlatforms || isEcommerceScenario(result);
 
   return (
-    ((result.cookieLifetimeAudit?.estimatedDataLoss ?? 0) >= 10 &&
-      (result.cookieLifetimeAudit?.impactedCookies.length ?? 0) > 0) ||
+    hasCommercialTracking &&
+    (((result.cookieLifetimeAudit?.impactedCookies.length ?? 0) > 0 &&
+      (result.cookieLifetimeAudit?.estimatedDataLoss ?? 0) >= 5) ||
     ((result.eventQualityScore?.overallScore ?? 100) < 80 &&
-      getDetectedPlatforms(result).length >= 1) ||
+      hasAdsPlatforms) ||
     (result.trackingTags.metaPixel.detected &&
       !result.trackingTags.serverSideTracking.summary.hasMetaCAPI) ||
-    (hasAdsPlatforms &&
-      !result.trackingTags.serverSideTracking.summary.hasServerSideGTM) ||
-    getDetectedPlatforms(result).length >= 2
+    ((result.conversionTrackingAudit?.overallScore ?? 100) < 75 &&
+      hasCommercialTracking))
   );
 }
 
 function getDifficultyPriceLabel(difficulty: 'easy' | 'medium' | 'hard'): string {
-  if (difficulty === 'easy') return '290 bis 490 EUR';
-  if (difficulty === 'medium') return '490 bis 890 EUR';
-  return '990 bis 1.690 EUR';
+  if (difficulty === 'easy') return 'ab 190 EUR';
+  if (difficulty === 'medium') return 'ab 290 EUR';
+  return 'ab 490 EUR';
 }
 
 function getPlatformPriceLabel(platform: string): string {
   const normalized = platform.toLowerCase();
 
   if (['amazon', 'otto', 'ebay'].includes(normalized)) {
-    return '490 bis 890 EUR / Plattform';
+    return 'ab 390 EUR / Plattform';
   }
 
   if (['linkedin', 'tiktok'].includes(normalized)) {
-    return '390 bis 590 EUR / Plattform';
+    return 'ab 290 EUR / Plattform';
   }
 
-  return '290 bis 490 EUR / Plattform';
+  return 'ab 190 EUR / Plattform';
 }
 
 function buildAddOns(result: AnalysisResult): OfferAddOn[] {
   const addOns: OfferAddOn[] = [];
 
-  for (const item of result.unusedPotential?.totalPotential ?? []) {
-    if (item.type === 'incomplete_setup' || item.type === 'missing_events') {
-      addOns.push({
-        id: `potential-${item.platform}-${item.title}`
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-'),
-        title: item.title,
-        description: item.recommendation,
-        priceLabel: getDifficultyPriceLabel(item.difficulty),
-        reason: item.currentState,
-        recommended: item.difficulty !== 'hard',
-      });
-    }
+  for (const item of result.unusedPotential?.quickWins ?? []) {
+    addOns.push({
+      id: `quick-win-${item.platform}-${item.title}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-'),
+      title: item.title,
+      description: item.recommendation,
+      priceLabel: getDifficultyPriceLabel(item.difficulty),
+      reason: item.currentState,
+      recommended: true,
+    });
   }
 
   for (const platform of result.unusedPotential?.missingPlatforms ?? []) {
@@ -267,24 +271,32 @@ function buildFoundationReasons(result: AnalysisResult): string[] {
 
   if (!result.cookieBanner.detected || !result.cookieBanner.hasRejectButton) {
     reasons.push(
-      'Cookie-Banner und Consent-Auswahl sollten technisch und rechtlich sauber aufgesetzt werden.'
+      'Consent, Banner und Tracking greifen erst sauber ineinander, wenn die Freigabelogik technisch korrekt umgesetzt ist.'
     );
   }
 
   if (!result.googleConsentMode.detected || result.googleConsentMode.version !== 'v2') {
-    reasons.push('Google Consent Mode v2 fehlt oder ist unvollständig.');
+    reasons.push(
+      'Consent Mode v2 fehlt oder ist unvollständig. Dadurch entstehen schneller Lücken zwischen Banner und Google-Tracking.'
+    );
   }
 
   if (!result.trackingTags.googleTagManager.detected || !result.trackingTags.googleAnalytics.detected) {
-    reasons.push('Die Basis aus GTM und GA4 ist aktuell nicht sauber erkennbar.');
+    reasons.push(
+      'Eine saubere Basis aus GTM und GA4 spart spätere Nacharbeit und macht Erweiterungen deutlich einfacher.'
+    );
   }
 
   if ((result.conversionTrackingAudit?.overallScore ?? 100) < 70) {
-    reasons.push('Wichtige Basis-Conversions sind noch nicht stabil messbar.');
+    reasons.push(
+      'Kern-Conversions sind noch nicht stabil messbar. Damit fehlt die Grundlage für verlässliches Reporting.'
+    );
   }
 
   if (reasons.length === 0) {
-    reasons.push('Die Analyse zeigt Potenzial bei Basis-Tracking, Consent und Conversion-Grundlage.');
+    reasons.push(
+      'Ein sauberes Basis-Setup schafft Ordnung im Tracking und reduziert spätere Korrekturen.'
+    );
   }
 
   return reasons.slice(0, 3);
@@ -294,9 +306,13 @@ function buildFunnelReasons(result: AnalysisResult): string[] {
   const reasons: string[] = [];
 
   if (isEcommerceScenario(result)) {
+    reasons.push(
+      'Mehr Funnel-Stufen zeigen, an welcher Stelle Nutzer im Shop abspringen und wo Umsatz verloren geht.'
+    );
+
     if ((result.funnelValidation?.criticalGaps.length ?? 0) > 0) {
       reasons.push(
-        `Wichtige Funnel-Stufen fehlen: ${result.funnelValidation?.criticalGaps
+        `Wichtige Shop-Schritte fehlen noch: ${result.funnelValidation?.criticalGaps
           .slice(0, 3)
           .join(', ')}.`
       );
@@ -304,41 +320,39 @@ function buildFunnelReasons(result: AnalysisResult): string[] {
 
     if ((result.ecommerceDeepDive?.coverage.missingEvents.length ?? 0) > 0) {
       reasons.push(
-        `Shop-Events sind noch unvollständig: ${result.ecommerceDeepDive?.coverage.missingEvents
+        `Saubere Shop-Events fehlen noch teilweise: ${result.ecommerceDeepDive?.coverage.missingEvents
           .slice(0, 3)
           .join(', ')}.`
       );
     }
-
-    if (
-      result.funnelValidation?.funnelSteps.some(
-        (step) => step.detected && !step.hasRequiredParams
-      )
-    ) {
-      reasons.push(
-        'Einzelne Funnel-Events senden noch nicht alle benötigten Parameter.'
-      );
-    }
   } else {
+    reasons.push(
+      'Zwischenziele im Lead-Funnel machen sichtbar, wo Nutzer abspringen und welche Quellen wirklich Qualität liefern.'
+    );
+
     if ((result.conversionTrackingAudit?.overallScore ?? 100) < 75) {
       reasons.push(
-        `Die Conversion-Erfassung liegt aktuell nur bei ${result.conversionTrackingAudit?.overallScore ?? 0}%.`
+        'Mehr Signale als nur der Abschluss helfen Kampagnen schneller zu bewerten und Budgets sauberer zu steuern.'
       );
     }
 
     if (getMeaningfulEventCount(result) < 3) {
       reasons.push(
-        'Zwischenstufen im Funnel sind kaum messbar; aktuell ist vor allem das Endergebnis sichtbar.'
+        'Aktuell ist vor allem das Endergebnis sichtbar. Mit Funnel-Events wird der Weg dorthin endlich messbar.'
       );
     }
 
     if ((result.campaignAttribution?.overallScore ?? 100) < 80) {
-      reasons.push('Attributionssignale und Funnel-Kontext sind noch ausbaufähig.');
+      reasons.push(
+        'Zusätzliche Funnel-Signale verbessern auch Attribution und Kanalvergleich.'
+      );
     }
   }
 
   if (reasons.length === 0) {
-    reasons.push('Mehrstufiges Event-Tracking schafft deutlich bessere Optimierungsdaten.');
+    reasons.push(
+      'Mehrstufiges Event-Tracking liefert bessere Entscheidungsgrundlagen für Marketing und Vertrieb.'
+    );
   }
 
   return reasons.slice(0, 3);
@@ -347,16 +361,24 @@ function buildFunnelReasons(result: AnalysisResult): string[] {
 function buildEcommerceReasons(result: AnalysisResult): string[] {
   const reasons: string[] = [];
 
+  reasons.push(
+    'Bestellwert, Währung und Produktdaten sind die Grundlage für ROAS, Shopping und wertbasierte Kampagnen.'
+  );
+
   if (!result.dataLayerAnalysis.ecommerce.valueTracking.hasTransactionValue) {
-    reasons.push('Kaufwerte werden aktuell nicht zuverlässig an die Tracking-Plattformen übergeben.');
+    reasons.push(
+      'Kaufwerte werden aktuell nicht zuverlässig übergeben. Dadurch fehlt die Basis für saubere Umsatzmessung.'
+    );
   }
 
   if (!result.dataLayerAnalysis.ecommerce.valueTracking.hasCurrency) {
-    reasons.push('Die Währung fehlt in den E-Commerce Events.');
+    reasons.push('Ohne Währung werden E-Commerce Daten in Reports und Werbekonten schnell ungenau.');
   }
 
   if (!result.dataLayerAnalysis.ecommerce.valueTracking.hasItemData) {
-    reasons.push('Produktdaten fehlen für ROAS, Dynamic Remarketing und sauberes Reporting.');
+    reasons.push(
+      'Produktdaten fehlen noch. Dadurch leiden Remarketing, Feed-Kampagnen und Auswertbarkeit.'
+    );
   }
 
   if ((result.ecommerceDeepDive?.coverage.missingEvents.length ?? 0) > 0) {
@@ -379,9 +401,13 @@ function buildEcommerceReasons(result: AnalysisResult): string[] {
 function buildServerSideReasons(result: AnalysisResult): string[] {
   const reasons: string[] = [];
 
-  if ((result.cookieLifetimeAudit?.estimatedDataLoss ?? 0) >= 10) {
+  reasons.push(
+    'Ein First-Party Setup macht die Messung robuster bei Safari, Adblockern und allgemeinen Browser-Limits.'
+  );
+
+  if ((result.cookieLifetimeAudit?.estimatedDataLoss ?? 0) >= 5) {
     reasons.push(
-      `Browser-Limits verursachen voraussichtlich rund ${result.cookieLifetimeAudit?.estimatedDataLoss ?? 0}% Datenverlust.`
+      'Die Analyse zeigt bereits Messlücken durch Browser-Limits. Genau dort spielt Server-Side Tracking seine Stärke aus.'
     );
   }
 
@@ -389,7 +415,9 @@ function buildServerSideReasons(result: AnalysisResult): string[] {
     result.trackingTags.metaPixel.detected &&
     !result.trackingTags.serverSideTracking.summary.hasMetaCAPI
   ) {
-    reasons.push('Meta Pixel ist vorhanden, aber die Conversions API fehlt.');
+    reasons.push(
+      'Meta CAPI verbessert die Zuordnung von Conversions und stabilisiert die Event-Übertragung im Werbekonto.'
+    );
   }
 
   if (
@@ -397,18 +425,20 @@ function buildServerSideReasons(result: AnalysisResult): string[] {
       result.trackingTags.googleAdsConversion.detected) &&
     !result.trackingTags.serverSideTracking.summary.hasServerSideGTM
   ) {
-    reasons.push('Google Tracking läuft aktuell nur clientseitig und ist dadurch anfälliger für Messverluste.');
+    reasons.push(
+      'Ein serverseitiges Google-Setup reduziert Messverluste, ohne die Consent-Logik zu umgehen.'
+    );
   }
 
   if ((result.eventQualityScore?.overallScore ?? 100) < 80) {
     reasons.push(
-      `Die Event Quality liegt aktuell nur bei ${result.eventQualityScore?.overallScore ?? 0}%.`
+      'Stabilere Event-Übertragung verbessert Datenqualität in Reports und Ads-Plattformen spürbar.'
     );
   }
 
   if (reasons.length === 0) {
     reasons.push(
-      'Server-Side Tracking schafft längere Cookie-Lifetimes und robustere Datenqualität.'
+      'Server-Side Tracking lohnt sich vor allem dann, wenn das Setup auf stabile Messung und weniger Datenlücken ausgelegt sein soll.'
     );
   }
 
@@ -424,16 +454,20 @@ function buildPlatformReasons(result: AnalysisResult, addOns: OfferAddOn[]): str
 
   if (missingPlatforms.length > 0) {
     reasons.push(
-      `Sinnvolle Ausbaukanäle fehlen aktuell noch: ${missingPlatforms.join(', ')}.`
+      `Sinnvolle weitere Kanäle fehlen aktuell noch: ${missingPlatforms.join(', ')}.`
     );
   }
 
   if ((result.unusedPotential?.quickWins.length ?? 0) > 0) {
-    reasons.push('Die Analyse zeigt direkt umsetzbare Quick Wins für zusätzliche Reichweite.');
+    reasons.push(
+      'Zusätzliche Plattformen lassen sich auf deiner bestehenden Basis schnell technisch sauber anbinden.'
+    );
   }
 
   if (reasons.length === 0) {
-    reasons.push('Zusätzliche Plattformen können auf Basis des bestehenden Trackings sauber angebunden werden.');
+    reasons.push(
+      'So werden neue Kanäle sofort messbar und lassen sich sauber mit bestehenden Kampagnen vergleichen.'
+    );
   }
 
   return reasons.slice(0, 3);
@@ -443,20 +477,19 @@ function createFoundationOffer(result: AnalysisResult, relevance: number): Offer
   return {
     id: 'tracking-foundation',
     relevance,
-    title: 'Web-Tracking Basis',
+    title: 'Tracking Basis',
     badge: 'Empfohlen',
     accent: 'indigo',
     description:
-      'Sauberes Client-Side Setup für Consent, Website-Tracking und die wichtigsten Conversion-Ziele.',
-    priceLabel: '790 bis 1.290 EUR',
-    timelineLabel: 'ca. 3 bis 5 Werktage',
-    bestFor: 'Websites mit lückenhaftem Basis-Tracking oder Consent-Setup',
+      'Consent, GTM, GA4 und die wichtigsten Conversions sauber aufsetzen.',
+    priceLabel: 'ab 490 EUR',
+    setupTimeLabel: '2 bis 4 Werktage',
+    bestFor: 'wenn Consent, Basis-Tracking oder Kern-Conversions noch Lücken haben',
     rationale: buildFoundationReasons(result),
     includes: [
-      'GTM- und GA4-Grundsetup',
-      'Consent Mode v2 und CMP-Mapping',
-      'Basis-Conversions und Trigger-Logik',
-      'QA, Debugging und Abnahme',
+      'Consent Mode v2 und CMP-Abgleich',
+      'GTM und GA4 Grundsetup',
+      '1 bis 2 Kern-Conversions inkl. QA',
     ],
   };
 }
@@ -471,26 +504,24 @@ function createFunnelOffer(result: AnalysisResult, relevance: number): OfferCand
     badge: 'Nächster Schritt',
     accent: 'purple',
     description: isEcommerce
-      ? 'Mehr Messpunkte entlang des Checkout-Funnels, damit Optimierung nicht nur auf dem Purchase basiert.'
-      : 'Mehrstufige Funnel-Messung für Leads, Formulare und wichtige Zwischenschritte im Nutzerweg.',
-    priceLabel: '1.290 bis 2.290 EUR',
-    timelineLabel: 'ca. 5 bis 8 Werktage',
+      ? 'Checkout- und Shop-Schritte messbar machen, damit Optimierung nicht nur am Kauf hängt.'
+      : 'Wichtige Zwischenstufen im Lead-Funnel messbar machen.',
+    priceLabel: 'ab 790 EUR',
+    setupTimeLabel: '3 bis 5 Werktage',
     bestFor: isEcommerce
-      ? 'Shops mit Optimierungsbedarf im Checkout-Funnel'
-      : 'Lead-Generierung, Form-Funnels und komplexere Customer Journeys',
+      ? 'wenn du nicht nur Käufe, sondern den Weg dorthin sauber messen willst'
+      : 'wenn Formulare, Anfragen oder Qualifizierungsschritte besser messbar werden sollen',
     rationale: buildFunnelReasons(result),
     includes: isEcommerce
       ? [
-          'Funnel-Stufen für Shop und Checkout',
+          'Shop- und Checkout-Stufen',
           'Event- und Parameter-Mapping',
-          'DataLayer-Verfeinerung inkl. QA',
-          'Funnel-Analyse für Ads und Reporting',
+          'QA für Funnel und Reporting',
         ]
       : [
-          'Lead- und Mikro-Conversion-Tracking',
-          'Funnel-Stufen für Formulare, Calls oder Qualifizierung',
-          'Saubere Event-Namenslogik im DataLayer',
-          'QA, Testfälle und Debugging',
+          'Lead- und Mikro-Conversions',
+          'Funnel-Stufen für Formulare oder Calls',
+          'QA und Debugging',
         ],
   };
 }
@@ -503,16 +534,15 @@ function createEcommerceOffer(result: AnalysisResult, relevance: number): OfferC
     badge: 'Empfohlen',
     accent: 'emerald',
     description:
-      'Shop-Tracking mit Kaufwert, Währung, Produktdaten und sauberem ROAS-Fundament für Ads-Plattformen.',
-    priceLabel: '1.490 bis 2.490 EUR',
-    timelineLabel: 'ca. 5 bis 10 Werktage',
-    bestFor: 'Shops mit Umsatz-, ROAS- und Conversion-Optimierung',
+      'Kaufwert, Währung und Produktdaten sauber an GA4 und Ads übergeben.',
+    priceLabel: 'ab 890 EUR',
+    setupTimeLabel: '3 bis 6 Werktage',
+    bestFor: 'wenn Umsatz, ROAS und Shop-Events sauber messbar werden sollen',
     rationale: buildEcommerceReasons(result),
     includes: [
-      'GA4 E-Commerce Events',
-      'Purchase-, Value-, Currency- und Item-Mapping',
-      'Google Ads / Meta Conversion-Anbindung',
-      'QA für Reporting, Remarketing und Wertübergabe',
+      'Shop-Events für GA4',
+      'Value, Currency und Produktdaten',
+      'QA für Reporting und Ads-Anbindung',
     ],
   };
 }
@@ -522,19 +552,18 @@ function createServerSideOffer(result: AnalysisResult, relevance: number): Offer
     id: 'server-side-tracking',
     relevance,
     title: 'Server-Side Tracking',
-    badge: 'Maximale Datenqualität',
+    badge: 'Starkes Upgrade',
     accent: 'amber',
     description:
-      'Robustes Setup mit sGTM, First-Party Endpunkt, CAPI und consent-sensibler Datenübertragung.',
-    priceLabel: '2.990 bis 4.990 EUR',
-    timelineLabel: 'ca. 10 bis 15 Werktage',
-    bestFor: 'Setups mit Ads-Budget, mehreren Plattformen oder messbarem Datenverlust',
+      'sGTM und CAPI für robusteres Tracking und weniger Messlücken im Werbekonto.',
+    priceLabel: 'ab 1.490 EUR',
+    setupTimeLabel: '4 bis 8 Werktage',
+    bestFor: 'wenn Tracking stabiler laufen und weniger anfällig für Browser-Limits werden soll',
     rationale: buildServerSideReasons(result),
     includes: [
-      'Server-Side GTM Setup',
-      'Meta CAPI / deduplizierte Event-Weitergabe',
-      'First-Party Tracking-Endpunkt',
-      'QA, Consent-Abgleich und Debugging',
+      'sGTM oder First-Party Setup',
+      'Meta CAPI bzw. serverseitige Event-Weitergabe',
+      'Testing, Deduplizierung und QA',
     ],
   };
 }
@@ -547,20 +576,19 @@ function createPlatformOffer(
   return {
     id: 'platform-expansion',
     relevance,
-    title: 'Plattform-Erweiterung',
-    badge: 'Mehr Reichweite',
+    title: 'Weitere Plattformen',
+    badge: 'Optional',
     accent: 'indigo',
     description:
-      'Zusätzliche Werbeplattformen technisch sauber anbinden und mit passenden Events messbar machen.',
-    priceLabel: '290 bis 690 EUR / Plattform',
-    timelineLabel: 'ca. 1 bis 3 Werktage je Plattform',
-    bestFor: 'Setups mit Potenzial auf weiteren Kanälen',
+      'Zusätzliche Kanäle wie Bing, TikTok oder Pinterest technisch sauber anbinden.',
+    priceLabel: 'ab 190 EUR / Plattform',
+    setupTimeLabel: '1 bis 2 Werktage je Plattform',
+    bestFor: 'wenn weitere Kanäle schnell messbar gemacht werden sollen',
     rationale: buildPlatformReasons(result, addOns),
     includes: [
-      'Pixel- oder Tag-Setup pro Plattform',
-      'Event- und Conversion-Mapping',
-      'Click-ID- und Consent-Prüfung',
-      'QA und Übergabe',
+      'Pixel- oder Tag-Setup',
+      'Conversion-Mapping',
+      'QA und Freigabe',
     ],
   };
 }
@@ -572,14 +600,17 @@ function assignBadges(cards: OfferCard[]): OfferCard[] {
     }
 
     if (card.id === 'server-side-tracking') {
-      return { ...card, badge: 'Maximale Datenqualität' };
+      return { ...card, badge: 'Starkes Upgrade' };
     }
 
     if (card.id === 'platform-expansion') {
-      return { ...card, badge: 'Mehr Reichweite' };
+      return { ...card, badge: 'Optional' };
     }
 
-    return { ...card, badge: index === 1 ? 'Nächster Schritt' : 'Ausbau' };
+    return {
+      ...card,
+      badge: index === 1 ? 'Sinnvoller nächster Schritt' : 'Erweiterung',
+    };
   });
 }
 
@@ -650,26 +681,24 @@ export function createOfferRecommendationSet(
   );
 
   const heading = ecommerce
-    ? 'Passende Tracking-Ausbaustufen für deinen Shop'
+    ? 'Empfohlene Setups für deinen Shop'
     : !trackingDetected || needsFoundation
-    ? 'Passende Tracking-Ausbaustufen für diese Website'
-    : 'Nächste Tracking-Ausbaustufen für mehr Datenqualität';
+    ? 'Empfohlene Setups für diese Website'
+    : 'Sinnvolle nächste Schritte für dein Tracking';
 
   const subheading = ecommerce
-    ? 'Die Auswahl basiert auf Shop-Signalen, Wertübergabe, Funnel-Lücken und Plattform-Setup.'
-    : 'Die Auswahl basiert auf Consent, Conversion-Setup, Funnel-Signalen und Plattform-Potenzial.';
+    ? 'Aus der Analyse leiten wir die nächsten sinnvollen Umsetzungen für saubere Messung und bessere Datenqualität ab.'
+    : 'Die Auswahl basiert auf Consent, Conversion-Setup und dem Potenzial deiner aktuellen Tracking-Basis.';
 
   const highlightPills = [
     `Score ${overallScore}/100`,
     `DSGVO ${gdprScore}/100`,
     `Tracking ${trackingScore}/100`,
-    ecommerce ? 'E-Commerce erkannt' : 'Kein Shop erkannt',
-    detectedPlatforms.length > 0
-      ? `${detectedPlatforms.length} Plattformsignale`
-      : 'Kaum Plattformsignale',
-    (result.cookieLifetimeAudit?.estimatedDataLoss ?? 0) > 0
-      ? `~${result.cookieLifetimeAudit?.estimatedDataLoss ?? 0}% Datenverlust`
-      : null,
+    ecommerce
+      ? 'Shop erkannt'
+      : detectedPlatforms.length > 0
+      ? `${detectedPlatforms.length} Tracking-Signale`
+      : 'Basis-Tracking ausbaufähig',
   ].filter((entry): entry is string => Boolean(entry));
 
   return {

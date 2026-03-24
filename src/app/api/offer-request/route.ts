@@ -12,6 +12,7 @@ const offerSchema = z.object({
   title: z.string().min(1).max(120),
   priceLabel: z.string().min(1).max(120),
   badge: z.string().max(80).optional(),
+  setupTimeLabel: z.string().min(1).max(120),
   rationale: z.array(z.string().min(1).max(240)).max(6),
   includes: z.array(z.string().min(1).max(240)).max(8),
   bestFor: z.string().min(1).max(240),
@@ -157,7 +158,8 @@ function buildInternalEmailHtml(
       <h3>Gewünschtes Angebot</h3>
       <p>
         <strong>${escapeHtml(payload.selectedOffer.title)}</strong><br />
-        Preisrahmen: ${escapeHtml(payload.selectedOffer.priceLabel)}<br />
+        Ab Preis: ${escapeHtml(payload.selectedOffer.priceLabel)}<br />
+        Einrichtungszeit: ${escapeHtml(payload.selectedOffer.setupTimeLabel)}<br />
         Badge: ${escapeHtml(payload.selectedOffer.badge || 'ohne Badge')}<br />
         Passend für: ${escapeHtml(payload.selectedOffer.bestFor)}
       </p>
@@ -214,6 +216,7 @@ function buildInternalEmailText(
     '',
     'Gewünschtes Angebot',
     `${payload.selectedOffer.title} (${payload.selectedOffer.priceLabel})`,
+    `Einrichtungszeit: ${payload.selectedOffer.setupTimeLabel}`,
     `Badge: ${payload.selectedOffer.badge || 'ohne Badge'}`,
     `Passend für: ${payload.selectedOffer.bestFor}`,
     '',
@@ -274,13 +277,14 @@ function buildConfirmationEmailHtml(
         Wir haben deine unverbindliche Anfrage für <strong>${escapeHtml(
           meta.host
         )}</strong> erhalten und melden uns zeitnah mit einer ersten
-        Aufwandseinschätzung.
+        Einschätzung.
       </p>
 
       <h3>Dein gewünschtes Paket</h3>
       <p>
         <strong>${escapeHtml(payload.selectedOffer.title)}</strong><br />
-        Preisrahmen: ${escapeHtml(payload.selectedOffer.priceLabel)}<br />
+        Ab Preis: ${escapeHtml(payload.selectedOffer.priceLabel)}<br />
+        Einrichtungszeit: ${escapeHtml(payload.selectedOffer.setupTimeLabel)}<br />
         Passend für: ${escapeHtml(payload.selectedOffer.bestFor)}
       </p>
 
@@ -314,6 +318,7 @@ function buildConfirmationEmailText(
     '',
     `Website: ${meta.host}`,
     `Gewaehltes Paket: ${payload.selectedOffer.title} (${payload.selectedOffer.priceLabel})`,
+    `Einrichtungszeit: ${payload.selectedOffer.setupTimeLabel}`,
     `Passend fuer: ${payload.selectedOffer.bestFor}`,
     '',
     'Ausgewaehlte Add-ons',
