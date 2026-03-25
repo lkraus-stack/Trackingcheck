@@ -990,9 +990,30 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
       </div>
 
       {currentAnalysis && (
-        <div className="pt-4 sm:pt-5 overflow-x-hidden">
-          <ExpertRecommendation result={currentAnalysis} />
-        </div>
+        <section
+          aria-labelledby="chat-offers-heading"
+          className="mt-6 sm:mt-8 shrink-0 overflow-x-hidden border-t border-slate-700/90 pt-6 sm:pt-8"
+        >
+          <div className="rounded-3xl border-2 border-indigo-500/35 bg-gradient-to-br from-slate-900/98 via-slate-950 to-slate-950 p-4 sm:p-6 shadow-[0_28px_64px_-24px_rgba(0,0,0,0.65)] ring-1 ring-indigo-500/25">
+            <div className="mb-4 flex items-start gap-3 sm:mb-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/15 ring-1 ring-indigo-500/30">
+                <Sparkles className="h-5 w-5 text-indigo-300" aria-hidden />
+              </div>
+              <div className="min-w-0 space-y-1">
+                <h2
+                  id="chat-offers-heading"
+                  className="text-base font-semibold tracking-tight text-white"
+                >
+                  Angebote &amp; Erstberatung
+                </h2>
+                <p className="text-xs leading-relaxed text-slate-400">
+                  Unverbindliche Pakete auf Basis dieser Analyse – getrennt vom Chat-Verlauf darüber.
+                </p>
+              </div>
+            </div>
+            <ExpertRecommendation result={currentAnalysis} embeddedInChat />
+          </div>
+        </section>
       )}
     </div>
   );

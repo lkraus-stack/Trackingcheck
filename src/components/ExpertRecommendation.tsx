@@ -29,6 +29,8 @@ import { useToast } from '@/contexts/ToastContext';
 
 interface ExpertRecommendationProps {
   result: AnalysisResult;
+  /** Im Chat unter der Analyse: eigener Rahmen, kein zusätzlicher Außenabstand */
+  embeddedInChat?: boolean;
 }
 
 interface OfferRequestFormState {
@@ -107,7 +109,7 @@ function defaultFormState(): OfferRequestFormState {
   };
 }
 
-export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
+export function ExpertRecommendation({ result, embeddedInChat = false }: ExpertRecommendationProps) {
   const { data: session } = useSession();
   const toast = useToast();
   const recommendationSet = useMemo(
@@ -307,8 +309,18 @@ export function ExpertRecommendation({ result }: ExpertRecommendationProps) {
 
   return (
     <>
-      <div className="mt-4 rounded-2xl border border-slate-700/60 bg-slate-950/50 overflow-hidden">
-        <div className="flex items-stretch border-b border-slate-800/80 bg-slate-900/70">
+      <div
+        className={
+          embeddedInChat
+            ? 'mt-0 rounded-2xl border border-slate-700/60 bg-slate-950/40 overflow-hidden shadow-inner shadow-black/20'
+            : 'mt-4 rounded-2xl border border-slate-700/60 bg-slate-950/50 overflow-hidden'
+        }
+      >
+        <div
+          className={`flex items-stretch border-b border-slate-800/80 bg-slate-900/70 ${
+            embeddedInChat ? 'rounded-t-2xl' : ''
+          }`}
+        >
           <button
             type="button"
             onClick={() => setExpanded((prev) => !prev)}
