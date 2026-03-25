@@ -357,11 +357,52 @@ const cases: ValidationCase[] = [
       const trackingTags = createBaseTrackingTags();
       trackingTags.googleAdsConversion.detected = true;
       trackingTags.metaPixel.detected = true;
+      trackingTags.googleAnalytics.detected = true;
 
       const result = analyzeCampaignAttribution(genericDataLayerOnlyFixture, trackingTags);
       assert.equal(result.issues.some((issue) => issue.title === 'Google Click IDs fehlen'), false);
       assert.equal(result.issues.some((issue) => issue.title === 'Meta Click ID fehlt'), false);
       assert.equal(result.issues.some((issue) => issue.title === 'UTM Parameter nicht sichtbar'), false);
+      assert.equal(result.assessmentMode, 'baseline');
+      assert.equal(result.overallScore, 85);
+      assert.match(result.explanation, /keine Kampagnen-Parameter/i);
+    },
+  },
+  {
+    name: 'Mit Kampagnenkontext wird Attribution moderat statt hart bewertet',
+    run: () => {
+      const trackingTags = createBaseTrackingTags();
+      trackingTags.googleAdsConversion.detected = true;
+      trackingTags.metaPixel.detected = true;
+      trackingTags.googleAnalytics.detected = true;
+
+      const result = analyzeCampaignAttribution(
+        {
+          ...genericDataLayerOnlyFixture,
+          pageUrl: 'https://fixture.example/?utm_source=google&utm_medium=cpc',
+        },
+        trackingTags
+      );
+
+      assert.equal(result.assessmentMode, 'campaign_context');
+      assert.equal(result.issues.some((issue) => issue.title === 'Google Click IDs fehlen'), true);
+      assert.equal(result.issues.some((issue) => issue.title === 'Meta Click ID fehlt'), true);
+      assert.equal(result.overallScore, 76);
+    },
+  },
+  {
+    name: 'Indirekte Kampagnenhinweise bleiben nur leicht gewichtet',
+    run: () => {
+      const trackingTags = createBaseTrackingTags();
+      trackingTags.googleAdsConversion.detected = true;
+      trackingTags.metaPixel.detected = true;
+      trackingTags.googleAnalytics.detected = true;
+      trackingTags.marketingParameters.utm = true;
+
+      const result = analyzeCampaignAttribution(genericDataLayerOnlyFixture, trackingTags);
+      assert.equal(result.assessmentMode, 'inferred_readiness');
+      assert.equal(result.overallScore, 92);
+      assert.equal(result.issues.length, 0);
     },
   },
   {

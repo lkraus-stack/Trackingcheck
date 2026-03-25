@@ -801,6 +801,9 @@ export interface ConversionAuditRecommendation {
 // Campaign Tracking & Attribution
 export interface CampaignAttributionResult {
   overallScore: number;
+  assessmentMode: 'campaign_context' | 'inferred_readiness' | 'baseline';
+  explanation: string;
+  detectionBasis: string[];
   clickIdStatus: CampaignSignalStatus[];
   utmStatus: CampaignSignalStatus[];
   crossDomain: CrossDomainTrackingStatus;

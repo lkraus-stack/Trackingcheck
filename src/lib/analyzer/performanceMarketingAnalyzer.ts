@@ -1228,16 +1228,36 @@ export function analyzeCampaignAttribution(
     warnings: crossDomainDetected ? [] : ['Keine Cross-Domain Konfiguration erkannt'],
   };
 
-  let score = 100;
+  const detectionBasis = [
+    'Aktuelle URL-Parameter',
+    'Cookies im Browser-Kontext',
+    'Script- und Network-Signale',
+    'Erkannte Marketing-Parameter aus dem Crawl',
+  ];
   const issues: CampaignAttributionIssue[] = [];
   const recommendations: CampaignAttributionRecommendation[] = [];
-  const hasCampaignLandingContext =
-    clickIdStatus.some((signal) => signal.detected) ||
-    utmStatus.some((signal) => signal.detected);
+  const hasConcreteCampaignContext =
+    clickIdStatus.some((signal) => signal.detected && (signal.source === 'url' || signal.source === 'cookie')) ||
+    utmStatus.some((signal) => signal.detected && signal.source === 'url');
+  const hasInferredCampaignReadiness =
+    clickIdStatus.some((signal) => signal.detected && (signal.source === 'script' || signal.source === 'network')) ||
+    utmStatus.some((signal) => signal.detected && signal.source === 'network');
+  const assessmentMode: CampaignAttributionResult['assessmentMode'] = hasConcreteCampaignContext
+    ? 'campaign_context'
+    : hasInferredCampaignReadiness
+      ? 'inferred_readiness'
+      : 'baseline';
+  const explanation = hasConcreteCampaignContext
+    ? 'Im aktuellen Scan wurden Kampagnen-Signale erkannt. Click IDs, UTM-Parameter und Cross-Domain-Hinweise werden deshalb aktiv bewertet.'
+    : hasInferredCampaignReadiness
+      ? 'Im aktuellen Scan wurden nur indirekte Kampagnen-Hinweise in Scripts oder Requests erkannt. Ohne konkrete Landing-Parameter wird der Score deshalb nur leicht gewichtet.'
+      : 'Im aktuellen Scan wurden keine Kampagnen-Parameter erkannt. Click IDs und UTM-Parameter sind daher nur eingeschränkt bewertbar; der Score wird bewusst neutraler gehalten.';
+
+  let score = hasConcreteCampaignContext ? 100 : hasInferredCampaignReadiness ? 92 : 85;
 
   const hasGoogleSignals = clickIdStatus.some(s => ['gclid', 'wbraid', 'pbraid'].includes(s.signal) && s.detected);
-  if (trackingTags.googleAdsConversion.detected && hasCampaignLandingContext && !hasGoogleSignals) {
-    score -= 20;
+  if (trackingTags.googleAdsConversion.detected && hasConcreteCampaignContext && !hasGoogleSignals) {
+    score -= 12;
     issues.push({
       severity: 'high',
       title: 'Google Click IDs fehlen',
@@ -1254,8 +1274,8 @@ export function analyzeCampaignAttribution(
 
   const hasMetaSignals = clickIdStatus.some(s => s.signal === 'fbclid' && s.detected) ||
     crawlResult.cookies.some(c => c.name === '_fbc');
-  if (trackingTags.metaPixel.detected && hasCampaignLandingContext && !hasMetaSignals) {
-    score -= 15;
+  if (trackingTags.metaPixel.detected && hasConcreteCampaignContext && !hasMetaSignals) {
+    score -= 8;
     issues.push({
       severity: 'medium',
       title: 'Meta Click ID fehlt',
@@ -1265,8 +1285,8 @@ export function analyzeCampaignAttribution(
   }
 
   const utmDetected = utmStatus.some(s => s.detected);
-  if (hasCampaignLandingContext && !utmDetected) {
-    score -= 10;
+  if (hasConcreteCampaignContext && !utmDetected) {
+    score -= 6;
     issues.push({
       severity: 'low',
       title: 'UTM Parameter nicht sichtbar',
@@ -1282,7 +1302,9 @@ export function analyzeCampaignAttribution(
   }
 
   if (!crossDomainDetected && trackingTags.googleAnalytics.detected) {
-    score -= 5;
+    if (hasConcreteCampaignContext) {
+      score -= 4;
+    }
     recommendations.push({
       priority: 'low',
       title: 'Cross-Domain Tracking prüfen',
@@ -1295,6 +1317,9 @@ export function analyzeCampaignAttribution(
 
   return {
     overallScore: score,
+    assessmentMode,
+    explanation,
+    detectionBasis,
     clickIdStatus,
     utmStatus,
     crossDomain,

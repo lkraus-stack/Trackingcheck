@@ -960,6 +960,21 @@ export function CampaignAttributionCard({ data }: CampaignAttributionCardProps) 
     return 'text-red-400';
   };
 
+  const getSourceLabel = (source: 'url' | 'cookie' | 'script' | 'network' | 'unknown') => {
+    switch (source) {
+      case 'url':
+        return 'URL';
+      case 'cookie':
+        return 'Cookie';
+      case 'script':
+        return 'Script';
+      case 'network':
+        return 'Network';
+      default:
+        return 'Nicht nachweisbar';
+    }
+  };
+
   return (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
       <button
@@ -992,12 +1007,25 @@ export function CampaignAttributionCard({ data }: CampaignAttributionCardProps) 
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4">
+          <div className="p-3 bg-slate-700/30 rounded-lg space-y-2">
+            <p className="text-sm text-slate-200">{data.explanation}</p>
+            <p className="text-xs text-slate-400">
+              Datenbasis: {data.detectionBasis.join(', ')}.
+            </p>
+            {data.assessmentMode !== 'campaign_context' && (
+              <p className="text-xs text-slate-500">
+                Grau bedeutet hier vor allem: im aktuellen Scan nicht sichtbar, nicht automatisch technisch falsch.
+              </p>
+            )}
+          </div>
+
           <div>
             <h4 className="text-sm font-medium text-slate-300 mb-2">Click IDs</h4>
             <div className="flex flex-wrap gap-2">
               {data.clickIdStatus.map((signal) => (
                 <span
                   key={signal.signal}
+                  title={`${signal.signal}: ${signal.detected ? `gefunden via ${getSourceLabel(signal.source)}` : signal.notes || 'Nicht nachweisbar'}`}
                   className={`text-xs px-2 py-1 rounded ${
                     signal.detected ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'
                   }`}
@@ -1006,6 +1034,9 @@ export function CampaignAttributionCard({ data }: CampaignAttributionCardProps) 
                 </span>
               ))}
             </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Treffer werden aus URL, Cookies, Scripts oder Network-Signalen abgeleitet.
+            </p>
           </div>
 
           <div>
@@ -1014,6 +1045,7 @@ export function CampaignAttributionCard({ data }: CampaignAttributionCardProps) 
               {data.utmStatus.map((signal) => (
                 <span
                   key={signal.signal}
+                  title={`${signal.signal}: ${signal.detected ? `gefunden via ${getSourceLabel(signal.source)}` : signal.notes || 'Nicht nachweisbar'}`}
                   className={`text-xs px-2 py-1 rounded ${
                     signal.detected ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'
                   }`}
@@ -1022,16 +1054,34 @@ export function CampaignAttributionCard({ data }: CampaignAttributionCardProps) 
                 </span>
               ))}
             </div>
+            <p className="mt-2 text-xs text-slate-500">
+              UTM-Werte sind nur dann belastbar beurteilbar, wenn die Seite mit Kampagnenparametern aufgerufen wurde.
+            </p>
           </div>
 
-          <div className="p-3 bg-slate-700/30 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-slate-400" />
-              <span className="text-sm text-slate-200">Cross-Domain Tracking</span>
+          <div className="p-3 bg-slate-700/30 rounded-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tag className="w-4 h-4 text-slate-400" />
+                <span className="text-sm text-slate-200">Cross-Domain Tracking</span>
+              </div>
+              <span className={`text-xs ${data.crossDomain.detected ? 'text-green-400' : 'text-yellow-400'}`}>
+                {data.crossDomain.detected ? 'Erkannt' : 'Nicht erkannt'}
+              </span>
             </div>
-            <span className={`text-xs ${data.crossDomain.detected ? 'text-green-400' : 'text-yellow-400'}`}>
-              {data.crossDomain.detected ? 'Erkannt' : 'Nicht erkannt'}
-            </span>
+            <p className="text-xs text-slate-500">
+              Heuristik auf Basis von Linker-/Decorate-/Cross-Domain-Signalen im geladenen Code.
+            </p>
+            {data.crossDomain.detected && data.crossDomain.methods.length > 0 && (
+              <p className="text-xs text-slate-400">
+                Erkannt über: {data.crossDomain.methods.join(', ')}
+              </p>
+            )}
+            {!data.crossDomain.detected && data.crossDomain.warnings.length > 0 && (
+              <p className="text-xs text-slate-400">
+                {data.crossDomain.warnings.join(', ')}
+              </p>
+            )}
           </div>
 
           {data.recommendations.length > 0 && (

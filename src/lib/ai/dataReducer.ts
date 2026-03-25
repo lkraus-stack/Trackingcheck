@@ -420,6 +420,9 @@ export function reduceAnalysisResultForAI(data: AnalysisResult): ReducedAnalysis
   if (data.campaignAttribution) {
     reduced.campaignAttribution = {
       overallScore: data.campaignAttribution.overallScore,
+      assessmentMode: data.campaignAttribution.assessmentMode,
+      explanation: data.campaignAttribution.explanation,
+      detectionBasis: data.campaignAttribution.detectionBasis,
       clickIdStatus: data.campaignAttribution.clickIdStatus,
       utmStatus: data.campaignAttribution.utmStatus,
       crossDomain: data.campaignAttribution.crossDomain,
