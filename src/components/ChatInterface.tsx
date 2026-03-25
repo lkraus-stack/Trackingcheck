@@ -156,6 +156,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   const inputRef = useRef<HTMLInputElement>(null);
 
   const hasConversation = messages.some((message) => message.role !== 'system');
+  const hasAnalysisResult = messages.some((message) => Boolean(message.analysisResult));
   const hasOnlyWelcomeMessage =
     embedded &&
     !hasConversation &&
@@ -543,11 +544,13 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
   };
 
   return (
-    <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 ${
+    <div className={`flex flex-col w-full max-w-[1400px] mx-auto px-3 sm:px-4 lg:px-6 overflow-x-hidden ${
       hasOnlyWelcomeMessage
         ? ''
         : embedded 
-        ? 'min-h-[420px] sm:min-h-[460px] h-[56vh] sm:h-[58vh] max-h-[760px]' 
+        ? hasAnalysisResult
+          ? 'min-h-[420px] sm:min-h-[460px]'
+          : 'min-h-[420px] sm:min-h-[460px] h-[56vh] sm:h-[58vh] max-h-[760px]'
         : 'h-[calc(100vh-7rem)] sm:h-[calc(100vh-8rem)]'
     }`}>
       {/* Messages Area */}
@@ -556,7 +559,9 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
         className={`${
           hasOnlyWelcomeMessage
             ? 'py-2 sm:py-3 space-y-2'
-            : 'flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0' // Scrollbarer Container
+            : hasAnalysisResult
+              ? 'py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0 overflow-x-hidden'
+              : 'flex-1 overflow-y-auto py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0 overflow-x-hidden' // Scrollbarer Container
         }`}
       >
         {messages.map((message) => {
@@ -570,7 +575,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                 message.analysisResult
                   ? 'w-full' // Volle Breite für Bericht
                   : 'w-full sm:max-w-[90%] lg:max-w-[85%]'
-              } rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
+              } rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 overflow-x-hidden ${
                 message.role === 'user'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white ml-auto max-w-[85%] sm:max-w-[70%]'
                   : message.role === 'system'
@@ -782,7 +787,7 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                     </div>
                   </div>
                   {message.analysisResult && (
-                    <div className="mt-3 -mx-3 sm:-mx-4 lg:-mx-6">
+                    <div className="mt-3 w-full overflow-x-hidden">
                       {message.fromCache && (
                         <button
                           onClick={() => handleRefresh(message.analysisResult!.url)}
@@ -793,8 +798,6 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
                         </button>
                       )}
                       <ResultCard result={message.analysisResult} />
-                      {/* Expert Recommendation CTA */}
-                      <ExpertRecommendation result={message.analysisResult} />
                     </div>
                   )}
                 </>
@@ -985,6 +988,12 @@ export function ChatInterface({ embedded = false, autoFocus = false }: ChatInter
           </button>
         </form>
       </div>
+
+      {currentAnalysis && (
+        <div className="pt-4 sm:pt-5 overflow-x-hidden">
+          <ExpertRecommendation result={currentAnalysis} />
+        </div>
+      )}
     </div>
   );
 }
