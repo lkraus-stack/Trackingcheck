@@ -8,18 +8,29 @@
 import assert from 'node:assert/strict';
 
 import { analyzeCookieBanner } from '../cookieBannerAnalyzer';
+import { analyzeDataLayer } from '../dataLayerAnalyzer';
 import { analyzeGoogleConsentMode } from '../googleConsentModeAnalyzer';
+import {
+  analyzeCampaignAttribution,
+  analyzeConversionTrackingAudit,
+  analyzeGTMAudit,
+  analyzeUnusedPotential,
+} from '../performanceMarketingAnalyzer';
+import { analyzeTCF } from '../tcfAnalyzer';
 import { analyzeTrackingTags } from '../trackingTagsAnalyzer';
 import { getSuspiciousAnalysisReason } from '@/lib/analysisResultMeta';
 import type { AnalysisResult } from '@/types';
 import {
   bingFalsePositiveTextFixture,
   bingUetFixture,
+  cmpDeclaredNoServerSideFixture,
+  cmpDeclaredStapeFixture,
   consentModeV2Fixture,
   falsePositiveFirstPartyTrackingAssetFixture,
   firstPartySgtmFixture,
   gaViaDataLayerFixture,
   genericDataLayerOnlyFixture,
+  genericTcfMentionFixture,
   matomoInlineSnippetFixture,
   metaServerSideFixture,
   posthogFixture,
@@ -99,6 +110,7 @@ function createBaseTrackingTags(): AnalysisResult['trackingTags'] {
         hasTikTokEventsAPI: false,
         hasLinkedInCAPI: false,
         hasCookieBridging: false,
+        hasCmpDeclaredServerSide: false,
       },
     },
   };
@@ -190,6 +202,23 @@ const cases: ValidationCase[] = [
     },
   },
   {
+    name: 'CMP-deklariertes Stape mit aktiven Plattformsignalen gilt als SST-Evidenz',
+    run: () => {
+      const result = analyzeTrackingTags(cmpDeclaredStapeFixture);
+      assert.equal(result.serverSideTracking.detected, true);
+      assert.equal(result.serverSideTracking.summary.hasCmpDeclaredServerSide, true);
+      assert.ok(result.serverSideTracking.indicators.some((indicator) => indicator.type === 'cmp_declared_service'));
+    },
+  },
+  {
+    name: 'CMP ohne Stape erzeugt kein SST False Positive',
+    run: () => {
+      const result = analyzeTrackingTags(cmpDeclaredNoServerSideFixture);
+      assert.equal(result.serverSideTracking.detected, false);
+      assert.equal(result.serverSideTracking.summary.hasCmpDeclaredServerSide, false);
+    },
+  },
+  {
     name: 'Lokale GTM-Datei und tribe-events CSS erzeugen kein Server-Side False Positive',
     run: () => {
       const result = analyzeTrackingTags(falsePositiveFirstPartyTrackingAssetFixture);
@@ -197,6 +226,42 @@ const cases: ValidationCase[] = [
       assert.equal(result.serverSideTracking.summary.hasServerSideGTM, false);
       assert.equal(result.serverSideTracking.summary.hasMetaCAPI, false);
       assert.equal(result.metaPixel.serverSide?.detected, false);
+    },
+  },
+  {
+    name: 'Kein Server-Side Tracking verschwindet bei CMP-deklariertem Stape',
+    run: () => {
+      const trackingTags = analyzeTrackingTags(cmpDeclaredStapeFixture);
+      const dataLayerAnalysis = analyzeDataLayer(cmpDeclaredStapeFixture);
+      const unusedPotential = analyzeUnusedPotential(cmpDeclaredStapeFixture, trackingTags, dataLayerAnalysis);
+      assert.equal(
+        unusedPotential.totalPotential.some((item) => item.title === 'Kein Server-Side Tracking'),
+        false
+      );
+    },
+  },
+  {
+    name: 'Ohne SST-Evidenz bleibt das Potenzial Kein Server-Side Tracking bestehen',
+    run: () => {
+      const trackingTags = analyzeTrackingTags(cmpDeclaredNoServerSideFixture);
+      const dataLayerAnalysis = analyzeDataLayer(cmpDeclaredNoServerSideFixture);
+      const unusedPotential = analyzeUnusedPotential(cmpDeclaredNoServerSideFixture, trackingTags, dataLayerAnalysis);
+      assert.equal(
+        unusedPotential.totalPotential.some((item) => item.title === 'Kein Server-Side Tracking'),
+        true
+      );
+    },
+  },
+  {
+    name: 'Indirekte Stape-Evidenz erzeugt kein Meta-Dedupe False Positive',
+    run: () => {
+      const trackingTags = analyzeTrackingTags(cmpDeclaredStapeFixture);
+      const dataLayerAnalysis = analyzeDataLayer(cmpDeclaredStapeFixture);
+      const audit = analyzeConversionTrackingAudit(cmpDeclaredStapeFixture, trackingTags, dataLayerAnalysis);
+      assert.equal(
+        audit.issues.some((issue) => issue.title === 'META: Deduplizierung fehlt'),
+        false
+      );
     },
   },
   {
@@ -254,6 +319,14 @@ const cases: ValidationCase[] = [
     },
   },
   {
+    name: 'Generischer TCF-Text erzeugt kein TCF False Positive',
+    run: () => {
+      const result = analyzeTCF(genericTcfMentionFixture);
+      assert.equal(result.detected, false);
+      assert.equal(result.validTcString, false);
+    },
+  },
+  {
     name: 'Usercentrics Banner wird erkannt',
     run: () => {
       const result = analyzeCookieBanner(usercentricsBannerFixture);
@@ -261,6 +334,34 @@ const cases: ValidationCase[] = [
       assert.equal(result.provider, 'Usercentrics');
       assert.equal(result.hasAcceptButton, true);
       assert.equal(result.hasRejectButton, true);
+    },
+  },
+  {
+    name: 'DataLayer-only GTM erzeugt keine Snippet-Fehlwarnungen',
+    run: () => {
+      const trackingTags = createBaseTrackingTags();
+      trackingTags.googleTagManager.detected = true;
+      trackingTags.googleTagManager.containerIds = ['GTM-TEST123'];
+      trackingTags.googleTagManager.containerId = 'GTM-TEST123';
+      trackingTags.googleTagManager.detectionMethod = ['dataLayer'];
+
+      const result = analyzeGTMAudit(genericDataLayerOnlyFixture, trackingTags);
+      assert.equal(result.issues.some((issue) => issue.title === 'GTM noscript fehlt'), false);
+      assert.equal(result.issues.some((issue) => issue.title === 'GTM nicht im Head'), false);
+      assert.equal(result.issues.some((issue) => issue.title === 'Consent Default nach GTM'), false);
+    },
+  },
+  {
+    name: 'Ohne Kampagnenkontext entstehen keine Click-ID oder UTM Warnungen',
+    run: () => {
+      const trackingTags = createBaseTrackingTags();
+      trackingTags.googleAdsConversion.detected = true;
+      trackingTags.metaPixel.detected = true;
+
+      const result = analyzeCampaignAttribution(genericDataLayerOnlyFixture, trackingTags);
+      assert.equal(result.issues.some((issue) => issue.title === 'Google Click IDs fehlen'), false);
+      assert.equal(result.issues.some((issue) => issue.title === 'Meta Click ID fehlt'), false);
+      assert.equal(result.issues.some((issue) => issue.title === 'UTM Parameter nicht sichtbar'), false);
     },
   },
   {

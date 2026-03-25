@@ -30,6 +30,7 @@ export interface CookieConsentTestData {
     buttonFound: boolean;
     buttonText?: string;
     consentSignals?: GoogleConsentSignals;
+    capture?: ConsentCaptureData;
   };
   afterReject: {
     cookies: CookieData[];
@@ -45,6 +46,7 @@ export interface AcceptOnlyTestResult {
   buttonFound: boolean;
   buttonText?: string;
   consentSignals?: GoogleConsentSignals;
+  capture?: ConsentCaptureData;
 }
 
 export interface GoogleConsentSignals {
@@ -95,6 +97,7 @@ export interface WindowObjectData {
   }>;
   gtagCalls?: unknown[][];
   dataLayerPushCalls?: unknown[][];
+  cmpMetadata?: CmpMetadata;
   // Zusätzliche Tracking-Objekte
   additionalTrackingObjects: {
     _fbq?: boolean;
@@ -124,6 +127,42 @@ export interface NetworkRequestExtended extends NetworkRequest {
   redirectChain?: string[];
 }
 
+export interface CmpDeclaredService {
+  id?: number | string;
+  name: string;
+  categoryId?: number | string;
+  categoryName?: string;
+  isEssential: boolean;
+  provider?: string;
+  uniqueName?: string;
+}
+
+export interface CmpMetadata {
+  provider: string;
+  categories: Array<{
+    id?: number | string;
+    name: string;
+    isEssential: boolean;
+    itemNames: string[];
+  }>;
+  declaredServices: CmpDeclaredService[];
+  declaredServiceNames: string[];
+}
+
+export interface ConsentCaptureData {
+  html: string;
+  scripts: string[];
+  networkRequests: NetworkRequest[];
+  networkRequestsExtended: NetworkRequestExtended[];
+  cookies: CookieData[];
+  windowObjects: WindowObjectData;
+  consoleMessages: string[];
+  responseHeaders: ResponseHeaderData[];
+  pageUrl: string;
+  pageDomain: string;
+  setCookieHeaders?: Array<{ url: string; cookies: string[] }>;
+}
+
 type ConsentCallSource = 'gtag' | 'dataLayer' | 'gtag_stub' | 'unknown';
 
 type RuntimeTrackingCheckerData = {
@@ -137,8 +176,22 @@ type UsercentricsWindowApi = {
   acceptAllConsents?: () => unknown;
 };
 
+type RealCookieBannerItem = {
+  id?: number | string;
+  name?: string;
+  uniqueName?: string;
+  provider?: string;
+};
+
+type RealCookieBannerGroup = {
+  id?: number | string;
+  name?: string;
+  isEssential?: boolean;
+  items?: RealCookieBannerItem[];
+};
+
 type RealCookieBannerApi = {
-  getOptions?: () => { groups?: unknown[] };
+  getOptions?: () => { groups?: RealCookieBannerGroup[] };
 };
 
 type CookiebotApi = {
@@ -154,7 +207,12 @@ type BorlabsApi = {
 };
 
 type GenericConsentApi = {
-  consent?: () => unknown;
+  consent?: (...args: unknown[]) => unknown;
+  consentAll?: (...args: unknown[]) => unknown;
+  consentSync?: (...args: unknown[]) => unknown;
+  unblock?: (...args: unknown[]) => unknown;
+  unblockSync?: (...args: unknown[]) => unknown;
+  wrapFn?: (...args: unknown[]) => unknown;
 };
 
 type WindowLikeRecord = Record<string, unknown> & {
@@ -374,6 +432,116 @@ export class WebCrawler {
     );
   }
 
+  private attachCaptureListeners(
+    page: Page,
+    networkRequests: NetworkRequest[],
+    networkRequestsExtended: NetworkRequestExtended[],
+    responseHeaders: ResponseHeaderData[],
+    consoleMessages: string[],
+    setCookieHeaders: Array<{ url: string; cookies: string[] }>
+  ): void {
+    page.on('request', (request) => {
+      const requestData: NetworkRequest = {
+        url: request.url(),
+        method: request.method(),
+        resourceType: request.resourceType(),
+        timestamp: Date.now(),
+      };
+      networkRequests.push(requestData);
+
+      networkRequestsExtended.push({
+        ...requestData,
+        initiator: request.initiator()?.type,
+        redirectChain: request.redirectChain().map((redirect) => redirect.url()),
+      });
+    });
+
+    page.on('response', async (response) => {
+      try {
+        const headers = response.headers();
+        const responseUrl = response.url();
+
+        const setCookie = headers['set-cookie'];
+        if (setCookie) {
+          setCookieHeaders.push({
+            url: responseUrl,
+            cookies: Array.isArray(setCookie) ? setCookie : [setCookie],
+          });
+        }
+
+        if (this.isTrackingRelatedUrl(responseUrl)) {
+          responseHeaders.push({
+            url: responseUrl,
+            headers,
+            serverInfo: headers['server'] || headers['x-powered-by'],
+          });
+        }
+      } catch {
+        // Response Header Fehler ignorieren
+      }
+    });
+
+    page.on('console', (msg) => {
+      consoleMessages.push(`${msg.type()}: ${msg.text()}`);
+    });
+  }
+
+  private async collectScripts(page: Page): Promise<string[]> {
+    return await page.evaluate(() => {
+      const scriptElements = document.querySelectorAll('script');
+      const scripts: string[] = [];
+
+      scriptElements.forEach((script) => {
+        if (script.src) {
+          scripts.push(script.src);
+        }
+        if (script.innerHTML) {
+          scripts.push(script.innerHTML);
+        }
+      });
+
+      const allScripts = document.getElementsByTagName('script');
+      Array.from(allScripts).forEach((script) => {
+        if (script.src && !scripts.includes(script.src)) {
+          scripts.push(script.src);
+        }
+      });
+
+      return scripts;
+    });
+  }
+
+  private async captureConsentState(
+    page: Page,
+    fallbackPageDomain: string,
+    networkRequests: NetworkRequest[],
+    networkRequestsExtended: NetworkRequestExtended[],
+    responseHeaders: ResponseHeaderData[],
+    consoleMessages: string[],
+    setCookieHeaders: Array<{ url: string; cookies: string[] }>
+  ): Promise<ConsentCaptureData> {
+    const html = await page.content();
+    const scripts = await this.collectScripts(page);
+    const windowObjects = await this.checkWindowObjects(page);
+    const cookies = await this.collectCookies(page);
+    const finalPageUrl = page.url();
+    const finalPageDomain = new URL(finalPageUrl).hostname;
+
+    return {
+      html,
+      scripts,
+      networkRequests: [...networkRequests],
+      networkRequestsExtended: [...networkRequestsExtended],
+      cookies,
+      windowObjects,
+      consoleMessages: [...consoleMessages],
+      responseHeaders: [...responseHeaders],
+      setCookieHeaders: [...setCookieHeaders],
+      pageUrl: finalPageUrl,
+      pageDomain: finalPageDomain || fallbackPageDomain,
+    };
+  }
+
   // Quick-Crawl für schnellere Analyse (ohne Consent-Test, kürzere Wartezeiten)
   async crawlQuick(url: string): Promise<CrawlResult> {
     const browser = await this.ensureBrowser();
@@ -409,16 +577,7 @@ export class WebCrawler {
       });
 
       const html = await page.content();
-
-      const scripts = await page.evaluate(() => {
-        const scriptElements = document.querySelectorAll('script');
-        const scripts: string[] = [];
-        scriptElements.forEach((script) => {
-          if (script.src) scripts.push(script.src);
-          if (script.innerHTML) scripts.push(script.innerHTML);
-        });
-        return scripts;
-      });
+      const scripts = await this.collectScripts(page);
 
       const windowObjects = await this.checkWindowObjects(page);
 
@@ -469,60 +628,15 @@ export class WebCrawler {
     const responseHeaders: ResponseHeaderData[] = [];
     const consoleMessages: string[] = [];
 
-    // Network Request Listener - erweitert für mehr Details
-    page.on('request', (request) => {
-      const requestData: NetworkRequest = {
-        url: request.url(),
-        method: request.method(),
-        resourceType: request.resourceType(),
-        timestamp: Date.now(),
-      };
-      networkRequests.push(requestData);
-      
-      // Erweiterte Request-Daten
-      const extendedData: NetworkRequestExtended = {
-        ...requestData,
-        initiator: request.initiator()?.type,
-        redirectChain: request.redirectChain().map(r => r.url()),
-      };
-      networkRequestsExtended.push(extendedData);
-    });
-
-    // Set-Cookie Header aus Responses sammeln (für HttpOnly Cookies)
     const setCookieHeaders: Array<{ url: string; cookies: string[] }> = [];
-    
-    // Response Listener für Header-Analyse (wichtig für Server-Side Tracking + Cookies)
-    page.on('response', async (response) => {
-      try {
-        const headers = response.headers();
-        const responseUrl = response.url();
-        
-        // Set-Cookie Headers erfassen (wichtig für HttpOnly Cookies die sonst nicht sichtbar sind)
-        const setCookie = headers['set-cookie'];
-        if (setCookie) {
-          setCookieHeaders.push({
-            url: responseUrl,
-            cookies: Array.isArray(setCookie) ? setCookie : [setCookie],
-          });
-        }
-        
-        // Sammle wichtige Response-Headers für Tracking-Analyse
-        if (this.isTrackingRelatedUrl(responseUrl)) {
-          responseHeaders.push({
-            url: responseUrl,
-            headers: headers,
-            serverInfo: headers['server'] || headers['x-powered-by'],
-          });
-        }
-      } catch {
-        // Response Header Fehler ignorieren
-      }
-    });
-
-    // Console Message Listener
-    page.on('console', (msg) => {
-      consoleMessages.push(`${msg.type()}: ${msg.text()}`);
-    });
+    this.attachCaptureListeners(
+      page,
+      networkRequests,
+      networkRequestsExtended,
+      responseHeaders,
+      consoleMessages,
+      setCookieHeaders
+    );
 
     try {
       await this.gotoAndStabilize(page, url, {
@@ -533,33 +647,7 @@ export class WebCrawler {
 
       // HTML Content (nach allen Wartezeiten für dynamisch injizierte Scripts)
       const html = await page.content();
-
-      // Alle Script-Tags sammeln - erweitert
-      const scripts = await page.evaluate(() => {
-        const scriptElements = document.querySelectorAll('script');
-        const scripts: string[] = [];
-        
-        scriptElements.forEach((script) => {
-          // Script-Src
-          if (script.src) {
-            scripts.push(script.src);
-          }
-          // Inline-Script Inhalt
-          if (script.innerHTML) {
-            scripts.push(script.innerHTML);
-          }
-        });
-        
-        // Auch dynamisch erstellte Scripts im DOM erfassen
-        const allScripts = document.getElementsByTagName('script');
-        Array.from(allScripts).forEach((script) => {
-          if (script.src && !scripts.includes(script.src)) {
-            scripts.push(script.src);
-          }
-        });
-        
-        return scripts;
-      });
+      const scripts = await this.collectScripts(page);
 
       // Window Objects prüfen - erweitert
       const windowObjects = await this.checkWindowObjects(page);
@@ -744,6 +832,67 @@ export class WebCrawler {
         } catch {
           // TCF API Aufruf fehlgeschlagen
         }
+      }
+
+      try {
+        const winLike = win as WindowLikeRecord;
+        if (winLike.rcbConsentManager && typeof winLike.rcbConsentManager.getOptions === 'function') {
+          const groups = winLike.rcbConsentManager.getOptions()?.groups;
+          if (Array.isArray(groups) && groups.length > 0) {
+            const declaredServices: CmpDeclaredService[] = [];
+            const declaredServiceNames = new Set<string>();
+            const categories: CmpMetadata['categories'] = [];
+
+            for (const group of groups) {
+              if (!group || typeof group !== 'object') continue;
+
+              const categoryName = typeof group.name === 'string' && group.name.trim().length > 0
+                ? group.name.trim()
+                : 'Unbekannt';
+              const itemNames: string[] = [];
+              const items = Array.isArray(group.items) ? group.items : [];
+
+              for (const item of items) {
+                if (!item || typeof item !== 'object') continue;
+                const serviceName = typeof item.name === 'string' && item.name.trim().length > 0
+                  ? item.name.trim()
+                  : typeof item.uniqueName === 'string' && item.uniqueName.trim().length > 0
+                  ? item.uniqueName.trim()
+                  : undefined;
+
+                if (!serviceName) continue;
+
+                itemNames.push(serviceName);
+                declaredServiceNames.add(serviceName);
+                declaredServices.push({
+                  id: item.id,
+                  name: serviceName,
+                  categoryId: group.id,
+                  categoryName,
+                  isEssential: Boolean(group.isEssential),
+                  provider: typeof item.provider === 'string' ? item.provider : undefined,
+                  uniqueName: typeof item.uniqueName === 'string' ? item.uniqueName : undefined,
+                });
+              }
+
+              categories.push({
+                id: group.id,
+                name: categoryName,
+                isEssential: Boolean(group.isEssential),
+                itemNames,
+              });
+            }
+
+            result.cmpMetadata = {
+              provider: 'Real Cookie Banner',
+              categories,
+              declaredServices,
+              declaredServiceNames: Array.from(declaredServiceNames),
+            };
+          }
+        }
+      } catch {
+        // CMP Metadaten nicht verfügbar
       }
 
       return result;
@@ -1271,45 +1420,108 @@ export class WebCrawler {
             var options = rcbManager && rcbManager.getOptions ? rcbManager.getOptions() : null;
             var groups = (options && options.groups) || [];
             
-            var allItemIds = [];
-            var essentialItemIds = [];
+            var allGroups = [];
+            var essentialGroups = [];
             
             for (var i = 0; i < groups.length; i++) {
               var g = groups[i];
-              if (g && g.items) {
+              if (g && Array.isArray(g.items) && g.id !== undefined) {
+                var itemIds = [];
                 for (var j = 0; j < g.items.length; j++) {
                   var item = g.items[j];
                   if (item && item.id !== undefined) {
-                    allItemIds.push(item.id);
-                    if (g.isEssential) {
-                      essentialItemIds.push(item.id);
-                    }
+                    itemIds.push(item.id);
+                  }
+                }
+
+                if (itemIds.length > 0) {
+                  allGroups.push([g.id, itemIds]);
+                  if (g.isEssential) {
+                    essentialGroups.push([g.id, itemIds]);
                   }
                 }
               }
             }
             
             if (action === 'accept') {
-              if (typeof win.consentApi.consent === 'function' && allItemIds.length > 0) {
-                var successCount = 0;
-                for (var k = 0; k < allItemIds.length; k++) {
+              if (typeof win.consentApi.consentAll === 'function' && allGroups.length > 0) {
+                try {
+                  win.consentApi.consentAll(allGroups);
+                  method = 'consentApi.consentAll';
+                } catch (e) {}
+              }
+
+              if (!method && typeof win.consentApi.consentSync === 'function' && allGroups.length > 0) {
+                var syncSuccessCount = 0;
+                for (var k = 0; k < allGroups.length; k++) {
                   try {
-                    win.consentApi.consent(allItemIds[k]);
-                    successCount++;
-                  } catch(e) {}
+                    win.consentApi.consentSync(allGroups[k][0], allGroups[k][1]);
+                    syncSuccessCount++;
+                  } catch (e) {}
                 }
-                if (successCount > 0) {
-                  method = 'consentApi.consent (' + successCount + ' items)';
+                if (syncSuccessCount > 0) {
+                  method = 'consentApi.consentSync (' + syncSuccessCount + ' groups)';
+                }
+              }
+
+              if (!method && typeof win.consentApi.consent === 'function' && allGroups.length > 0) {
+                var consentSuccessCount = 0;
+                for (var k = 0; k < allGroups.length; k++) {
+                  try {
+                    win.consentApi.consent(allGroups[k][0], allGroups[k][1]);
+                    consentSuccessCount++;
+                  } catch (e) {}
+                }
+                if (consentSuccessCount > 0) {
+                  method = 'consentApi.consent (' + consentSuccessCount + ' groups)';
                 }
               }
             } else {
-              if (typeof win.consentApi.consent === 'function' && essentialItemIds.length > 0) {
-                for (var k = 0; k < essentialItemIds.length; k++) {
+              if (typeof win.consentApi.consentAll === 'function' && essentialGroups.length > 0) {
+                try {
+                  win.consentApi.consentAll(essentialGroups);
+                  method = 'consentApi.consentAll (essential only)';
+                } catch (e) {}
+              }
+
+              if (!method && typeof win.consentApi.consentSync === 'function' && essentialGroups.length > 0) {
+                var essentialSyncSuccessCount = 0;
+                for (var k = 0; k < essentialGroups.length; k++) {
                   try {
-                    win.consentApi.consent(essentialItemIds[k]);
-                  } catch(e) {}
+                    win.consentApi.consentSync(essentialGroups[k][0], essentialGroups[k][1]);
+                    essentialSyncSuccessCount++;
+                  } catch (e) {}
                 }
-                method = 'consentApi.consent (essential only, ' + essentialItemIds.length + ' items)';
+                if (essentialSyncSuccessCount > 0) {
+                  method = 'consentApi.consentSync (essential only, ' + essentialSyncSuccessCount + ' groups)';
+                }
+              }
+
+              if (!method && typeof win.consentApi.consent === 'function' && essentialGroups.length > 0) {
+                var essentialConsentSuccessCount = 0;
+                for (var k = 0; k < essentialGroups.length; k++) {
+                  try {
+                    win.consentApi.consent(essentialGroups[k][0], essentialGroups[k][1]);
+                    essentialConsentSuccessCount++;
+                  } catch (e) {}
+                }
+                if (essentialConsentSuccessCount > 0) {
+                  method = 'consentApi.consent (essential only, ' + essentialConsentSuccessCount + ' groups)';
+                }
+              }
+            }
+
+            if (method && (method.indexOf('consentApi.') === 0) && win.document) {
+              try {
+                if (typeof win.consentApi.unblockSync === 'function') {
+                  win.consentApi.unblockSync(win.document.body);
+                  method += ' + unblockSync';
+                } else if (typeof win.consentApi.unblock === 'function') {
+                  win.consentApi.unblock(win.document.body);
+                  method += ' + unblock';
+                }
+              } catch (e) {
+                // ignore unblock errors
               }
             }
           }
@@ -1920,10 +2132,19 @@ export class WebCrawler {
     // Test 1: Cookies vor Consent + Akzeptieren
     const acceptContext = await this.createIsolatedContext();
     const pageAccept = acceptContext ? await acceptContext.newPage() : await browser.newPage();
-    const acceptNetworkRequests: string[] = [];
-    pageAccept.on('request', (request) => {
-      acceptNetworkRequests.push(request.url());
-    });
+    const acceptRequests: NetworkRequest[] = [];
+    const acceptRequestsExtended: NetworkRequestExtended[] = [];
+    const acceptResponseHeaders: ResponseHeaderData[] = [];
+    const acceptConsoleMessages: string[] = [];
+    const acceptSetCookieHeaders: Array<{ url: string; cookies: string[] }> = [];
+    this.attachCaptureListeners(
+      pageAccept,
+      acceptRequests,
+      acceptRequestsExtended,
+      acceptResponseHeaders,
+      acceptConsoleMessages,
+      acceptSetCookieHeaders
+    );
     await this.setupPage(pageAccept);
     
     try {
@@ -1984,14 +2205,26 @@ export class WebCrawler {
 
       // Cookies NACH Akzeptieren sammeln
       result.afterAccept.cookies = await this.collectCookiesAfterConsentAction(pageAccept);
-      result.afterAccept.consentSignals = await this.collectGoogleConsentSignals(pageAccept, acceptNetworkRequests);
+      result.afterAccept.consentSignals = await this.collectGoogleConsentSignals(
+        pageAccept,
+        acceptRequests.map((request) => request.url)
+      );
+      result.afterAccept.capture = await this.captureConsentState(
+        pageAccept,
+        result.pageDomain || new URL(url).hostname,
+        acceptRequests,
+        acceptRequestsExtended,
+        acceptResponseHeaders,
+        acceptConsoleMessages,
+        acceptSetCookieHeaders
+      );
 
     } finally {
       await this.safeClosePage(pageAccept);
       await this.safeCloseContext(acceptContext);
     }
 
-    result.acceptNetworkRequests = acceptNetworkRequests;
+    result.acceptNetworkRequests = acceptRequests.map((request) => request.url);
 
     // Test 2: Ablehnen in neuem, sauberen Tab
     const rejectBrowser = await this.ensureBrowser();
@@ -2100,10 +2333,19 @@ export class WebCrawler {
 
     const acceptContext = await this.createIsolatedContext();
     const pageAccept = acceptContext ? await acceptContext.newPage() : await browser.newPage();
-    const acceptNetworkRequests: string[] = [];
-    pageAccept.on('request', (request) => {
-      acceptNetworkRequests.push(request.url());
-    });
+    const acceptRequests: NetworkRequest[] = [];
+    const acceptRequestsExtended: NetworkRequestExtended[] = [];
+    const acceptResponseHeaders: ResponseHeaderData[] = [];
+    const acceptConsoleMessages: string[] = [];
+    const acceptSetCookieHeaders: Array<{ url: string; cookies: string[] }> = [];
+    this.attachCaptureListeners(
+      pageAccept,
+      acceptRequests,
+      acceptRequestsExtended,
+      acceptResponseHeaders,
+      acceptConsoleMessages,
+      acceptSetCookieHeaders
+    );
 
     await this.setupPage(pageAccept);
 
@@ -2153,7 +2395,19 @@ export class WebCrawler {
       }
 
       const cookies = await this.collectCookiesAfterConsentAction(pageAccept);
-      const consentSignals = await this.collectGoogleConsentSignals(pageAccept, acceptNetworkRequests);
+      const consentSignals = await this.collectGoogleConsentSignals(
+        pageAccept,
+        acceptRequests.map((request) => request.url)
+      );
+      const capture = await this.captureConsentState(
+        pageAccept,
+        new URL(url).hostname,
+        acceptRequests,
+        acceptRequestsExtended,
+        acceptResponseHeaders,
+        acceptConsoleMessages,
+        acceptSetCookieHeaders
+      );
 
       return {
         cookies,
@@ -2161,6 +2415,7 @@ export class WebCrawler {
         buttonFound: acceptResult.found,
         buttonText: acceptResult.buttonText,
         consentSignals,
+        capture,
       };
     } finally {
       await this.safeClosePage(pageAccept);

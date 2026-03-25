@@ -461,11 +461,12 @@ export interface ServerSideTrackingResult {
     hasTikTokEventsAPI: boolean;
     hasLinkedInCAPI: boolean;
     hasCookieBridging: boolean;
+    hasCmpDeclaredServerSide: boolean;
   };
 }
 
 export interface ServerSideIndicator {
-  type: 'sgtm' | 'meta_capi' | 'tiktok_events_api' | 'linkedin_capi' | 'first_party_proxy' | 'custom_endpoint' | 'cookie_bridging';
+  type: 'sgtm' | 'meta_capi' | 'tiktok_events_api' | 'linkedin_capi' | 'first_party_proxy' | 'custom_endpoint' | 'cookie_bridging' | 'cmp_declared_service';
   confidence: DetectionConfidence;
   description: string;
   evidence: string[];
@@ -775,6 +776,7 @@ export interface ConversionPlatformAudit {
   detected: boolean;
   hasServerSide: boolean;
   hasDedupe: boolean;
+  dedupeAssessable?: boolean;
   hasValue: boolean;
   hasCurrency: boolean;
   hasEventId: boolean;

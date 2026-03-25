@@ -480,7 +480,17 @@ export function analyzeTrackingTags(crawlResult: CrawlResult): TrackingTagsResul
     responseHeaders, 
     pageDomain,
     combinedContent,
-    crawlResult.cookies
+    crawlResult.cookies,
+    windowObjects,
+    {
+      hasGoogleSignals:
+        googleAnalytics.detected ||
+        googleAdsConversion.detected ||
+        googleTagManager.detected,
+      hasMetaSignals: metaPixel.detected,
+      hasTikTokSignals: tiktokPixel.detected,
+      hasLinkedInSignals: linkedInInsight.detected,
+    }
   );
 
   return {
@@ -1439,7 +1449,14 @@ function analyzeServerSideTracking(
   responseHeaders: ResponseHeaderData[],
   pageDomain: string,
   content: string,
-  cookies: { name: string; value: string; domain: string }[]
+  cookies: { name: string; value: string; domain: string }[],
+  windowObjects: WindowObjectData,
+  signalContext: {
+    hasGoogleSignals: boolean;
+    hasMetaSignals: boolean;
+    hasTikTokSignals: boolean;
+    hasLinkedInSignals: boolean;
+  }
 ): ServerSideTrackingResult {
   const indicators: ServerSideIndicator[] = [];
   const firstPartyEndpoints: FirstPartyEndpoint[] = [];
@@ -1519,6 +1536,17 @@ function analyzeServerSideTracking(
     });
   }
 
+  // 7. CMP-deklarierte Server-Side Dienste
+  const cmpDeclaredServerSide = detectCmpDeclaredServerSide(windowObjects, signalContext);
+  if (cmpDeclaredServerSide.detected) {
+    indicators.push({
+      type: 'cmp_declared_service',
+      confidence: cmpDeclaredServerSide.confidence,
+      description: 'CMP deklariert ein serverseitiges Tracking-Setup',
+      evidence: cmpDeclaredServerSide.evidence,
+    });
+  }
+
   return {
     detected: indicators.length > 0,
     indicators,
@@ -1531,6 +1559,7 @@ function analyzeServerSideTracking(
       hasTikTokEventsAPI: indicators.some(i => i.type === 'tiktok_events_api'),
       hasLinkedInCAPI: indicators.some(i => i.type === 'linkedin_capi'),
       hasCookieBridging: cookieBridgingResult.detected,
+      hasCmpDeclaredServerSide: indicators.some(i => i.type === 'cmp_declared_service'),
     },
   };
 }
@@ -1570,6 +1599,55 @@ function detectCookieBridging(
     confidence,
     cookies: bridgingCookies,
     indicators: evidence,
+  };
+}
+
+function detectCmpDeclaredServerSide(
+  windowObjects: WindowObjectData,
+  signalContext: {
+    hasGoogleSignals: boolean;
+    hasMetaSignals: boolean;
+    hasTikTokSignals: boolean;
+    hasLinkedInSignals: boolean;
+  }
+): { detected: boolean; confidence: 'high' | 'medium' | 'low'; evidence: string[] } {
+  const cmpMetadata = windowObjects.cmpMetadata;
+  if (!cmpMetadata || cmpMetadata.provider !== 'Real Cookie Banner') {
+    return { detected: false, confidence: 'low', evidence: [] };
+  }
+
+  const stapeServices = cmpMetadata.declaredServices.filter((service) =>
+    /stape/i.test(`${service.name} ${service.provider || ''} ${service.uniqueName || ''}`)
+  );
+  if (stapeServices.length === 0) {
+    return { detected: false, confidence: 'low', evidence: [] };
+  }
+
+  const activePlatforms: string[] = [];
+  if (signalContext.hasGoogleSignals) activePlatforms.push('Google');
+  if (signalContext.hasMetaSignals) activePlatforms.push('Meta');
+  if (signalContext.hasTikTokSignals) activePlatforms.push('TikTok');
+  if (signalContext.hasLinkedInSignals) activePlatforms.push('LinkedIn');
+
+  if (activePlatforms.length === 0) {
+    return { detected: false, confidence: 'low', evidence: [] };
+  }
+
+  const categories = Array.from(
+    new Set(stapeServices.map((service) => service.categoryName).filter(Boolean))
+  ) as string[];
+
+  return {
+    detected: true,
+    confidence: 'medium',
+    evidence: [
+      `CMP Provider: ${cmpMetadata.provider}`,
+      `Deklarierter Server-Side Dienst: ${Array.from(new Set(stapeServices.map((service) => service.name))).join(', ')}`,
+      categories.length > 0
+        ? `CMP Kategorie: ${categories.join(', ')}`
+        : 'CMP Kategorie: unbekannt',
+      `Passende Client-Signale aktiv für: ${activePlatforms.join(', ')}`,
+    ],
   };
 }
 

@@ -43,6 +43,33 @@ import {
   CookieResult,
 } from '@/types';
 
+function hasCmpDeclaredServerSide(trackingTags: TrackingTagsResult): boolean {
+  return trackingTags.serverSideTracking.summary.hasCmpDeclaredServerSide;
+}
+
+function hasGoogleServerSideTracking(trackingTags: TrackingTagsResult): boolean {
+  return trackingTags.serverSideTracking.summary.hasServerSideGTM || hasCmpDeclaredServerSide(trackingTags);
+}
+
+function hasMetaServerSideTracking(trackingTags: TrackingTagsResult): boolean {
+  return Boolean(
+    trackingTags.metaPixel.serverSide?.detected ||
+    trackingTags.serverSideTracking.summary.hasMetaCAPI ||
+    (hasCmpDeclaredServerSide(trackingTags) && trackingTags.metaPixel.detected)
+  );
+}
+
+function hasDirectMetaServerSideEvidence(trackingTags: TrackingTagsResult): boolean {
+  return Boolean(
+    trackingTags.metaPixel.serverSide?.hasConversionsAPI ||
+    trackingTags.serverSideTracking.summary.hasMetaCAPI
+  );
+}
+
+function hasAnyServerSideTracking(trackingTags: TrackingTagsResult): boolean {
+  return trackingTags.serverSideTracking.detected;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Event Quality Score Analyzer
 // ═══════════════════════════════════════════════════════════════════════════
@@ -84,7 +111,7 @@ export function analyzeEventQuality(
   if (trackingTags.googleAnalytics.detected || trackingTags.googleAdsConversion.detected) {
     platforms.google = analyzeGoogleEventQuality(crawlResult, trackingTags, dataLayerAnalysis);
     
-    if (!trackingTags.serverSideTracking.summary.hasServerSideGTM) {
+    if (!hasGoogleServerSideTracking(trackingTags)) {
       recommendations.push({
         platform: 'Google',
         priority: 'medium',
@@ -188,12 +215,14 @@ function analyzeMetaEventQuality(
   if (hasFbp) score += 5;
 
   // Server-Side Check
-  const hasServerSide = trackingTags.metaPixel.serverSide?.detected || false;
+  const hasServerSide = hasMetaServerSideTracking(trackingTags);
   if (hasServerSide) score += 15;
 
   // Dedupe Check
-  const hasDedupe = trackingTags.metaPixel.serverSide?.hasDedupe || 
-                    /event_id/i.test(combinedContent);
+  const dedupeAssessable = hasDirectMetaServerSideEvidence(trackingTags) || /event_id/i.test(combinedContent);
+  const hasDedupe = trackingTags.metaPixel.serverSide?.hasDedupe ||
+                    /event_id/i.test(combinedContent) ||
+                    !dedupeAssessable;
 
   return {
     platform: 'Meta',
@@ -265,7 +294,7 @@ function analyzeGoogleEventQuality(
   }
 
   // Server-Side GTM
-  const hasServerSide = trackingTags.serverSideTracking.summary.hasServerSideGTM;
+  const hasServerSide = hasGoogleServerSideTracking(trackingTags);
   if (hasServerSide) score += 10;
 
   return {
@@ -674,7 +703,7 @@ export function analyzeCookieLifetime(
   const recommendations: CookieLifetimeRecommendation[] = [];
   
   // Server-Side Tracking Empfehlung
-  if (impactedCookies.length > 0 && !trackingTags.serverSideTracking.summary.hasServerSideGTM) {
+  if (impactedCookies.length > 0 && !hasGoogleServerSideTracking(trackingTags)) {
     recommendations.push({
       priority: 'high',
       title: 'Server-Side GTM implementieren',
@@ -797,7 +826,7 @@ export function analyzeUnusedPotential(
   }
 
   // 7. Kein Server-Side Tracking
-  if (!trackingTags.serverSideTracking.detected) {
+  if (!hasAnyServerSideTracking(trackingTags)) {
     totalPotential.push({
       type: 'incomplete_setup',
       platform: 'Alle',
@@ -1026,7 +1055,7 @@ export function analyzeConversionTrackingAudit(
         estimatedImpact: 'Wertbasiertes Bidding möglich',
       });
     }
-    if (platform.detected && !platform.hasDedupe && platform.hasServerSide) {
+    if (platform.detected && !platform.hasDedupe && platform.hasServerSide && platform.dedupeAssessable !== false) {
       issues.push({
         severity: 'medium',
         title: `${platform.platform.toUpperCase()}: Deduplizierung fehlt`,
@@ -1043,7 +1072,7 @@ export function analyzeConversionTrackingAudit(
   };
 
   if (trackingTags.googleAdsConversion.detected || trackingTags.googleAnalytics.detected) {
-    const hasServerSide = trackingTags.serverSideTracking.summary.hasServerSideGTM;
+    const hasServerSide = hasGoogleServerSideTracking(trackingTags);
     const notes = [];
     if (trackingTags.googleAdsConversion.detected) notes.push('Google Ads Conversion Tag erkannt');
     if (trackingTags.googleAnalytics.detected) notes.push('GA4 erkannt');
@@ -1062,18 +1091,25 @@ export function analyzeConversionTrackingAudit(
   }
 
   if (trackingTags.metaPixel.detected) {
-    const hasServerSide = trackingTags.metaPixel.serverSide?.detected || false;
+    const hasServerSide = hasMetaServerSideTracking(trackingTags);
+    const dedupeAssessable = hasDirectMetaServerSideEvidence(trackingTags) || hasEventId;
     const hasDedupe = trackingTags.metaPixel.serverSide?.hasDedupe || hasEventId;
     addPlatform({
       platform: 'meta',
       detected: true,
       hasServerSide,
       hasDedupe,
+      dedupeAssessable,
       hasValue,
       hasCurrency,
       hasEventId,
-      coverageScore: calculateCoverageScore([hasServerSide, hasDedupe, hasValue, hasCurrency, hasEventId], 35),
-      notes: ['Meta Pixel erkannt'],
+      coverageScore: calculateCoverageScore(
+        [hasServerSide, dedupeAssessable ? hasDedupe : true, hasValue, hasCurrency, dedupeAssessable ? hasEventId : true],
+        35
+      ),
+      notes: dedupeAssessable
+        ? ['Meta Pixel erkannt']
+        : ['Meta Pixel erkannt', 'Deduplizierung ohne direkte CAPI-/event_id-Signale nicht belastbar prüfbar'],
     });
   }
 
@@ -1195,9 +1231,12 @@ export function analyzeCampaignAttribution(
   let score = 100;
   const issues: CampaignAttributionIssue[] = [];
   const recommendations: CampaignAttributionRecommendation[] = [];
+  const hasCampaignLandingContext =
+    clickIdStatus.some((signal) => signal.detected) ||
+    utmStatus.some((signal) => signal.detected);
 
   const hasGoogleSignals = clickIdStatus.some(s => ['gclid', 'wbraid', 'pbraid'].includes(s.signal) && s.detected);
-  if (trackingTags.googleAdsConversion.detected && !hasGoogleSignals) {
+  if (trackingTags.googleAdsConversion.detected && hasCampaignLandingContext && !hasGoogleSignals) {
     score -= 20;
     issues.push({
       severity: 'high',
@@ -1215,7 +1254,7 @@ export function analyzeCampaignAttribution(
 
   const hasMetaSignals = clickIdStatus.some(s => s.signal === 'fbclid' && s.detected) ||
     crawlResult.cookies.some(c => c.name === '_fbc');
-  if (trackingTags.metaPixel.detected && !hasMetaSignals) {
+  if (trackingTags.metaPixel.detected && hasCampaignLandingContext && !hasMetaSignals) {
     score -= 15;
     issues.push({
       severity: 'medium',
@@ -1226,7 +1265,7 @@ export function analyzeCampaignAttribution(
   }
 
   const utmDetected = utmStatus.some(s => s.detected);
-  if (!utmDetected) {
+  if (hasCampaignLandingContext && !utmDetected) {
     score -= 10;
     issues.push({
       severity: 'low',
@@ -1280,6 +1319,9 @@ export function analyzeGTMAudit(
   const gtmIndex = html.indexOf('googletagmanager.com/gtm.js');
   const headCloseIndex = html.indexOf('</head>');
   const snippetInHead = gtmIndex !== -1 && headCloseIndex !== -1 && gtmIndex < headCloseIndex;
+  const hasSnippetEvidence = trackingTags.googleTagManager.detectionMethod.some(
+    (method) => method === 'script' || method === 'network'
+  );
 
   const consentDefaultIndex = html.indexOf("gtag('consent");
   const consentDefaultBeforeGtm = consentDefaultIndex !== -1 && gtmIndex !== -1 && consentDefaultIndex < gtmIndex;
@@ -1321,7 +1363,7 @@ export function analyzeGTMAudit(
     });
   }
 
-  if (detected && !hasNoScriptTag) {
+  if (detected && hasSnippetEvidence && !hasNoScriptTag) {
     score -= 5;
     issues.push({
       severity: 'low',
@@ -1331,7 +1373,7 @@ export function analyzeGTMAudit(
     });
   }
 
-  if (detected && !snippetInHead) {
+  if (detected && hasSnippetEvidence && !snippetInHead) {
     score -= 10;
     issues.push({
       severity: 'medium',
@@ -1341,7 +1383,7 @@ export function analyzeGTMAudit(
     });
   }
 
-  if (detected && !consentDefaultBeforeGtm) {
+  if (detected && hasSnippetEvidence && !consentDefaultBeforeGtm) {
     score -= 10;
     issues.push({
       severity: 'medium',

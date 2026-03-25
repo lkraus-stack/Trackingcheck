@@ -47,6 +47,19 @@ export const genericDataLayerOnlyFixture = createCrawlResult({
   }),
 });
 
+export const genericTcfMentionFixture = createCrawlResult({
+  html: `
+    <html>
+      <head>
+        <script>
+          console.log('TCF helper text from plugin changelog');
+        </script>
+      </head>
+      <body></body>
+    </html>
+  `,
+});
+
 export const gaViaDataLayerFixture = createCrawlResult({
   html: `<script>
     window.dataLayer = window.dataLayer || [];
@@ -102,6 +115,113 @@ export const firstPartySgtmFixture = createCrawlResult({
       },
     },
   ],
+});
+
+export const cmpDeclaredStapeFixture = createCrawlResult({
+  pageUrl: 'https://www.hotel.example/',
+  pageDomain: 'www.hotel.example',
+  html: `
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TEST123456"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('config', 'G-TEST123456');
+      fbq('init', '123456789012345');
+    </script>
+  `,
+  scripts: [
+    'https://www.googletagmanager.com/gtag/js?id=G-TEST123456',
+    `window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('config', 'G-TEST123456'); fbq('init', '123456789012345');`,
+  ],
+  networkRequests: [
+    createRequest('https://www.googletagmanager.com/gtag/js?id=G-TEST123456'),
+    createRequest('https://www.google-analytics.com/g/collect?v=2&tid=G-TEST123456&cid=123.456&en=page_view', 'fetch'),
+    createRequest('https://connect.facebook.net/en_US/fbevents.js'),
+    createRequest('https://www.facebook.com/tr?id=123456789012345&ev=PageView', 'image'),
+  ],
+  windowObjects: createWindowObjects({
+    hasGtag: true,
+    hasDataLayer: true,
+    hasFbq: true,
+    hasFbEvents: true,
+    dataLayerContent: [['config', 'G-TEST123456']],
+    gtagCalls: [['config', 'G-TEST123456']],
+    cmpMetadata: {
+      provider: 'Real Cookie Banner',
+      categories: [
+        { id: 20, name: 'Funktional', isEssential: false, itemNames: ['Google Tag Manager'] },
+        { id: 22, name: 'Marketing', isEssential: false, itemNames: ['Stape', 'Facebook Pixel'] },
+      ],
+      declaredServices: [
+        {
+          id: 25208,
+          name: 'Google Tag Manager',
+          categoryId: 20,
+          categoryName: 'Funktional',
+          isEssential: false,
+          uniqueName: 'google-tag-manager',
+        },
+        {
+          id: 25210,
+          name: 'Stape',
+          categoryId: 22,
+          categoryName: 'Marketing',
+          isEssential: false,
+          provider: 'Stape',
+          uniqueName: 'stape',
+        },
+        {
+          id: 15712,
+          name: 'Facebook Pixel',
+          categoryId: 22,
+          categoryName: 'Marketing',
+          isEssential: false,
+          uniqueName: 'facebook-pixel',
+        },
+      ],
+      declaredServiceNames: ['Google Tag Manager', 'Stape', 'Facebook Pixel'],
+    },
+    additionalTrackingObjects: { fbq: true, _fbq: true },
+  }),
+});
+
+export const cmpDeclaredNoServerSideFixture = createCrawlResult({
+  ...cmpDeclaredStapeFixture,
+  windowObjects: createWindowObjects({
+    hasGtag: true,
+    hasDataLayer: true,
+    hasFbq: true,
+    hasFbEvents: true,
+    dataLayerContent: [['config', 'G-TEST123456']],
+    gtagCalls: [['config', 'G-TEST123456']],
+    cmpMetadata: {
+      provider: 'Real Cookie Banner',
+      categories: [
+        { id: 20, name: 'Funktional', isEssential: false, itemNames: ['Google Tag Manager'] },
+        { id: 22, name: 'Marketing', isEssential: false, itemNames: ['Facebook Pixel'] },
+      ],
+      declaredServices: [
+        {
+          id: 25208,
+          name: 'Google Tag Manager',
+          categoryId: 20,
+          categoryName: 'Funktional',
+          isEssential: false,
+          uniqueName: 'google-tag-manager',
+        },
+        {
+          id: 15712,
+          name: 'Facebook Pixel',
+          categoryId: 22,
+          categoryName: 'Marketing',
+          isEssential: false,
+          uniqueName: 'facebook-pixel',
+        },
+      ],
+      declaredServiceNames: ['Google Tag Manager', 'Facebook Pixel'],
+    },
+    additionalTrackingObjects: { fbq: true, _fbq: true },
+  }),
 });
 
 export const falsePositiveFirstPartyTrackingAssetFixture = createCrawlResult({

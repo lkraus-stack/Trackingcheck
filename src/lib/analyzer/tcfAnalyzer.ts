@@ -62,22 +62,22 @@ export function analyzeTCF(crawlResult: CrawlResult): TCFResult {
 
 function detectTCFScripts(content: string, scripts: string[]): boolean {
   const tcfPatterns = [
-    '__tcfapi',
-    'tcf-stub',
-    'tcfapi',
-    'cmp-stub',
-    'gdpr-stub',
-    'euconsent',
-    'iabtcf',
-    'TCF',
-    'CmpApi',
+    /__tcfapi\b/i,
+    /\btcfapi\s*\(/i,
+    /\btcf-stub\b/i,
+    /\bcmp-stub\b/i,
+    /\bgdpr-stub\b/i,
+    /\beuconsent-v2\b/i,
+    /\beupubconsent-v2\b/i,
+    /\bIABTCF_[A-Za-z0-9_]+\b/,
+    /\biabtcf\b/i,
+    /\bgdprapplies\b/i,
   ];
 
-  const contentLower = content.toLowerCase();
-  const scriptsLower = scripts.map(s => s.toLowerCase()).join(' ');
+  const haystack = `${content}\n${scripts.join('\n')}`;
 
   for (const pattern of tcfPatterns) {
-    if (contentLower.includes(pattern.toLowerCase()) || scriptsLower.includes(pattern.toLowerCase())) {
+    if (pattern.test(haystack)) {
       return true;
     }
   }

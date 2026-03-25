@@ -1,4 +1,12 @@
-import { WebCrawler, CookieConsentTestData, GoogleConsentSignals, AcceptOnlyTestResult } from './crawler';
+import {
+  WebCrawler,
+  CookieConsentTestData,
+  GoogleConsentSignals,
+  AcceptOnlyTestResult,
+  ConsentCaptureData,
+  CrawlResult,
+  WindowObjectData,
+} from './crawler';
 import { analyzeCookieBanner } from './cookieBannerAnalyzer';
 import { analyzeTCF } from './tcfAnalyzer';
 import { analyzeGoogleConsentMode, checkConsentModeCompleteness } from './googleConsentModeAnalyzer';
@@ -94,6 +102,128 @@ const hasLikelyTrackingSignals = (trackingTags: AnalysisResult['trackingTags']):
   );
 };
 
+const dedupeByKey = <T>(items: T[], getKey: (item: T) => string): T[] => {
+  const map = new Map<string, T>();
+  for (const item of items) {
+    map.set(getKey(item), item);
+  }
+  return Array.from(map.values());
+};
+
+const mergeUnknownEntries = <T>(...groups: Array<T[] | undefined>): T[] => {
+  const merged = new Map<string, T>();
+  for (const group of groups) {
+    for (const entry of group || []) {
+      try {
+        merged.set(JSON.stringify(entry), entry);
+      } catch {
+        merged.set(String(entry), entry);
+      }
+    }
+  }
+  return Array.from(merged.values());
+};
+
+const mergeWindowObjects = (
+  base: WindowObjectData,
+  capture?: WindowObjectData
+): WindowObjectData => {
+  if (!capture) {
+    return base;
+  }
+
+  return {
+    hasGtag: base.hasGtag || capture.hasGtag,
+    hasDataLayer: base.hasDataLayer || capture.hasDataLayer,
+    hasTcfApi: base.hasTcfApi || capture.hasTcfApi,
+    hasFbq: base.hasFbq || capture.hasFbq,
+    hasFbEvents: base.hasFbEvents || capture.hasFbEvents,
+    hasTtq: base.hasTtq || capture.hasTtq,
+    hasLintrk: base.hasLintrk || capture.hasLintrk,
+    dataLayerContent: mergeUnknownEntries(base.dataLayerContent, capture.dataLayerContent),
+    tcfApiResponse: capture.tcfApiResponse ?? base.tcfApiResponse,
+    fbqQueue: mergeUnknownEntries(base.fbqQueue, capture.fbqQueue),
+    consentModeCalls: mergeUnknownEntries(base.consentModeCalls, capture.consentModeCalls),
+    gtagCalls: mergeUnknownEntries(base.gtagCalls, capture.gtagCalls) as unknown[][],
+    dataLayerPushCalls: mergeUnknownEntries(base.dataLayerPushCalls, capture.dataLayerPushCalls) as unknown[][],
+    cmpMetadata: capture.cmpMetadata || base.cmpMetadata,
+    additionalTrackingObjects: {
+      _fbq: base.additionalTrackingObjects._fbq || capture.additionalTrackingObjects._fbq,
+      fbq: base.additionalTrackingObjects.fbq || capture.additionalTrackingObjects.fbq,
+      _ttq: base.additionalTrackingObjects._ttq || capture.additionalTrackingObjects._ttq,
+      ttq: base.additionalTrackingObjects.ttq || capture.additionalTrackingObjects.ttq,
+      lintrk: base.additionalTrackingObjects.lintrk || capture.additionalTrackingObjects.lintrk,
+      _linkedin_data_partner_ids:
+        capture.additionalTrackingObjects._linkedin_data_partner_ids ??
+        base.additionalTrackingObjects._linkedin_data_partner_ids,
+      uetq: base.additionalTrackingObjects.uetq || capture.additionalTrackingObjects.uetq,
+      snaptr: base.additionalTrackingObjects.snaptr || capture.additionalTrackingObjects.snaptr,
+      pintrk: base.additionalTrackingObjects.pintrk || capture.additionalTrackingObjects.pintrk,
+      twq: base.additionalTrackingObjects.twq || capture.additionalTrackingObjects.twq,
+      clarity: base.additionalTrackingObjects.clarity || capture.additionalTrackingObjects.clarity,
+      hj: base.additionalTrackingObjects.hj || capture.additionalTrackingObjects.hj,
+    },
+  };
+};
+
+function buildEffectiveCrawlResult(
+  base: CrawlResult,
+  capture: ConsentCaptureData | undefined,
+  rawCookies: Array<{
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    expires: number;
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite?: string;
+  }> | undefined
+): CrawlResult {
+  if (!capture && !rawCookies) {
+    return base;
+  }
+
+  return {
+    ...base,
+    html: capture ? [base.html, capture.html].filter(Boolean).join('\n') : base.html,
+    scripts: capture ? dedupeByKey([...base.scripts, ...capture.scripts], (entry) => entry) : base.scripts,
+    networkRequests: capture
+      ? dedupeByKey(
+          [...base.networkRequests, ...capture.networkRequests],
+          (request) => `${request.method}|${request.resourceType}|${request.url}`
+        )
+      : base.networkRequests,
+    networkRequestsExtended: capture
+      ? dedupeByKey(
+          [...base.networkRequestsExtended, ...capture.networkRequestsExtended],
+          (request) =>
+            `${request.method}|${request.resourceType}|${request.url}|${request.initiator || ''}|${(request.redirectChain || []).join('>')}`
+        )
+      : base.networkRequestsExtended,
+    cookies: dedupeByKey(
+      [...base.cookies, ...(capture?.cookies || []), ...(rawCookies || [])],
+      (cookie) => `${cookie.name}|${cookie.domain}|${cookie.path}`
+    ),
+    windowObjects: mergeWindowObjects(base.windowObjects, capture?.windowObjects),
+    consoleMessages: capture
+      ? dedupeByKey([...base.consoleMessages, ...capture.consoleMessages], (entry) => entry)
+      : base.consoleMessages,
+    responseHeaders: capture
+      ? dedupeByKey(
+          [...base.responseHeaders, ...capture.responseHeaders],
+          (entry) => `${entry.url}|${Object.keys(entry.headers).sort().join(',')}`
+        )
+      : base.responseHeaders,
+    pageUrl: capture?.pageUrl || base.pageUrl,
+    pageDomain: capture?.pageDomain || base.pageDomain,
+    setCookieHeaders: dedupeByKey(
+      [...(base.setCookieHeaders || []), ...(capture?.setCookieHeaders || [])],
+      (entry) => `${entry.url}|${entry.cookies.join('|')}`
+    ),
+  };
+}
+
 export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
   const crawler = new WebCrawler();
   const analysisSteps: AnalysisStep[] = [];
@@ -135,7 +265,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     );
 
     addStep('analyze_tracking', 'running', 'Tracking-Tags werden identifiziert...');
-    const trackingTags = analyzeTrackingTags(crawlResult);
+    let trackingTags = analyzeTrackingTags(crawlResult);
     const trackingCount = [
       trackingTags.googleAnalytics.detected,
       trackingTags.googleTagManager.detected,
@@ -152,7 +282,7 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
 
     // NEU: DataLayer & E-Commerce analysieren
     addStep('analyze_datalayer', 'running', 'DataLayer und E-Commerce Events werden analysiert...');
-    const dataLayerAnalysis = analyzeDataLayer(crawlResult);
+    let dataLayerAnalysis = analyzeDataLayer(crawlResult);
     addStep('analyze_datalayer', 'completed', 
       dataLayerAnalysis.ecommerce.detected 
         ? `E-Commerce erkannt: ${dataLayerAnalysis.ecommerce.events.length} Events`
@@ -162,11 +292,11 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     // Cookie-Consent-Test durchführen (nur wenn Banner erkannt wurde)
     let cookieConsentTest: CookieConsentTestResult | undefined;
     let acceptFallback: AcceptOnlyTestResult | undefined;
+    let consentTestData: CookieConsentTestData | undefined;
     if (cookieBanner.detected) {
       addStep('consent_test', 'running', 'Cookie-Consent wird getestet...', 'Cookies vor und nach Banner-Interaktion werden verglichen');
 
       const maxAttempts = 2;
-      let consentTestData: CookieConsentTestData | undefined;
       let lastError: unknown;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
@@ -275,8 +405,8 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
           const retryFallback = await crawler.performAcceptOnlyTest(normalizedUrl);
+          acceptFallback = retryFallback;
           if (retryFallback.cookies.length > 0) {
-            acceptFallback = retryFallback;
             addStep('consent_fallback_retry', 'completed', `${retryFallback.cookies.length} Cookies im Retry gefunden`);
             googleConsentMode = enrichConsentModeWithPostConsentSignals(
               googleConsentMode,
@@ -313,17 +443,42 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     
     // Cookies kategorisieren
     addStep('analyze_cookies', 'running', 'Cookies werden kategorisiert...');
-    const cookiesToUse = cookieConsentTest?.afterAccept.cookies.length 
-      ? cookieConsentTest.afterAccept.cookies 
+    const rawCookiesToUse = consentTestData?.afterAccept.cookies.length
+      ? consentTestData.afterAccept.cookies
       : acceptFallback?.cookies.length
       ? acceptFallback.cookies
-      : categorizeCookies(crawlResult.cookies, crawlResult.pageDomain);
-    const cookies = toCookieResults(cookiesToUse, crawlResult.pageDomain);
+      : crawlResult.cookies;
+    const postConsentCapture = consentTestData?.afterAccept.capture ?? acceptFallback?.capture;
+    const effectiveCrawlResult = buildEffectiveCrawlResult(crawlResult, postConsentCapture, rawCookiesToUse);
+
+    if (postConsentCapture) {
+      addStep(
+        'reanalyze_post_consent',
+        'running',
+        'Post-Consent Zustand wird neu ausgewertet...',
+        'Tracking- und DataLayer-Signale werden mit Accept-Capture zusammengeführt'
+      );
+      trackingTags = analyzeTrackingTags(effectiveCrawlResult);
+      dataLayerAnalysis = analyzeDataLayer(effectiveCrawlResult);
+      addStep(
+        'reanalyze_post_consent',
+        'completed',
+        `${effectiveCrawlResult.networkRequests.length} Requests im effektiven Scan-Kontext`
+      );
+    } else if (rawCookiesToUse !== crawlResult.cookies) {
+      trackingTags = analyzeTrackingTags(effectiveCrawlResult);
+      dataLayerAnalysis = analyzeDataLayer(effectiveCrawlResult);
+    }
+
+    const cookies = toCookieResults(
+      rawCookiesToUse.length ? rawCookiesToUse : effectiveCrawlResult.cookies,
+      effectiveCrawlResult.pageDomain
+    );
     addStep('analyze_cookies', 'completed', `${cookies.length} Cookies kategorisiert`);
 
     // NEU: Third-Party Domains analysieren
     addStep('analyze_third_party', 'running', 'Drittanbieter-Domains werden analysiert...');
-    const thirdPartyDomains = analyzeThirdPartyDomains(crawlResult, cookies);
+    const thirdPartyDomains = analyzeThirdPartyDomains(effectiveCrawlResult, cookies);
     addStep('analyze_third_party', 'completed', `${thirdPartyDomains.totalCount} Third-Party Domains`);
 
     // NEU: DSGVO Checkliste
@@ -351,17 +506,17 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     // NEU: Performance Marketing Analysen
     addStep('analyze_performance', 'running', 'Performance Marketing Analyse läuft...');
     
-    const eventQualityScore = analyzeEventQuality(crawlResult, trackingTags, dataLayerAnalysis);
-    const funnelValidation = analyzeFunnelValidation(crawlResult, dataLayerAnalysis);
+    const eventQualityScore = analyzeEventQuality(effectiveCrawlResult, trackingTags, dataLayerAnalysis);
+    const funnelValidation = analyzeFunnelValidation(effectiveCrawlResult, dataLayerAnalysis);
     const cookieLifetimeAudit = analyzeCookieLifetime(cookies, trackingTags);
-    const unusedPotential = analyzeUnusedPotential(crawlResult, trackingTags, dataLayerAnalysis);
+    const unusedPotential = analyzeUnusedPotential(effectiveCrawlResult, trackingTags, dataLayerAnalysis);
     const roasQuality = dataLayerAnalysis.ecommerce.detected 
       ? analyzeROASQuality(dataLayerAnalysis)
       : undefined;
-    const conversionTrackingAudit = analyzeConversionTrackingAudit(crawlResult, trackingTags, dataLayerAnalysis);
-    const campaignAttribution = analyzeCampaignAttribution(crawlResult, trackingTags);
-    const gtmAudit = analyzeGTMAudit(crawlResult, trackingTags);
-    const privacySandbox = analyzePrivacySandbox(crawlResult);
+    const conversionTrackingAudit = analyzeConversionTrackingAudit(effectiveCrawlResult, trackingTags, dataLayerAnalysis);
+    const campaignAttribution = analyzeCampaignAttribution(effectiveCrawlResult, trackingTags);
+    const gtmAudit = analyzeGTMAudit(effectiveCrawlResult, trackingTags);
+    const privacySandbox = analyzePrivacySandbox(effectiveCrawlResult);
     const ecommerceDeepDive = dataLayerAnalysis.ecommerce.detected
       ? analyzeEcommerceDeepDive(dataLayerAnalysis)
       : undefined;
@@ -514,6 +669,10 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
   const treatAsAccept = saveButtonAcceptedMarketing && !isEssentialOnlyAction;
   
   const issues: CookieConsentIssue[] = [];
+  const hasPostAcceptConsentSignals = Boolean(
+    testData.afterAccept.consentSignals?.dataLayerConsentDetected ||
+    (testData.afterAccept.consentSignals?.gcsOrGcdRequests || 0) > 0
+  );
   
   if (trackingCookiesBefore.length > 0) {
     issues.push({
@@ -533,7 +692,12 @@ function processCookieConsentTest(testData: CookieConsentTestData): CookieConsen
     });
   }
   
-  if (testData.afterAccept.clickSuccessful && newCookiesAfterAccept.length === 0 && afterAcceptCookies.length === beforeCookies.length) {
+  if (
+    testData.afterAccept.clickSuccessful &&
+    newCookiesAfterAccept.length === 0 &&
+    afterAcceptCookies.length === beforeCookies.length &&
+    !hasPostAcceptConsentSignals
+  ) {
     issues.push({
       severity: 'warning',
       title: 'Keine neuen Cookies nach Akzeptieren',
@@ -1221,11 +1385,11 @@ function generateIssues(
   if (trackingTags.googleAnalytics.detected || trackingTags.metaPixel.detected) {
     if (!tcf.detected) {
       issues.push({
-        severity: 'warning',
+        severity: 'info',
         category: 'tcf',
-        title: 'TCF nicht implementiert',
-        description: 'Tracking-Tags erkannt, aber kein IAB TCF Framework gefunden.',
-        recommendation: 'Implementieren Sie das IAB Transparency & Consent Framework für bessere Compliance.',
+        title: 'Kein IAB TCF Signal erkannt',
+        description: 'Tracking-Tags erkannt, aber kein IAB TCF Framework nachweisbar. Das ist nicht automatisch ein Compliance-Problem, da viele CMPs ohne TCF arbeiten.',
+        recommendation: 'Nur erforderlich, wenn Ihre Consent-Architektur oder Partner explizit IAB TCF voraussetzen.',
       });
     } else if (!tcf.validTcString) {
       issues.push({
